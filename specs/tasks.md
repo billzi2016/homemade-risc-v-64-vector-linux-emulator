@@ -131,7 +131,11 @@
   - 验证命令：`ctest --test-dir build --output-on-failure`；`ctest --test-dir build/sanitize --output-on-failure`
   - 验证结果：F/D 2.2 加载存储、单双精度四种 FMA、四则、平方根、符号注入、最值、比较、分类、格式转换、全部 W/WU/L/LU 转换和位搬运均走正式机器码路径；五种舍入、NaN boxing、canonical NaN、次正规数、NV/DZ/OF/UF/NX、FS 门控和保留编码专项测试通过；普通与 ASan/UBSan 完整测试均为 8/8 通过。
   - 对应需求：`ISA-REQ-004`、`CPU-REQ-002`、`CPU-REQ-016`、`CPU-REQ-017`、`CPU-REQ-018`、`CPU-REQ-019`
-- [ ] **ISA-106** 完整实现 RV64C 解压与执行映射。
+- [x] **ISA-106** 完整实现 RV64C 解压与执行映射。
+  - 实现文件：`include/rvemu/core/compressed_decoder.hpp`、`src/core/compressed_decoder.cpp`、`src/core/cpu.cpp`、`src/core/csr.cpp`
+  - 验证命令：`ctest --test-dir build --output-on-failure`；`ctest --test-dir build/sanitize --output-on-failure`
+  - 验证结果：RV64C 三个 quadrant 的整数、控制流、栈指针访存、双精度压缩访存、六位移位量、负跳转/分支、HINT、reserved 编码、原始 16 位 Trap 和 16/32 位半字交错均通过正式 CPU/Bus/RAM 机器码测试；普通与 ASan/UBSan 完整测试均为 9/9 通过。
+  - 对应需求：`ISA-REQ-005`、`ISA-REQ-004`、`CPU-REQ-017`
 - [ ] **ISA-107** 运行正式 ISA/一致性测试并记录结果。
 
 ## 8. 阶段 6：MMU、Sv39 与 TLB

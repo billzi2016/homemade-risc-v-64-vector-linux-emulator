@@ -70,19 +70,22 @@
 
 ## 7. C 扩展
 
-压缩指令必须映射到等价架构语义，但保留 RV64 特有合法性规则。重点包括：
+压缩指令通过唯一解压器映射到一条等价 RV64I/F/D 指令，再进入现有执行路径；解压层不得复制算术、访存或 Trap 语义。
 
-- 压缩寄存器映射和立即数重组。
-- 栈指针相关加载、存储和立即数。
-- `C.J/C.JR/C.JALR/C.BEQZ/C.BNEZ` 的 PC 与链接地址。
-- RV64 合法的 `C.ADDIW`、双字加载/存储等编码。
-- 保留零立即数、零目标寄存器或提示编码的正确处理。
+- quadrant 0 实现 `C.ADDI4SPN`、`C.FLD/C.LW/C.LD` 和 `C.FSD/C.SW/C.SD`。
+- quadrant 1 实现 `C.NOP/C.ADDI/C.ADDIW/C.LI/C.LUI/C.ADDI16SP`、`C.SRLI/C.SRAI/C.ANDI`、`C.SUB/XOR/OR/AND/SUBW/ADDW` 以及 `C.J/C.BEQZ/C.BNEZ`。
+- quadrant 2 实现 `C.SLLI`、`C.FLDSP/C.LWSP/C.LDSP`、`C.JR/C.MV/C.EBREAK/C.JALR/C.ADD` 以及 `C.FSDSP/C.SWSP/C.SDSP`。
+- 本机同时声明 D，因此按 C 2.0 强制提供 `C.FLD/C.FSD/C.FLDSP/C.FSDSP`；RV32 专属 `C.FLW/C.FSW/C.JAL` 不得在 RV64 编码位置被误接收。
+- CI/CIW/CL/CS/CSS/CA/CB/CJ/CR 的压缩寄存器映射、缩放立即数和符号扩展必须逐位重组；RV64 的 `C.SLLI/SRLI/SRAI` 接受六位 `shamt[5:0]`。
+- `C.JALR` 链接地址固定为原 PC+2。C 扩展令 `IALIGN=16`，合法控制流可以到达半字边界，32 位指令也可以从 PC+2 开始取指。
+- 规范定义的 HINT 作为无架构状态副作用的指令正常退休；reserved、custom、全零、非法零立即数或非法零目标寄存器编码触发非法指令。
+- 压缩指令引发 Trap 时，诊断指令字段保存原始 16 位编码；非法指令 `tval` 也使用该原始编码，不能暴露内部展开后的 32 位位模式。
 
 ## 8. 对齐与异常
 
 数据访问是否允许非自然对齐必须作为统一机器策略明确。PRD 要求向量内存支持非对齐，不自动意味着所有标量访问无条件允许。首版应选择并记录：软件模拟非对齐标量访问，或触发 load/store address misaligned；无论选择何者都必须保证跨 MMIO/页边界不会产生部分错误副作用。
 
-异常优先级、`tval` 内容和原 PC 保存遵循 `15-error-trap-handling.md`。
+异常优先级、`tval` 内容和原 PC 保存遵循 `15-error-trap-handling.md`。实现 C 后取指对齐为 2 字节；外部强制设置的奇地址 PC 仍产生 instruction address misaligned，但合法 J/JALR/branch 目标不会生成奇地址。
 
 ## 9. 验收条件
 

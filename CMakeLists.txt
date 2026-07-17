@@ -30,6 +30,7 @@ target_compile_features(rvemu_bus_memory PUBLIC cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_bus_memory)
 
 add_library(rvemu_core STATIC
+    src/core/compressed_decoder.cpp
     src/core/csr.cpp
     src/core/cpu.cpp
     src/core/cpu_floating.cpp

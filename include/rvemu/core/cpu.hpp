@@ -1,5 +1,5 @@
-// 文件职责：声明单 Hart RV64I/M/A/F/D/Zicsr 取指执行、特权指令以及统一 Trap/中断入口。
-// 边界：本节点不做 MMU 翻译，也不实现 C/V 扩展或具体中断设备。
+// 文件职责：声明单 Hart RV64I/M/A/F/D/C/Zicsr 取指执行、特权指令以及统一 Trap/中断入口。
+// 边界：本节点不做 MMU 翻译，也不实现 V 扩展或具体中断设备。
 
 #pragma once
 
@@ -63,8 +63,10 @@ private:
 
     // 先取低半字判断 16/32 位长度，再按真实总线边界取完整指令，失败时保存精确地址。
     [[nodiscard]] FetchResult fetch();
-    // 分发非压缩指令并确保异常路径不提交 PC、目标寄存器或禁止的内存副作用。
+    // 识别原始指令长度，压缩编码先解压；所有异常路径都不得提交禁止的架构副作用。
     [[nodiscard]] StepResult execute(const InstructionPacket& packet);
+    // 执行已确认的 32 位语义编码；packet.length 仍保留原始 2/4 字节长度用于 PC 和链接值。
+    [[nodiscard]] StepResult execute_standard(const InstructionPacket& packet);
     // 集中处理 ECALL/EBREAK/xRET/WFI 和六种 Zicsr 编码，避免 SYSTEM 语义散落到主 switch。
     [[nodiscard]] StepResult execute_system(
         const InstructionPacket& packet,

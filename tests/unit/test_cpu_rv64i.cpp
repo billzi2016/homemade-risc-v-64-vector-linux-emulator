@@ -197,9 +197,11 @@ void test_fetch_and_precise_faults(TestContext& context) {
     fixture.write_halfword(0x0001U);
     fixture.cpu().state().set_program_counter(kRamBase);
     const auto compressed = fixture.cpu().step();
-    expect_trap(context, compressed, rvemu::core::ExceptionCause::IllegalInstruction, "未实现压缩指令");
+    context.expect(compressed.retired && !compressed.trap.has_value(),
+                   "实现 C 扩展后 C.NOP 必须正常退休");
     context.expect(compressed.instruction_length == 2U, "压缩编码必须识别为 2 字节");
-    context.expect(fixture.cpu().state().program_counter() == kRamBase, "非法压缩指令不得推进 PC");
+    context.expect(fixture.cpu().state().program_counter() == kRamBase + 2U,
+                   "C.NOP 必须把 PC 推进两个字节");
 
     fixture.cpu().state().set_program_counter(kRamBase + 1U);
     const auto misaligned = fixture.cpu().step();

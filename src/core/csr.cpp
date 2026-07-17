@@ -38,6 +38,7 @@ constexpr std::uint64_t kDelegatableExceptionMask =
 
 constexpr std::uint64_t kMisa =
     (0x2ULL << 62U) | bit(static_cast<std::uint8_t>('A' - 'A')) |
+    bit(static_cast<std::uint8_t>('C' - 'A')) |
     bit(static_cast<std::uint8_t>('D' - 'A')) |
     bit(static_cast<std::uint8_t>('F' - 'A')) |
     bit(static_cast<std::uint8_t>('I' - 'A')) |

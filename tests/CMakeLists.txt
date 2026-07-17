@@ -80,3 +80,13 @@ target_compile_features(rvemu_cpu_floating_tests PRIVATE cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_cpu_floating_tests)
 
 add_test(NAME rvemu.cpu_floating COMMAND rvemu_cpu_floating_tests)
+
+add_executable(rvemu_cpu_compressed_tests
+    unit/test_cpu_compressed.cpp
+)
+
+target_link_libraries(rvemu_cpu_compressed_tests PRIVATE rvemu_core)
+target_compile_features(rvemu_cpu_compressed_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_cpu_compressed_tests)
+
+add_test(NAME rvemu.cpu_compressed COMMAND rvemu_cpu_compressed_tests)

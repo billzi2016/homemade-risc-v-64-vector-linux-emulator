@@ -18,6 +18,7 @@
 │   ├── core/
 │   │   ├── cpu.hpp
 │   │   ├── cpu_state.hpp
+│   │   ├── compressed_decoder.hpp
 │   │   ├── csr.hpp
 │   │   ├── decoder.hpp
 │   │   ├── floating_state.hpp
@@ -62,6 +63,7 @@
 ├── src/
 │   ├── main.cpp
 │   ├── core/
+│   │   ├── compressed_decoder.cpp
 │   │   ├── cpu_floating.cpp
 │   │   ├── soft_float_internal.hpp
 │   │   ├── soft_float_arithmetic.cpp

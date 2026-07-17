@@ -1,8 +1,9 @@
-// 文件职责：实现单 Hart、非流水线 RV64I/M/A/F/D/Zicsr 主分发、特权指令和统一 Trap/中断入口。
-// 边界：F/D 具体语义位于 cpu_floating.cpp；本文件不实现 MMU、C/V 或具体设备。
+// 文件职责：实现单 Hart、非流水线 RV64I/M/A/F/D/C/Zicsr 主分发、特权指令和统一 Trap/中断入口。
+// 边界：F/D 与 C 的数值/解压语义位于独立文件；本文件不实现 MMU、V 或具体设备。
 
 #include "rvemu/core/cpu.hpp"
 
+#include "rvemu/core/compressed_decoder.hpp"
 #include "rvemu/core/decoder.hpp"
 #include "rvemu/core/integer_a.hpp"
 #include "rvemu/core/integer_m.hpp"
@@ -218,9 +219,28 @@ StepResult Cpu::illegal(const InstructionPacket& packet) const {
 
 StepResult Cpu::execute(const InstructionPacket& packet) {
     if (packet.compressed()) {
-        return illegal(packet);
+        const auto expanded = decompress_rv64c(static_cast<std::uint16_t>(packet.bits));
+        if (!expanded.has_value()) {
+            return illegal(packet);
+        }
+        auto result = execute_standard(InstructionPacket{
+            packet.program_counter,
+            *expanded,
+            packet.length,
+        });
+        if (result.trap.has_value()) {
+            // 解压只是一项内部实现细节；诊断必须指向来宾真正取到的 16 位编码。
+            result.trap->instruction = packet.bits;
+            if (result.trap->cause == ExceptionCause::IllegalInstruction) {
+                result.trap->value = packet.bits;
+            }
+        }
+        return result;
     }
+    return execute_standard(packet);
+}
 
+StepResult Cpu::execute_standard(const InstructionPacket& packet) {
     const auto instruction = decode(packet.bits);
     const auto source1 = state_.integer(instruction.source1);
     const auto source2 = state_.integer(instruction.source2);
