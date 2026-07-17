@@ -1,5 +1,5 @@
-// 文件职责：声明单 Hart RV64I/M/A/Zicsr 取指执行、特权指令以及统一 Trap/中断入口。
-// 边界：本节点不做 MMU 翻译，也不实现 F/D/C/V 扩展或具体中断设备。
+// 文件职责：声明单 Hart RV64I/M/A/F/D/Zicsr 取指执行、特权指令以及统一 Trap/中断入口。
+// 边界：本节点不做 MMU 翻译，也不实现 C/V 扩展或具体中断设备。
 
 #pragma once
 
@@ -70,6 +70,11 @@ private:
         const InstructionPacket& packet,
         const DecodedInstruction& instruction,
         std::uint64_t source1,
+        std::uint64_t sequential_pc);
+    // 集中处理 LOAD/STORE-FP、OP-FP 与 R4 FMA，校验完成后才提交浮点副作用。
+    [[nodiscard]] StepResult execute_floating(
+        const InstructionPacket& packet,
+        const DecodedInstruction& instruction,
         std::uint64_t sequential_pc);
     // 构造统一非法指令结果，tval 使用原始指令编码且 PC 保持故障指令地址。
     [[nodiscard]] StepResult illegal(const InstructionPacket& packet) const;

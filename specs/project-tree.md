@@ -2,7 +2,7 @@
 
 ## 1. 目的
 
-本文定义目标目录结构。目录树是架构边界的物理表达，用于阻止重复实现、循环依赖和职责漂移。当前 SDD 阶段只创建规格文档，下面的代码目录均为后续规划，不代表已经存在。
+本文定义目标目录结构。目录树是架构边界的物理表达，用于阻止重复实现、循环依赖和职责漂移；已实施节点按实际文件同步，尚未实施节点仍表达最终目标。
 
 ## 2. 目标目录树
 
@@ -21,6 +21,7 @@
 │   │   ├── csr.hpp
 │   │   ├── decoder.hpp
 │   │   ├── floating_state.hpp
+│   │   ├── soft_float.hpp
 │   │   ├── integer_a.hpp
 │   │   ├── integer_m.hpp
 │   │   ├── instruction.hpp
@@ -61,6 +62,10 @@
 ├── src/
 │   ├── main.cpp
 │   ├── core/
+│   │   ├── cpu_floating.cpp
+│   │   ├── soft_float_internal.hpp
+│   │   ├── soft_float_arithmetic.cpp
+│   │   └── soft_float_conversion.cpp
 │   ├── vector/
 │   ├── memory/
 │   ├── bus/

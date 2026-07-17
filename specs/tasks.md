@@ -126,7 +126,11 @@
   - 验证命令：`ctest --test-dir build --output-on-failure`；`ctest --test-dir build/sanitize --output-on-failure`
   - 验证结果：`fflags/frm/fcsr` 别名、FS=Off 门控、FS Dirty/SD 派生、五类异常标志累积、静态/动态舍入解析、保留编码拒绝及合法/非法 NaN box 测试通过；普通与 ASan/UBSan 完整测试均为 6/6 通过。
   - 对应需求：`CPU-REQ-002`、`CPU-REQ-016`、`CPU-REQ-017`、`CPU-REQ-018`、`CPU-REQ-019`、`ISA-REQ-004`
-- [ ] **ISA-105** 完整实现声明范围内的 F/D 指令。
+- [x] **ISA-105** 完整实现声明范围内的 F/D 指令。
+  - 实现文件：`include/rvemu/core/soft_float.hpp`、`src/core/soft_float_internal.hpp`、`src/core/soft_float_arithmetic.cpp`、`src/core/soft_float_conversion.cpp`、`src/core/cpu_floating.cpp`、`src/core/cpu.cpp`、`src/core/csr.cpp`
+  - 验证命令：`ctest --test-dir build --output-on-failure`；`ctest --test-dir build/sanitize --output-on-failure`
+  - 验证结果：F/D 2.2 加载存储、单双精度四种 FMA、四则、平方根、符号注入、最值、比较、分类、格式转换、全部 W/WU/L/LU 转换和位搬运均走正式机器码路径；五种舍入、NaN boxing、canonical NaN、次正规数、NV/DZ/OF/UF/NX、FS 门控和保留编码专项测试通过；普通与 ASan/UBSan 完整测试均为 8/8 通过。
+  - 对应需求：`ISA-REQ-004`、`CPU-REQ-002`、`CPU-REQ-016`、`CPU-REQ-017`、`CPU-REQ-018`、`CPU-REQ-019`
 - [ ] **ISA-106** 完整实现 RV64C 解压与执行映射。
 - [ ] **ISA-107** 运行正式 ISA/一致性测试并记录结果。
 

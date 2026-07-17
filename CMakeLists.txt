@@ -32,11 +32,14 @@ rvemu_enable_strict_warnings(rvemu_bus_memory)
 add_library(rvemu_core STATIC
     src/core/csr.cpp
     src/core/cpu.cpp
+    src/core/cpu_floating.cpp
     src/core/cpu_state.cpp
     src/core/decoder.cpp
     src/core/floating_state.cpp
     src/core/integer_a.cpp
     src/core/integer_m.cpp
+    src/core/soft_float_arithmetic.cpp
+    src/core/soft_float_conversion.cpp
 )
 
 target_include_directories(rvemu_core

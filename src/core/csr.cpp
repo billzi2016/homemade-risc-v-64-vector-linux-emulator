@@ -38,6 +38,8 @@ constexpr std::uint64_t kDelegatableExceptionMask =
 
 constexpr std::uint64_t kMisa =
     (0x2ULL << 62U) | bit(static_cast<std::uint8_t>('A' - 'A')) |
+    bit(static_cast<std::uint8_t>('D' - 'A')) |
+    bit(static_cast<std::uint8_t>('F' - 'A')) |
     bit(static_cast<std::uint8_t>('I' - 'A')) |
     bit(static_cast<std::uint8_t>('M' - 'A')) | bit(static_cast<std::uint8_t>('S' - 'A')) |
     bit(static_cast<std::uint8_t>('U' - 'A'));
@@ -219,11 +221,11 @@ std::uint8_t CsrFile::floating_exception_flags() const noexcept {
 }
 
 void CsrFile::accrue_floating_exception_flags(std::uint8_t flags) noexcept {
-    if (!floating_state_enabled()) {
+    const auto normalized = normalize_floating_exception_flags(flags);
+    if (!floating_state_enabled() || normalized == 0U) {
         return;
     }
-    fcsr_ = static_cast<std::uint8_t>(
-        fcsr_ | normalize_floating_exception_flags(flags));
+    fcsr_ = static_cast<std::uint8_t>(fcsr_ | normalized);
     mark_floating_state_dirty();
 }
 

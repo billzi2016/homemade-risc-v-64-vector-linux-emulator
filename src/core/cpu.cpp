@@ -1,5 +1,5 @@
-// 文件职责：实现单 Hart、非流水线 RV64I/M/A/Zicsr 执行、特权指令和统一 Trap/中断入口。
-// 边界：本文件不实现 MMU、F/D/C/V 扩展或具体设备，也不绕过统一物理总线。
+// 文件职责：实现单 Hart、非流水线 RV64I/M/A/F/D/Zicsr 主分发、特权指令和统一 Trap/中断入口。
+// 边界：F/D 具体语义位于 cpu_floating.cpp；本文件不实现 MMU、C/V 或具体设备。
 
 #include "rvemu/core/cpu.hpp"
 
@@ -648,6 +648,15 @@ StepResult Cpu::execute(const InstructionPacket& packet) {
         const auto result = word_operation ? sign_extend_word(original) : original;
         return write_and_retire(instruction.destination, result, sequential_pc);
     }
+
+    case 0x07U:  // LOAD-FP
+    case 0x27U:  // STORE-FP
+    case 0x43U:  // FMADD
+    case 0x47U:  // FMSUB
+    case 0x4BU:  // FNMSUB
+    case 0x4FU:  // FNMADD
+    case 0x53U:  // OP-FP
+        return execute_floating(packet, instruction, sequential_pc);
 
     case 0x0FU:  // FENCE / FENCE.I
         if (instruction.destination != 0U || instruction.source1 != 0U) {

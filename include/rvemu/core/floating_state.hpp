@@ -26,6 +26,7 @@ enum class FloatingExceptionFlag : std::uint8_t {
 
 inline constexpr std::uint8_t kFloatingExceptionMask = 0x1FU;
 inline constexpr std::uint32_t kCanonicalSingleNan = 0x7FC0'0000U;
+inline constexpr std::uint64_t kCanonicalDoubleNan = 0x7FF8'0000'0000'0000ULL;
 
 // 解析指令 rm。0..4 直接选择模式，7 使用 frm；任何保留编码都返回空。
 [[nodiscard]] std::optional<FloatingRoundingMode> resolve_floating_rounding_mode(

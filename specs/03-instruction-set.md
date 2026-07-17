@@ -57,12 +57,16 @@
 
 ## 6. F/D 扩展
 
-- 浮点加载、存储、融合乘加、四则、平方根、符号注入、比较、分类、转换和搬运按声明范围实现。
-- 指令 `rm=000..100` 直接选择 RNE/RTZ/RDN/RUP/RMM；`rm=111` 动态读取 `frm`。指令 `rm=101/110` 或动态 `frm=101..111` 必须触发非法指令且不产生浮点状态副作用。
+- F 2.2 实现 `FLW/FSW`，四种 `.S` 融合乘加，`FADD/FSUB/FMUL/FDIV/FSQRT.S`，`FSGNJ/FSGNJN/FSGNJX.S`，`FMIN/FMAX.S`，`FEQ/FLT/FLE.S`，`FCLASS.S`，全部 RV64 有符号/无符号 32/64 位整数转换及 `FMV.X.W/FMV.W.X`。
+- D 2.2 实现上述全部 `.D` 对应形式、`FLD/FSD`、`FCVT.S.D/FCVT.D.S` 以及 `FMV.X.D/FMV.D.X`。Zfa、Q、H 等独立扩展编码不因共用 `OP-FP` 空间而被宽松接受。
+- 产生舍入结果的指令中，`rm=000..100` 直接选择 RNE/RTZ/RDN/RUP/RMM，`rm=111` 动态读取 `frm`；`rm=101/110` 或动态 `frm=101..111` 必须触发非法指令且不产生任何浮点、整数或内存副作用。符号注入、最值、比较、分类和位搬运的 `funct3` 不得误作 `rm` 解析。
 - `fflags` 的 NV/DZ/OF/UF/NX 由每条实际执行的浮点运算按 OR 累积；被非法编码或 FS=Off 拦截的指令不得更新标志。
-- 单精度值在 64 位浮点寄存器中必须把上 32 位全部置一形成 NaN box；作为单精度源读取时，任何非法 box 都按 `0x7FC00000` canonical quiet NaN 处理，不改写原寄存器。
+- 单精度值在 64 位浮点寄存器中必须把上 32 位全部置一形成 NaN box；计算、比较、分类和格式转换读取单精度源时，非法 box 按 `0x7FC00000` canonical quiet NaN 处理且不改写原寄存器。`FSW` 与 `FMV.X.W` 是原始位模式传输，必须保留并使用寄存器低 32 位，不执行 box 检查。
+- 除规范单独规定的操作外，NaN 结果使用 canonical NaN。`FMIN/FMAX` 在单个 NaN 输入时返回数值输入、两个 NaN 时返回 canonical NaN，任何 signaling NaN 输入设置 NV；`FEQ` 仅对 signaling NaN 设置 NV，`FLT/FLE` 对任何 NaN 设置 NV。
+- 次正规数不得 flush-to-zero；tininess 在舍入后检测。融合乘加必须对完整乘积与加数的精确和只舍入一次，不能拆成乘法和加法两条软件运算。
+- 浮点转整数越界、无穷和 NaN 按 F/D 2.2 规定的上下界饱和并设置 NV；仅发生舍入差异且未设置 NV 时设置 NX。RV64 的 32 位转换结果统一符号扩展至 XLEN，包括无符号 `FCVT.WU.S/D`。
 - `mstatus.FS=Off` 时，浮点 CSR、加载、存储、运算和搬运都不可执行；任何浮点架构状态写入都必须把已启用的 FS 标记为 Dirty。
-- 使用宿主浮点实现时，必须证明舍入、异常标志和 NaN 行为与来宾规范一致；不能直接假定宿主默认行为等价。
+- 生产执行路径使用项目内整数软件浮点实现，不读取宿主 `float/double/long double` 或 `fenv`。所有格式共用一个解包、固定宽度精确有效数和 guard/round/sticky 舍入入口，禁止按指令族复制第二套舍入逻辑。
 
 ## 7. C 扩展
 
