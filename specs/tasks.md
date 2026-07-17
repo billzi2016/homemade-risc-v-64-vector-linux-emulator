@@ -59,28 +59,51 @@
 
 ## 5. 阶段 3：CPU 基础状态与 RV64I
 
-- [ ] **CPU-001** 实现标量、浮点、向量寄存器状态和 x0 写保护。（`CPU-REQ-*`）
-- [ ] **CPU-002** 实现统一取指，正确区分 16 位与 32 位指令。（`ISA-REQ-*`）
-- [ ] **CPU-003** 完整实现 RV64I 算术、逻辑、分支、跳转和访存。
-- [ ] **CPU-004** 实现 RV64I 系统指令和非法指令异常。
-- [ ] **CPU-005** 通过边界值、对齐、溢出和 PC 更新测试。
+- [x] **CPU-001** 实现标量、浮点、向量寄存器状态和 x0 写保护。（`CPU-REQ-*`）
+  - 实现文件：`include/rvemu/core/cpu_state.hpp`、`src/core/cpu_state.cpp`
+  - 验证结果：32 个整数、32 个浮点和 32×256 位向量寄存器状态测试通过；整数唯一写入口拒绝修改 x0。
+  - 对应需求：`CPU-REQ-001`、`CPU-REQ-002`、`CPU-REQ-003`、`CPU-REQ-004`、`CPU-REQ-005`
+- [x] **CPU-002** 实现统一取指，正确区分 16 位与 32 位指令。（`ISA-REQ-*`）
+  - 实现文件：`include/rvemu/core/cpu.hpp`、`src/core/cpu.cpp`
+  - 验证结果：2 字节/4 字节长度识别、奇地址、未映射地址和跨 RAM 边界第二半字取指错误均通过精确异常测试。
+  - 对应需求：`ISA-REQ-001`、`ISA-REQ-006`、`TRAP-REQ-001`、`TRAP-REQ-002`
+- [x] **CPU-003** 完整实现 RV64I 算术、逻辑、分支、跳转和访存。
+  - 实现文件：`src/core/cpu.cpp`、`src/core/decoder.cpp`
+  - 验证结果：RV64I 各指令族、正负立即数、寄存器别名、回绕、加载扩展和存储宽度均通过真实机器码测试。
+- [x] **CPU-004** 实现 RV64I 系统指令和非法指令异常。
+  - 实现文件：`src/core/cpu.cpp`、`include/rvemu/core/trap.hpp`
+  - 验证结果：`FENCE`、`FENCE.I`、`ECALL`、`EBREAK`、未定义 opcode 和保留编码的精确异常测试通过。
+- [x] **CPU-005** 通过边界值、对齐、溢出和 PC 更新测试。
+  - 验证命令：`ctest --test-dir build --output-on-failure`；`ctest --test-dir build/sanitize --output-on-failure`
+  - 验证结果：普通严格构建和 ASan/UBSan 构建中的 `rvemu.cpu_rv64i` 均通过；失败访存不提交目标寄存器或 PC。
 
 ## 6. 阶段 4：CSR、特权态与陷阱
 
-- [ ] **PRV-001** 实现 M/S/U 三种特权模式和合法转换。（`CPU-REQ-*`）
-- [ ] **PRV-002** 实现 CSR 地址权限、只读属性和原子读改写语义。
-- [ ] **PRV-003** 实现 `mstatus/sstatus`、`mie/sie`、`mip/sip` 的别名与受限视图。
+- [x] **PRV-001** 实现 M/S/U 三种特权模式和合法转换。（`CPU-REQ-*`）
+  - 实现文件：`include/rvemu/core/csr.hpp`、`src/core/csr.cpp`、`src/core/cpu.cpp`
+  - 验证结果：复位进入 M-mode，M/S/U Trap 与 `MRET/SRET` 往返、非法降权返回和状态栈恢复测试通过。
+- [x] **PRV-002** 实现 CSR 地址权限、只读属性和原子读改写语义。
+  - 实现文件：`include/rvemu/core/csr.hpp`、`src/core/csr.cpp`
+  - 验证结果：六种 Zicsr 真实机器码、最低权限、只读编码、条件写、WARL、TVM 和 counteren 门控测试通过。
+- [x] **PRV-003** 实现 `mstatus/sstatus`、`mie/sie`、`mip/sip` 的别名与受限视图。
+  - 验证结果：S 级视图直接投影唯一 M 级状态；别名写入保留 M-only 位，设备 pending 位不被软件错误清除。
 - [ ] **PRV-004** 完成 `medeleg/mideleg` 及 M/S 陷阱委托父级里程碑。
-  - [ ] **PRV-004A** 实现 `medeleg/mideleg` 的存在位、只读零位和 WARL 委托掩码。
-  - [ ] **PRV-004B** 验证 `mie/mip` 与 `sie/sip` 委托受限视图不会形成两套状态。
+  - [x] **PRV-004A** 实现 `medeleg/mideleg` 的存在位、只读零位和 WARL 委托掩码。
+    - 验证结果：全一写入后只读回可委托同步异常位和 SSIP/STIP/SEIP 位；M-mode ECALL 等不可委托位保持零。
+  - [x] **PRV-004B** 验证 `mie/mip` 与 `sie/sip` 委托受限视图不会形成两套状态。
+    - 验证结果：`sie/sip` 读取受 `mideleg` 限制，写入直接修改共享 `mie/mip` 的允许位，无独立 S 状态副本。
   - [ ] **PRV-004C** 实现每一种可委托同步异常的目标特权级选择。
   - [ ] **PRV-004D** 实现软件、定时器和外部中断的委托目标选择。
   - [ ] **PRV-004E** 实现不同当前特权级下的全局中断使能与抢占规则。
   - [ ] **PRV-004F** 验证委托前后 `epc/cause/tval/status` 只写入正确目标 CSR。
   - [ ] **PRV-004G** 使用真实 OpenSBI 验证向 S-mode Linux 的委托链路。
   - 完成条件：以上子任务全部完成，真实 OpenSBI/Linux 不在中断初始化阶段卡死，且有 Trap 状态证据。
-- [ ] **PRV-005** 实现 `ECALL`、`EBREAK`、`MRET`、`SRET`、`WFI` 与陷阱入口。
-- [ ] **PRV-006** 验证直接/向量化 `tvec`、中断优先级和返回状态恢复。
+- [x] **PRV-005** 实现 `ECALL`、`EBREAK`、`MRET`、`SRET`、`WFI` 与陷阱入口。
+  - 实现文件：`src/core/cpu.cpp`、`src/core/csr.cpp`
+  - 验证结果：真实 SYSTEM 机器码、TSR/TW 拦截、WFI 停顿/唤醒、M/S Trap 状态写入和 xRET 恢复测试通过。
+- [x] **PRV-006** 验证直接/向量化 `tvec`、中断优先级和返回状态恢复。
+  - 验证命令：`ctest --test-dir build --output-on-failure`；`ctest --test-dir build/sanitize --output-on-failure`
+  - 验证结果：MEI/MSI/MTI/SEI/SSI/STI 固定优先级、Direct/Vectored 入口、interrupt cause 最高位和 M/S 返回栈均通过；完整测试 3/3 通过。
 
 ## 7. 阶段 5：M、A、F、D、C 扩展
 
