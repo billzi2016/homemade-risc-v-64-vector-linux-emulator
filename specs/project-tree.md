@@ -80,6 +80,21 @@
 │   └── default-machine.toml
 ├── specs/
 │   └── ...
+├── docs-site/
+│   ├── mkdocs.yml
+│   ├── requirements.lock
+│   ├── README.md
+│   ├── specs/
+│   │   ├── mkdocs_prd.zh.md
+│   │   └── github_action_prd.zh.md
+│   ├── docs/
+│   │   ├── zh/             # 指向中文权威 Markdown 的相对 symlink
+│   │   └── en/             # 指向英文权威 Markdown 的相对 symlink
+│   ├── overrides/
+│   └── assets/
+├── .github/
+│   └── workflows/
+│       └── docs-pages.yml
 ├── docs/
 │   ├── build.md
 │   ├── running.md
@@ -172,3 +187,7 @@ flowchart LR
 ## 6. 外部产物目录
 
 `artifacts/` 只保存本地下载、构建、运行日志和镜像。该目录必须由 `.gitignore` 排除；仓库内只提交可复现脚本、校验清单和文档。实际目录及忽略规则在实施阶段另行确认后创建。
+
+## 7. 文档站目录
+
+`docs-site/` 是独立 MkDocs 工程。其 `docs/zh/` 与 `docs/en/` 只保存相对 symlink，分别指向仓库中的中文和英文权威 Markdown；禁止复制规格正文形成第二套来源。`.github/workflows/docs-pages.yml` 是 GitHub 平台要求的唯一站点目录外工作流文件。

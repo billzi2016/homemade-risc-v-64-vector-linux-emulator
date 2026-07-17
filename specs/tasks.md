@@ -6,7 +6,7 @@
 - 任务必须按依赖顺序执行，前置任务未完成时不得勾选下游任务。
 - 每次勾选必须附有可复核证据，例如测试命令、日志路径、规范测试结果或人工验收记录。
 - Mock、Stub、占位实现、硬编码输出、仅编译通过和未覆盖真实路径的快速验证均不构成完成证据。
-- 当前只完成规格文档编写不代表任何实现任务完成，因此下列任务保持未勾选。
+- 任务状态必须以条目下的实际证据为准；未列出通过证据的任务保持未勾选。
 
 ## 2. 阶段 0：治理与规格基线
 
@@ -21,18 +21,39 @@
 
 ## 3. 阶段 1：工程骨架与基础设施
 
-- [ ] **BLD-001** 建立 C++17+ 构建系统和严格编译告警配置。
+- [x] **BLD-001** 建立 C++17+ 构建系统和严格编译告警配置。
+  - 实现文件：`CMakeLists.txt`、`cmake/CompilerWarnings.cmake`
+  - 验证命令：`cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug`；`cmake --build build --parallel`
+  - 验证结果：AppleClang 21 使用 C++17 和 `-Werror` 完成生产库及测试目标编译，0 告警、0 错误。
+  - 已知限制：当前只建立首个生产模块目标，后续模块必须复用同一告警函数。
 - [ ] **BLD-002** 按 `project-tree.md` 建立模块目录和最小接口边界。
 - [ ] **BLD-003** 建立统一错误、诊断和类型安全的位操作基础。
-- [ ] **BLD-004** 建立测试目录、正式测试框架和可复现测试入口。
+- [x] **BLD-004** 建立测试目录、正式测试框架和可复现测试入口。
+  - 实现文件：`tests/CMakeLists.txt`、`tests/unit/test_bus_memory.cpp`
+  - 验证命令：`ctest --test-dir build --output-on-failure`
+  - 验证结果：CTest 运行真实 Bus/RAM/Boot ROM 生产组件，1/1 通过、0 失败。
+  - 日志或报告：`build/Testing/Temporary/LastTest.log`
+  - 已知限制：后续模块需要继续增加 integration、conformance 与 system 测试目标。
 - [ ] **BLD-005** 建立外部产物目录及精确 `.gitignore` 规则。
   - 完成条件：大文件、镜像、日志和缓存不会被 Git 跟踪，源码及校验清单不被误排除。
 
 ## 4. 阶段 2：物理内存与总线
 
-- [ ] **BUS-001** 实现统一的 8/16/32/64 位物理总线访问接口。（`BUS-REQ-*`）
-- [ ] **BUS-002** 实现 RAM 边界检查、小端序读写和可配置容量。（`BUS-REQ-*`）
-- [ ] **BUS-003** 实现只读 Boot ROM 及初始化期受控装载。（`BUS-REQ-*`）
+- [x] **BUS-001** 实现统一的 8/16/32/64 位物理总线访问接口。（`BUS-REQ-*`）
+  - 实现文件：`include/rvemu/bus/`、`src/bus/`
+  - 验证命令：`cmake --build build --parallel`；`ctest --test-dir build --output-on-failure`
+  - 验证结果：四种宽度的真实读写、小端序、跨界、未映射、地址溢出和 compare-exchange 均通过。
+  - 对应需求：`BUS-REQ-001`、`BUS-REQ-002`、`BUS-REQ-003`
+- [x] **BUS-002** 实现 RAM 边界检查、小端序读写和可配置容量。（`BUS-REQ-*`）
+  - 实现文件：`include/rvemu/memory/physical_memory.hpp`、`src/memory/physical_memory.cpp`
+  - 验证结果：非对齐小端访问、各宽度高位截断、末边界无部分写入和窄宽度原子事务测试通过。
+  - 日志或报告：`build/Testing/Temporary/LastTest.log`
+  - 对应需求：`BUS-REQ-001`、`BUS-REQ-002`
+- [x] **BUS-003** 实现只读 Boot ROM 及初始化期受控装载。（`BUS-REQ-*`）
+  - 实现文件：`include/rvemu/memory/boot_rom.hpp`、`src/memory/boot_rom.cpp`
+  - 验证结果：密封前装载、装载越界、密封后拒绝装载、运行期写入和原子写拒绝均通过。
+  - 日志或报告：`build/Testing/Temporary/LastTest.log`
+  - 对应需求：`BUS-REQ-001`、`BUS-REQ-003`
 - [ ] **BUS-004** 实现 MMIO 区间注册、重叠检测和访问错误。（`BUS-REQ-*`）
 - [ ] **BUS-005** 验证全部固定地址区间和越界行为。
 
@@ -164,7 +185,21 @@
 - [ ] **SYS-007** 确认 4 个 ICMP 响应且丢包率为 0%，保存完整日志和环境说明。
 - [ ] **SYS-008** 完成全部需求追踪复核，无伪造、跳过或未声明偏差。
 
-## 15. 任务证据模板
+## 15. 文档站与 GitHub Pages
+
+- [ ] **DOCS-001** 审阅并确认项目化 MkDocs 与 GitHub Actions PRD。
+  - 规格文件：`docs-site/specs/mkdocs_prd.zh.md`、`docs-site/specs/github_action_prd.zh.md`
+- [ ] **DOCS-002** 锁定 MkDocs、Material、i18n 插件和 Python 依赖版本。
+- [ ] **DOCS-003** 建立 `docs-site/docs/zh/` 中文 `.zh.md` 相对 symlink 文档树。
+- [ ] **DOCS-004** 建立 `docs-site/docs/en/` 真实英文 `.en.md` 文档树，不使用空翻译或中文替代。
+- [ ] **DOCS-005** 实现与模拟器规格对应的左侧分层导航。
+- [ ] **DOCS-006** 实现顶部简体中文/English 切换并验证对应页面映射。
+- [ ] **DOCS-007** 实现失效、绝对、循环和仓库越界 symlink 严格检查。
+- [ ] **DOCS-008** 实现 `.github/workflows/docs-pages.yml` 的 PR 验证与 `main` Pages 部署。
+- [ ] **DOCS-009** 使用锁定依赖执行本地严格构建并验证桌面/移动导航与链接。
+- [ ] **DOCS-010** 在 GitHub Actions 中真实部署 Pages，并核对公开 URL、语言切换和全部导航。
+
+## 16. 任务证据模板
 
 完成任务时在对应条目下追加：
 

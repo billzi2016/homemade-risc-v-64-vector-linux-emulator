@@ -32,6 +32,7 @@ flowchart TD
 | `constitution.md` | 项目宪法 | 治理、质量和禁止事项 |
 | `project-tree.md` | 目标项目树 | 模块边界和文件职责 |
 | `tasks.md` | 可勾选任务 | 实施顺序和完成证据 |
+| `standards-baseline.md` | 标准版本基线 | RISC-V、RVV 与 VirtIO 版本锁定 |
 | `00-product-overview.md` | 产品总览 | 范围、目标和最终验收 |
 | `01-architecture.md` | 总体架构 | 组件、依赖和数据流 |
 | `02-cpu-privilege-csr.md` | CPU 与 CSR | 寄存器、特权态和陷阱状态 |
@@ -52,6 +53,8 @@ flowchart TD
 | `17-coding-standards.md` | 编码规范 | C++、SOLID/DRY 和中文注释 |
 | `18-dependency-artifact-policy.md` | 产物策略 | 下载、校验、许可证和忽略规则 |
 | `19-implementation-roadmap.md` | 路线图 | 阶段依赖和完成定义 |
+| `../docs-site/specs/mkdocs_prd.zh.md` | MkDocs 文档站 PRD | 双语结构、symlink、导航与语言切换 |
+| `../docs-site/specs/github_action_prd.zh.md` | 文档部署 PRD | 严格构建与 GitHub Pages 自动部署 |
 
 ## 4. 需求标识与追踪
 
@@ -74,4 +77,4 @@ flowchart TD
 
 ## 6. 当前阶段
 
-当前仅定义 SDD 文档，不代表任何代码、依赖、镜像、测试或网络链路已经完成。所有任务初始均为未完成状态。
+项目已经完成首个物理总线、RAM 与 Boot ROM 生产模块及其真实组件测试。其他 CPU、MMU、设备、文档站、外部产物和系统网络任务仍以 `tasks.md` 的逐项状态为准，不得从首个模块通过推断整个模拟器已经可运行。
