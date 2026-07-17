@@ -1,5 +1,5 @@
-// 文件职责：实现单 Hart、非流水线 RV64I 的精确取指、完整基础整数执行和同步异常返回。
-// 边界：本文件不实现 CSR/Trap 入口、MMU、M/A/F/D/C/V 扩展，也不绕过统一物理总线。
+// 文件职责：实现单 Hart、非流水线 RV64I/Zicsr 执行、特权指令和统一 Trap/中断入口。
+// 边界：本文件不实现 MMU、M/A/F/D/C/V 扩展或具体设备，也不绕过统一物理总线。
 
 #include "rvemu/core/cpu.hpp"
 
@@ -12,6 +12,9 @@
 namespace rvemu::core {
 namespace {
 
+constexpr std::uint64_t kInterruptFlag = 1ULL << 63U;
+
+// 把执行器发现的同步错误绑定原始指令 PC/编码，Trap 入口不再猜测故障现场。
 [[nodiscard]] Trap make_trap(
     const InstructionPacket& packet,
     ExceptionCause cause,
@@ -19,11 +22,13 @@ namespace {
     return Trap{cause, value, packet.program_counter, packet.bits};
 }
 
+// 翻转符号位可把二补码有符号序映射为无符号序，避免宿主有符号转换差异。
 [[nodiscard]] bool signed_less(std::uint64_t lhs, std::uint64_t rhs) noexcept {
     constexpr std::uint64_t sign_bit = 1ULL << 63U;
     return (lhs ^ sign_bit) < (rhs ^ sign_bit);
 }
 
+// 显式补符号位实现 64 位算术右移，不依赖 C++ 对负数右移的实现定义行为。
 [[nodiscard]] std::uint64_t arithmetic_shift_right64(
     std::uint64_t value,
     std::uint8_t amount) noexcept {
@@ -37,6 +42,7 @@ namespace {
     return result;
 }
 
+// 32 位版本在无符号域完成移位和补位，避免整数提升引入宿主相关语义。
 [[nodiscard]] std::uint32_t arithmetic_shift_right32(
     std::uint32_t value,
     std::uint8_t amount) noexcept {
@@ -50,10 +56,12 @@ namespace {
     return result;
 }
 
+// RV64 W 类结果必须先截为 32 位，再符号扩展为完整 XLEN。
 [[nodiscard]] std::uint64_t sign_extend_word(std::uint64_t value) noexcept {
     return sign_extend(value & 0xFFFF'FFFFULL, 32U);
 }
 
+// ECALL cause 只取决于发起模式；集中映射避免 SYSTEM 分支散落原因常量。
 [[nodiscard]] ExceptionCause environment_call_cause(PrivilegeMode privilege) noexcept {
     switch (privilege) {
     case PrivilegeMode::User:
@@ -115,11 +123,74 @@ Cpu::FetchResult Cpu::fetch() {
 }
 
 StepResult Cpu::step() {
+    suppress_cycle_increment_ = false;
+    suppress_instret_increment_ = false;
+
+    if (state_.waiting_for_interrupt()) {
+        if (!state_.csrs().has_locally_enabled_interrupt()) {
+            state_.csrs().increment_cycle();
+            return StepResult::wait();
+        }
+        // WFI 的唤醒只依赖局部 enable；全局 enable 和委托决定是否真正进入 Trap。
+        state_.set_waiting_for_interrupt(false);
+    }
+
     const auto fetched = fetch();
     if (fetched.trap.has_value()) {
+        state_.csrs().increment_cycle();
         return StepResult::failure(*fetched.trap, 0U);
     }
-    return execute(*fetched.instruction);
+    const auto result = execute(*fetched.instruction);
+    if (!suppress_cycle_increment_) {
+        state_.csrs().increment_cycle();
+    }
+    if (result.retired && !suppress_instret_increment_) {
+        state_.csrs().increment_instret();
+    }
+    return result;
+}
+
+TrapDelivery Cpu::take_trap(const Trap& trap) noexcept {
+    const auto source = state_.privilege();
+    const auto cause = static_cast<std::uint64_t>(trap.cause);
+    const auto target = state_.csrs().exception_delegated(source, trap.cause) ?
+                            PrivilegeMode::Supervisor : PrivilegeMode::Machine;
+
+    if (target == PrivilegeMode::Supervisor) {
+        state_.csrs().enter_supervisor_trap(source, trap.program_counter, cause, trap.value);
+    } else {
+        state_.csrs().enter_machine_trap(source, trap.program_counter, cause, trap.value);
+    }
+
+    const auto vector = state_.csrs().trap_vector(target, false, cause);
+    state_.set_privilege(target);
+    state_.set_program_counter(vector);
+    state_.set_waiting_for_interrupt(false);
+    return TrapDelivery{false, cause, source, target, vector};
+}
+
+// pending 位在 Trap 入口不会自动清除：电平源必须由 CLINT/PLIC 或软件完成寄存器清除。
+std::optional<TrapDelivery> Cpu::take_pending_interrupt() noexcept {
+    const auto source = state_.privilege();
+    const auto pending = state_.csrs().select_pending_interrupt(source);
+    if (!pending.has_value()) {
+        return std::nullopt;
+    }
+
+    const auto cause = static_cast<std::uint64_t>(pending->cause);
+    const auto encoded_cause = kInterruptFlag | cause;
+    const auto interrupted_pc = state_.program_counter();
+    if (pending->target == PrivilegeMode::Supervisor) {
+        state_.csrs().enter_supervisor_trap(source, interrupted_pc, encoded_cause, 0U);
+    } else {
+        state_.csrs().enter_machine_trap(source, interrupted_pc, encoded_cause, 0U);
+    }
+
+    const auto vector = state_.csrs().trap_vector(pending->target, true, cause);
+    state_.set_privilege(pending->target);
+    state_.set_program_counter(vector);
+    state_.set_waiting_for_interrupt(false);
+    return TrapDelivery{true, cause, source, pending->target, vector};
 }
 
 StepResult Cpu::illegal(const InstructionPacket& packet) const {
@@ -457,22 +528,118 @@ StepResult Cpu::execute(const InstructionPacket& packet) {
         }
         return illegal(packet);
 
-    case 0x73U:  // SYSTEM 中属于基础 ISA 的 ECALL/EBREAK
-        if (packet.bits == 0x0000'0073U) {
-            return StepResult::failure(
-                make_trap(packet, environment_call_cause(state_.privilege()), 0U),
-                packet.length);
-        }
-        if (packet.bits == 0x0010'0073U) {
-            return StepResult::failure(
-                make_trap(packet, ExceptionCause::Breakpoint, 0U),
-                packet.length);
-        }
-        return illegal(packet);
+    case 0x73U:
+        return execute_system(packet, instruction, source1, sequential_pc);
 
     default:
         return illegal(packet);
     }
+}
+
+StepResult Cpu::execute_system(
+    const InstructionPacket& packet,
+    const DecodedInstruction& instruction,
+    std::uint64_t source1,
+    std::uint64_t sequential_pc) {
+    // funct3=0 使用完整机器码区分特权指令；其余 funct3 才解释为 Zicsr 操作。
+    if (instruction.function3 == 0U) {
+        if (packet.bits == 0x0000'0073U) {  // ECALL
+            return StepResult::failure(
+                make_trap(packet, environment_call_cause(state_.privilege()), 0U),
+                packet.length);
+        }
+        if (packet.bits == 0x0010'0073U) {  // EBREAK
+            return StepResult::failure(
+                make_trap(packet, ExceptionCause::Breakpoint, 0U),
+                packet.length);
+        }
+        if (packet.bits == 0x3020'0073U) {  // MRET
+            if (state_.privilege() != PrivilegeMode::Machine) {
+                return illegal(packet);
+            }
+            const auto returned = state_.csrs().return_from_machine();
+            state_.set_privilege(returned.privilege);
+            state_.set_program_counter(returned.program_counter);
+            state_.set_waiting_for_interrupt(false);
+            return StepResult::success(packet.length);
+        }
+        if (packet.bits == 0x1020'0073U) {  // SRET
+            if (!state_.csrs().supervisor_return_allowed(state_.privilege())) {
+                return illegal(packet);
+            }
+            const auto returned = state_.csrs().return_from_supervisor();
+            state_.set_privilege(returned.privilege);
+            state_.set_program_counter(returned.program_counter);
+            state_.set_waiting_for_interrupt(false);
+            return StepResult::success(packet.length);
+        }
+        if (packet.bits == 0x1050'0073U) {  // WFI
+            if (!state_.csrs().wait_for_interrupt_allowed(state_.privilege())) {
+                return illegal(packet);
+            }
+            state_.set_program_counter(sequential_pc);
+            state_.set_waiting_for_interrupt(true);
+            return StepResult::success(packet.length);
+        }
+        return illegal(packet);
+    }
+
+    CsrModifyOperation operation = CsrModifyOperation::Replace;
+    bool immediate = false;
+    switch (instruction.function3) {
+    case 0x1U:  // CSRRW
+        break;
+    case 0x2U:  // CSRRS
+        operation = CsrModifyOperation::SetBits;
+        break;
+    case 0x3U:  // CSRRC
+        operation = CsrModifyOperation::ClearBits;
+        break;
+    case 0x5U:  // CSRRWI
+        immediate = true;
+        break;
+    case 0x6U:  // CSRRSI
+        immediate = true;
+        operation = CsrModifyOperation::SetBits;
+        break;
+    case 0x7U:  // CSRRCI
+        immediate = true;
+        operation = CsrModifyOperation::ClearBits;
+        break;
+    default:
+        return illegal(packet);
+    }
+
+    // CSRRS/CSRRC 是否产生写访问由 rs1 字段是否为 x0 决定，而不是寄存器运行值是否为零。
+    const auto source_field_is_zero = instruction.source1 == 0U;
+    const auto replace = operation == CsrModifyOperation::Replace;
+    const auto read = !replace || instruction.destination != 0U;
+    const auto write = replace || !source_field_is_zero;
+    const auto operand = immediate ? static_cast<std::uint64_t>(instruction.source1) : source1;
+    const auto address = static_cast<CsrAddress>((packet.bits >> 20U) & 0xFFFU);
+    const auto accessed = state_.csrs().access(CsrAccessRequest{
+        address,
+        state_.privilege(),
+        read,
+        write,
+        operation,
+        operand,
+    });
+    if (!accessed.success) {
+        return illegal(packet);
+    }
+
+    // 规范要求显式计数器写替代该指令本身的隐式更新，不能先写再额外加一。
+    if (write && address == CsrAddress::Mcycle) {
+        suppress_cycle_increment_ = true;
+    }
+    if (write && address == CsrAddress::Minstret) {
+        suppress_instret_increment_ = true;
+    }
+
+    state_.set_integer(instruction.destination, accessed.value);
+    state_.set_program_counter(sequential_pc);
+    return StepResult::success(packet.length);
 }
 
 }  // namespace rvemu::core

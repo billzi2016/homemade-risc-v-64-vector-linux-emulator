@@ -20,3 +20,13 @@ target_compile_features(rvemu_cpu_rv64i_tests PRIVATE cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_cpu_rv64i_tests)
 
 add_test(NAME rvemu.cpu_rv64i COMMAND rvemu_cpu_rv64i_tests)
+
+add_executable(rvemu_cpu_privilege_tests
+    unit/test_cpu_privilege.cpp
+)
+
+target_link_libraries(rvemu_cpu_privilege_tests PRIVATE rvemu_core)
+target_compile_features(rvemu_cpu_privilege_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_cpu_privilege_tests)
+
+add_test(NAME rvemu.cpu_privilege COMMAND rvemu_cpu_privilege_tests)

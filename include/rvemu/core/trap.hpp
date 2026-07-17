@@ -30,6 +30,15 @@ enum class ExceptionCause : std::uint64_t {
     StorePageFault = 15U,
 };
 
+enum class InterruptCause : std::uint64_t {
+    SupervisorSoftware = 1U,
+    MachineSoftware = 3U,
+    SupervisorTimer = 5U,
+    MachineTimer = 7U,
+    SupervisorExternal = 9U,
+    MachineExternal = 11U,
+};
+
 struct Trap final {
     ExceptionCause cause{ExceptionCause::IllegalInstruction};
     std::uint64_t value{0U};
