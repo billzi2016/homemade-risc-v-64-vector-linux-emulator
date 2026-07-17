@@ -7,6 +7,8 @@
 #include "rvemu/bus/address_region.hpp"
 
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <vector>
 
 namespace rvemu::bus {
@@ -34,6 +36,18 @@ public:
         std::uint64_t desired,
         AccessType type = AccessType::Atomic);
 
+    // 在同一总线事务内读取并建立精确到操作数字节范围的单 Hart 保留。
+    [[nodiscard]] LoadReservedResult load_reserved(
+        PhysicalAddress address,
+        AccessWidth width);
+
+    // 无论成功、失败还是地址错误，SC 都消费当前 token；exchanged 表示是否真正写入。
+    [[nodiscard]] AccessResult store_conditional(
+        ReservationToken token,
+        PhysicalAddress address,
+        AccessWidth width,
+        std::uint64_t value);
+
     [[nodiscard]] std::size_t region_count() const noexcept { return regions_.size(); }
 
 private:
@@ -45,7 +59,20 @@ private:
 
     [[nodiscard]] LocatedRegion locate(PhysicalAddress address, AccessWidth width);
 
+    struct ReservationRecord final {
+        ReservationToken token{};
+        PhysicalAddress address{};
+        std::uint64_t length{0U};
+    };
+
+    // 调用方必须持有 transaction_mutex_；成功写入统一经过此处使重叠保留失效。
+    void invalidate_reservation_locked(PhysicalAddress address, std::uint64_t length) noexcept;
+    [[nodiscard]] ReservationToken next_reservation_token_locked() noexcept;
+
     std::vector<std::shared_ptr<AddressRegion>> regions_;
+    std::mutex transaction_mutex_;
+    std::optional<ReservationRecord> reservation_{};
+    std::uint64_t next_reservation_token_{1U};
 };
 
 }  // namespace rvemu::bus

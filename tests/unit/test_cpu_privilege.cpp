@@ -174,6 +174,7 @@ void test_reset_permissions_and_warl(TestContext& context) {
     rvemu::core::CsrFile csrs;
     const auto misa = csrs.peek(rvemu::core::CsrAddress::Misa);
     context.expect((misa >> 62U) == 2U, "misa.MXL 必须声明 RV64");
+    context.expect((misa & bit('A' - 'A')) != 0U, "RV64A 完整实现后 misa 必须声明 A 扩展");
     context.expect((misa & bit('I' - 'A')) != 0U, "misa 必须声明已实现 I 扩展");
     context.expect((misa & bit('S' - 'A')) != 0U, "misa 必须声明 S-mode");
     context.expect((misa & bit('U' - 'A')) != 0U, "misa 必须声明 U-mode");

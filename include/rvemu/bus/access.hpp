@@ -87,4 +87,18 @@ struct AccessResult final {
     }
 };
 
+// 保留 token 只用于把某次 LR 与后续 SC 关联起来；零值永久表示“当前没有保留”。
+// 地址范围与失效状态由总线私有监视器保存，CPU 不得根据 token 猜测物理地址。
+struct ReservationToken final {
+    std::uint64_t value{0U};
+
+    [[nodiscard]] bool valid() const noexcept { return value != 0U; }
+};
+
+// LR 必须把读取值与保留建立作为一个不可分割事务，因此不能用两个独立返回值调用完成。
+struct LoadReservedResult final {
+    AccessResult access{};
+    ReservationToken token{};
+};
+
 }  // namespace rvemu::bus

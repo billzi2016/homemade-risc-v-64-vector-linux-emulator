@@ -40,3 +40,13 @@ target_compile_features(rvemu_cpu_m_tests PRIVATE cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_cpu_m_tests)
 
 add_test(NAME rvemu.cpu_m COMMAND rvemu_cpu_m_tests)
+
+add_executable(rvemu_cpu_a_tests
+    unit/test_cpu_a.cpp
+)
+
+target_link_libraries(rvemu_cpu_a_tests PRIVATE rvemu_core)
+target_compile_features(rvemu_cpu_a_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_cpu_a_tests)
+
+add_test(NAME rvemu.cpu_a COMMAND rvemu_cpu_a_tests)

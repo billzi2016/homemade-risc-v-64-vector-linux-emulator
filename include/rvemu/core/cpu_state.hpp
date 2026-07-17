@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "rvemu/bus/access.hpp"
 #include "rvemu/core/csr.hpp"
 
 #include <array>
@@ -45,6 +46,15 @@ public:
     [[nodiscard]] bool waiting_for_interrupt() const noexcept { return waiting_for_interrupt_; }
     void set_waiting_for_interrupt(bool value) noexcept { waiting_for_interrupt_ = value; }
 
+    // LR/SC token 是本 Hart 的不可见执行状态；复位清除，具体地址与失效判定仍由总线负责。
+    [[nodiscard]] bus::ReservationToken reservation_token() const noexcept {
+        return reservation_token_;
+    }
+    void set_reservation_token(bus::ReservationToken token) noexcept {
+        reservation_token_ = token;
+    }
+    void clear_reservation_token() noexcept { reservation_token_ = bus::ReservationToken{}; }
+
 private:
     std::array<std::uint64_t, kRegisterCount> integer_registers_{};
     std::array<std::uint64_t, kRegisterCount> floating_registers_{};
@@ -53,6 +63,7 @@ private:
     std::uint64_t program_counter_{0U};
     PrivilegeMode privilege_{PrivilegeMode::Machine};
     bool waiting_for_interrupt_{false};
+    bus::ReservationToken reservation_token_{};
 };
 
 }  // namespace rvemu::core

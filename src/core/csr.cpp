@@ -35,7 +35,8 @@ constexpr std::uint64_t kDelegatableExceptionMask =
     bit(7U) | bit(8U) | bit(9U) | bit(12U) | bit(13U) | bit(15U);
 
 constexpr std::uint64_t kMisa =
-    (0x2ULL << 62U) | bit(static_cast<std::uint8_t>('I' - 'A')) |
+    (0x2ULL << 62U) | bit(static_cast<std::uint8_t>('A' - 'A')) |
+    bit(static_cast<std::uint8_t>('I' - 'A')) |
     bit(static_cast<std::uint8_t>('M' - 'A')) | bit(static_cast<std::uint8_t>('S' - 'A')) |
     bit(static_cast<std::uint8_t>('U' - 'A'));
 constexpr std::uint64_t kSatpModeMask = 0xFULL << 60U;

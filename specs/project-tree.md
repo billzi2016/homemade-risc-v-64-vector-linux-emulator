@@ -20,9 +20,10 @@
 │   │   ├── cpu_state.hpp
 │   │   ├── csr.hpp
 │   │   ├── decoder.hpp
+│   │   ├── integer_a.hpp
+│   │   ├── integer_m.hpp
 │   │   ├── instruction.hpp
-│   │   ├── trap.hpp
-│   │   └── reservation_set.hpp
+│   │   └── trap.hpp
 │   ├── vector/
 │   │   ├── vector_state.hpp
 │   │   ├── vector_decoder.hpp
@@ -124,7 +125,7 @@ flowchart TD
 
 ### 3.1 `core`
 
-负责标量 CPU 状态、CSR、特权态、标量指令译码执行、陷阱入口/返回以及 LR/SC 保留集。它不负责物理地址路由、宿主文件或终端操作。
+负责标量 CPU 状态、CSR、特权态、标量指令译码执行、陷阱入口/返回以及 LR/SC token 生命周期。它不负责物理地址路由、宿主文件或终端操作。
 
 ### 3.2 `vector`
 
@@ -136,7 +137,7 @@ flowchart TD
 
 ### 3.4 `bus`
 
-负责唯一的物理地址分发。RAM、ROM 和每个 MMIO 设备都注册不重叠区间。总线不解释指令，也不处理虚拟地址。
+负责唯一的物理地址分发和单 Hart 物理保留监视。RAM、ROM 和每个 MMIO 设备都注册不重叠区间。总线不解释指令，也不处理虚拟地址。
 
 ### 3.5 `devices`
 

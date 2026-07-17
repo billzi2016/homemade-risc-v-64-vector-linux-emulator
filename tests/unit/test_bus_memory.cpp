@@ -305,6 +305,82 @@ void test_atomic_compare_exchange(TestContext& context) {
         "跨 RAM 末端的原子事务必须在提交前失败");
 }
 
+// 使用生产总线验证 LR/SC 保留监视器；普通存储、DMA 与 CAS 都必须共享同一失效入口。
+void test_load_reserved_and_store_conditional(TestContext& context) {
+    constexpr std::uint64_t base = 0x8000'0000U;
+    const auto reserved_address = PhysicalAddress{base + 0x40U};
+    rvemu::bus::Bus bus;
+    auto ram = std::make_shared<rvemu::memory::PhysicalMemory>(PhysicalAddress{base}, 0x100U);
+    context.expect(bus.register_region(ram).ok(), "保留监视测试 RAM 注册必须成功");
+    context.expect(
+        bus.write(reserved_address, AccessWidth::DoubleWord, 0x10U, AccessType::Store).ok(),
+        "保留监视测试初值写入必须成功");
+
+    auto loaded = bus.load_reserved(reserved_address, AccessWidth::DoubleWord);
+    context.expect(loaded.access.ok() && loaded.access.value == 0x10U, "LR 总线事务必须读取旧值");
+    context.expect(loaded.token.valid(), "成功 LR 必须返回非零不透明 token");
+
+    context.expect(
+        bus.write(PhysicalAddress{base + 0x60U}, AccessWidth::Word, 1U, AccessType::DmaWrite).ok(),
+        "不重叠 DMA 写必须成功");
+    auto conditional = bus.store_conditional(
+        loaded.token, reserved_address, AccessWidth::DoubleWord, 0x20U);
+    context.expect(
+        conditional.ok() && conditional.exchanged,
+        "不重叠写入不得破坏保留，SC 应成功");
+
+    conditional = bus.store_conditional(
+        loaded.token, reserved_address, AccessWidth::DoubleWord, 0x30U);
+    context.expect(
+        conditional.ok() && !conditional.exchanged,
+        "同一个 token 只能被一次 SC 消费");
+
+    loaded = bus.load_reserved(reserved_address, AccessWidth::DoubleWord);
+    context.expect(
+        bus.write(PhysicalAddress{base + 0x43U}, AccessWidth::Byte, 0xAAU, AccessType::DmaWrite).ok(),
+        "重叠 DMA 字节写必须成功");
+    conditional = bus.store_conditional(
+        loaded.token, reserved_address, AccessWidth::DoubleWord, 0x40U);
+    context.expect(
+        conditional.ok() && !conditional.exchanged,
+        "重叠 DMA 写必须使 SC 条件失败");
+
+    loaded = bus.load_reserved(reserved_address, AccessWidth::DoubleWord);
+    const auto observed = loaded.access.value;
+    const auto failed_compare = bus.compare_exchange(
+        reserved_address, AccessWidth::DoubleWord, observed ^ 1U, 0x50U);
+    context.expect(
+        failed_compare.ok() && !failed_compare.exchanged,
+        "未提交的 CAS 必须明确报告比较失败");
+    conditional = bus.store_conditional(
+        loaded.token, reserved_address, AccessWidth::DoubleWord, 0x60U);
+    context.expect(
+        conditional.ok() && conditional.exchanged,
+        "未改变内存的 CAS 失败不得使保留失效");
+
+    loaded = bus.load_reserved(reserved_address, AccessWidth::DoubleWord);
+    const auto successful_compare = bus.compare_exchange(
+        reserved_address, AccessWidth::DoubleWord, 0x60U, 0x70U);
+    context.expect(successful_compare.ok() && successful_compare.exchanged, "重叠 CAS 必须成功提交");
+    conditional = bus.store_conditional(
+        loaded.token, reserved_address, AccessWidth::DoubleWord, 0x80U);
+    context.expect(
+        conditional.ok() && !conditional.exchanged,
+        "成功原子更新必须使旧保留失效");
+
+    loaded = bus.load_reserved(reserved_address, AccessWidth::DoubleWord);
+    conditional = bus.store_conditional(
+        loaded.token, PhysicalAddress{base + 0x48U}, AccessWidth::DoubleWord, 0x90U);
+    context.expect(
+        conditional.ok() && !conditional.exchanged,
+        "地址不匹配的 SC 必须失败并消费 token");
+    conditional = bus.store_conditional(
+        loaded.token, reserved_address, AccessWidth::DoubleWord, 0xA0U);
+    context.expect(
+        conditional.ok() && !conditional.exchanged,
+        "地址不匹配后不得再次使用已消费 token");
+}
+
 }  // namespace
 
 int main() {
@@ -317,6 +393,7 @@ int main() {
         test_bus_failures_have_no_partial_effect(context);
         test_boot_rom_lifecycle(context);
         test_atomic_compare_exchange(context);
+        test_load_reserved_and_store_conditional(context);
     } catch (const std::exception& error) {
         std::cerr << "测试运行出现未处理异常：" << error.what() << '\n';
         return 2;

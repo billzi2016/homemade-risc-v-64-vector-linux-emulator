@@ -23,6 +23,7 @@ namespace {
 }  // namespace
 
 AccessResult Bus::register_region(std::shared_ptr<AddressRegion> region) {
+    std::lock_guard<std::mutex> transaction_lock{transaction_mutex_};
     if (region == nullptr) {
         return AccessResult::failure(make_error(
             BusErrorCode::InvalidRegion,
@@ -122,11 +123,16 @@ AccessResult Bus::write(
     AccessWidth width,
     std::uint64_t value,
     AccessType type) {
+    std::lock_guard<std::mutex> transaction_lock{transaction_mutex_};
     auto located = locate(address, width);
     if (located.region == nullptr) {
         return located.failure;
     }
-    return located.region->write(located.offset, width, value, type);
+    const auto result = located.region->write(located.offset, width, value, type);
+    if (result.ok()) {
+        invalidate_reservation_locked(address, width_in_bytes(width));
+    }
+    return result;
 }
 
 AccessResult Bus::compare_exchange(
@@ -135,11 +141,91 @@ AccessResult Bus::compare_exchange(
     std::uint64_t expected,
     std::uint64_t desired,
     AccessType type) {
+    std::lock_guard<std::mutex> transaction_lock{transaction_mutex_};
     auto located = locate(address, width);
     if (located.region == nullptr) {
         return located.failure;
     }
-    return located.region->compare_exchange(located.offset, width, expected, desired, type);
+    const auto result = located.region->compare_exchange(
+        located.offset, width, expected, desired, type);
+    if (result.ok() && result.exchanged) {
+        invalidate_reservation_locked(address, width_in_bytes(width));
+    }
+    return result;
+}
+
+LoadReservedResult Bus::load_reserved(PhysicalAddress address, AccessWidth width) {
+    std::lock_guard<std::mutex> transaction_lock{transaction_mutex_};
+    auto located = locate(address, width);
+    if (located.region == nullptr) {
+        return LoadReservedResult{located.failure, ReservationToken{}};
+    }
+
+    const auto loaded = located.region->read(located.offset, width, AccessType::Atomic);
+    if (!loaded.ok()) {
+        return LoadReservedResult{loaded, ReservationToken{}};
+    }
+
+    const auto token = next_reservation_token_locked();
+    reservation_ = ReservationRecord{token, address, width_in_bytes(width)};
+    return LoadReservedResult{loaded, token};
+}
+
+AccessResult Bus::store_conditional(
+    ReservationToken token,
+    PhysicalAddress address,
+    AccessWidth width,
+    std::uint64_t value) {
+    std::lock_guard<std::mutex> transaction_lock{transaction_mutex_};
+
+    // SC 无条件消费当前保留。先复制再清除，保证后端错误或条件失败也不能重复使用 token。
+    const auto prior_reservation = reservation_;
+    reservation_.reset();
+
+    auto located = locate(address, width);
+    if (located.region == nullptr) {
+        return located.failure;
+    }
+
+    const auto length = width_in_bytes(width);
+    const auto matches = token.valid() && prior_reservation.has_value() &&
+                         prior_reservation->token.value == token.value &&
+                         prior_reservation->address == address &&
+                         prior_reservation->length == length;
+    if (!matches) {
+        return AccessResult::success(0U, false);
+    }
+
+    const auto stored = located.region->write(
+        located.offset, width, value, AccessType::Atomic);
+    if (!stored.ok()) {
+        return stored;
+    }
+    return AccessResult::success(0U, true);
+}
+
+void Bus::invalidate_reservation_locked(
+    PhysicalAddress address,
+    std::uint64_t length) noexcept {
+    if (!reservation_.has_value() || length == 0U) {
+        return;
+    }
+
+    const auto write_first = address.value();
+    const auto write_last = write_first + length - 1U;
+    const auto reserved_first = reservation_->address.value();
+    const auto reserved_last = reserved_first + reservation_->length - 1U;
+    if (write_first <= reserved_last && reserved_first <= write_last) {
+        reservation_.reset();
+    }
+}
+
+ReservationToken Bus::next_reservation_token_locked() noexcept {
+    auto token = ReservationToken{next_reservation_token_++};
+    if (!token.valid()) {
+        token = ReservationToken{next_reservation_token_++};
+    }
+    return token;
 }
 
 }  // namespace rvemu::bus

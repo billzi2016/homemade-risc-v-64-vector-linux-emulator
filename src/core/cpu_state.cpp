@@ -29,6 +29,7 @@ void CpuState::reset(std::uint64_t reset_pc) noexcept {
     program_counter_ = reset_pc;
     privilege_ = PrivilegeMode::Machine;
     waiting_for_interrupt_ = false;
+    reservation_token_ = bus::ReservationToken{};
 }
 
 // x0 即使底层数组被未来诊断设施触碰，架构读取仍强制返回零。

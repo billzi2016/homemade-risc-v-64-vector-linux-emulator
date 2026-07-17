@@ -1,11 +1,13 @@
-// 文件职责：实现单 Hart、非流水线 RV64I/Zicsr 执行、特权指令和统一 Trap/中断入口。
-// 边界：本文件不实现 MMU、M/A/F/D/C/V 扩展或具体设备，也不绕过统一物理总线。
+// 文件职责：实现单 Hart、非流水线 RV64I/M/A/Zicsr 执行、特权指令和统一 Trap/中断入口。
+// 边界：本文件不实现 MMU、F/D/C/V 扩展或具体设备，也不绕过统一物理总线。
 
 #include "rvemu/core/cpu.hpp"
 
 #include "rvemu/core/decoder.hpp"
+#include "rvemu/core/integer_a.hpp"
 #include "rvemu/core/integer_m.hpp"
 
+#include <atomic>
 #include <cstdint>
 #include <limits>
 #include <optional>
@@ -60,6 +62,20 @@ constexpr std::uint64_t kInterruptFlag = 1ULL << 63U;
 // RV64 W 类结果必须先截为 32 位，再符号扩展为完整 XLEN。
 [[nodiscard]] std::uint64_t sign_extend_word(std::uint64_t value) noexcept {
     return sign_extend(value & 0xFFFF'FFFFULL, 32U);
+}
+
+// aq/rl 描述同一地址域内的顺序。同步总线已经串行提交事务，宿主栅栏再阻止编译器或
+// 异步设备线程把共享状态访问跨越原子指令，明确落实而不是静默丢弃编码位。
+void apply_release_ordering(bool release) noexcept {
+    if (release) {
+        std::atomic_thread_fence(std::memory_order_release);
+    }
+}
+
+void apply_acquire_ordering(bool acquire) noexcept {
+    if (acquire) {
+        std::atomic_thread_fence(std::memory_order_acquire);
+    }
 }
 
 // ECALL cause 只取决于发起模式；集中映射避免 SYSTEM 分支散落原因常量。
@@ -529,6 +545,108 @@ StepResult Cpu::execute(const InstructionPacket& packet) {
             return illegal(packet);
         }
         return write_and_retire(instruction.destination, sign_extend_word(result), sequential_pc);
+    }
+
+    case 0x2FU: {  // RV64A：LR/SC 与 AMO
+        const auto word_operation = instruction.function3 == 0x2U;
+        if (!word_operation && instruction.function3 != 0x3U) {
+            return illegal(packet);
+        }
+
+        const auto width = word_operation ? bus::AccessWidth::Word : bus::AccessWidth::DoubleWord;
+        const auto width_bytes = bus::width_in_bytes(width);
+        const auto address = source1;
+        const auto function5 = static_cast<std::uint8_t>((packet.bits >> 27U) & 0x1FU);
+        const auto acquire = ((packet.bits >> 26U) & 0x1U) != 0U;
+        const auto release = ((packet.bits >> 25U) & 0x1U) != 0U;
+
+        if (function5 == 0x02U) {  // LR.W / LR.D
+            if (instruction.source2 != 0U) {
+                return illegal(packet);
+            }
+            if ((address & (width_bytes - 1U)) != 0U) {
+                return StepResult::failure(
+                    make_trap(packet, ExceptionCause::LoadAddressMisaligned, address),
+                    packet.length);
+            }
+
+            apply_release_ordering(release);
+            const auto loaded = bus_.load_reserved(bus::PhysicalAddress{address}, width);
+            if (!loaded.access.ok()) {
+                return StepResult::failure(
+                    make_trap(packet, ExceptionCause::LoadAccessFault, address),
+                    packet.length);
+            }
+            state_.set_reservation_token(loaded.token);
+            apply_acquire_ordering(acquire);
+            const auto value = word_operation ? sign_extend_word(loaded.access.value) :
+                                                loaded.access.value;
+            return write_and_retire(instruction.destination, value, sequential_pc);
+        }
+
+        if (function5 == 0x03U) {  // SC.W / SC.D
+            if ((address & (width_bytes - 1U)) != 0U) {
+                state_.clear_reservation_token();
+                return StepResult::failure(
+                    make_trap(packet, ExceptionCause::StoreAddressMisaligned, address),
+                    packet.length);
+            }
+
+            apply_release_ordering(release);
+            const auto token = state_.reservation_token();
+            state_.clear_reservation_token();
+            const auto stored = bus_.store_conditional(
+                token, bus::PhysicalAddress{address}, width, source2);
+            if (!stored.ok()) {
+                return StepResult::failure(
+                    make_trap(packet, ExceptionCause::StoreAccessFault, address),
+                    packet.length);
+            }
+            apply_acquire_ordering(acquire);
+            return write_and_retire(
+                instruction.destination, stored.exchanged ? 0U : 1U, sequential_pc);
+        }
+
+        const auto operation = decode_atomic_operation(function5);
+        if (!operation.has_value()) {
+            return illegal(packet);
+        }
+        if ((address & (width_bytes - 1U)) != 0U) {
+            return StepResult::failure(
+                make_trap(packet, ExceptionCause::StoreAddressMisaligned, address),
+                packet.length);
+        }
+
+        apply_release_ordering(release);
+        auto observed = bus_.read(bus::PhysicalAddress{address}, width, bus::AccessType::Atomic);
+        if (!observed.ok()) {
+            return StepResult::failure(
+                make_trap(packet, ExceptionCause::StoreAccessFault, address),
+                packet.length);
+        }
+
+        // CAS 失败说明另一个总线主设备已更新内存；使用它返回的新观察值重算，直至
+        // 某次比较与写入在 RAM 锁内原子提交，期间不会把过期结果写回。
+        std::uint64_t original = observed.value;
+        for (;;) {
+            const auto desired = execute_atomic_operation(
+                *operation, original, source2, word_operation);
+            const auto exchanged = bus_.compare_exchange(
+                bus::PhysicalAddress{address}, width, original, desired);
+            if (!exchanged.ok()) {
+                return StepResult::failure(
+                    make_trap(packet, ExceptionCause::StoreAccessFault, address),
+                    packet.length);
+            }
+            if (exchanged.exchanged) {
+                break;
+            }
+            original = exchanged.value;
+        }
+
+        apply_acquire_ordering(acquire);
+        const auto result = word_operation ? sign_extend_word(original) : original;
+        return write_and_retire(instruction.destination, result, sequential_pc);
     }
 
     case 0x0FU:  // FENCE / FENCE.I

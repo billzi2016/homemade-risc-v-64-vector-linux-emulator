@@ -111,8 +111,16 @@
   - 实现文件：`include/rvemu/core/integer_m.hpp`、`src/core/integer_m.cpp`、`src/core/cpu.cpp`、`src/core/csr.cpp`
   - 验证命令：`ctest --test-dir build --output-on-failure`；`ctest --test-dir build/sanitize --output-on-failure`
   - 验证结果：全部 13 条 RV64M/M-W 指令、乘法高半部、除零、最小负数除以负一、`.W` 符号扩展、寄存器别名、x0 和保留编码测试通过；普通与 ASan/UBSan 完整测试均为 4/4 通过。
-- [ ] **ISA-102** 实现 LR/SC 保留集、失效条件和 `.W/.D` 语义。
-- [ ] **ISA-103** 实现规范要求的 AMO 运算与内存原子性。
+- [x] **ISA-102** 实现 LR/SC 保留集、失效条件和 `.W/.D` 语义。
+  - 实现文件：`include/rvemu/bus/access.hpp`、`include/rvemu/bus/bus.hpp`、`src/bus/bus.cpp`、`include/rvemu/core/cpu_state.hpp`、`src/core/cpu_state.cpp`、`src/core/cpu.cpp`
+  - 验证命令：`ctest --test-dir build --output-on-failure`；`ctest --test-dir build/sanitize --output-on-failure`
+  - 验证结果：LR/SC `.W/.D`、自然对齐、一次性 token、精确范围、普通写/DMA/AMO 重叠失效、不重叠保持和失败无副作用测试通过；普通与 ASan/UBSan 完整测试均为 5/5 通过。
+  - 对应需求：`ISA-REQ-003`、`BUS-REQ-008`、`BUS-REQ-009`、`BUS-REQ-010`、`BUS-REQ-011`
+- [x] **ISA-103** 实现规范要求的 AMO 运算与内存原子性。
+  - 实现文件：`include/rvemu/core/integer_a.hpp`、`src/core/integer_a.cpp`、`src/core/cpu.cpp`、`src/core/csr.cpp`、`src/bus/bus.cpp`
+  - 验证命令：`ctest --test-dir build --output-on-failure`；`ctest --test-dir build/sanitize --output-on-failure`
+  - 验证结果：AMOSWAP/ADD/XOR/AND/OR/MIN/MAX/MINU/MAXU 的 `.W/.D` 全部 18 种形式、旧值写回、32 位符号扩展、回绕、aq/rl、别名、x0、保留编码和原子提交测试通过；普通与 ASan/UBSan 完整测试均为 5/5 通过。
+  - 对应需求：`ISA-REQ-003`、`BUS-REQ-003`、`BUS-REQ-010`
 - [ ] **ISA-104** 实现浮点状态、舍入模式、异常标志和 NaN boxing。
 - [ ] **ISA-105** 完整实现声明范围内的 F/D 指令。
 - [ ] **ISA-106** 完整实现 RV64C 解压与执行映射。
