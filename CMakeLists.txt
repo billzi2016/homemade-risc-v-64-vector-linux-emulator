@@ -52,6 +52,31 @@ target_link_libraries(rvemu_core PUBLIC rvemu_bus_memory)
 target_compile_features(rvemu_core PUBLIC cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_core)
 
+add_library(rvemu_conformance STATIC
+    src/conformance/elf_loader.cpp
+)
+
+target_include_directories(rvemu_conformance
+    PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+)
+
+target_link_libraries(rvemu_conformance PUBLIC rvemu_bus_memory)
+target_compile_features(rvemu_conformance PUBLIC cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_conformance)
+
+add_executable(rvemu_conformance_runner
+    src/conformance/main.cpp
+)
+
+target_link_libraries(rvemu_conformance_runner
+    PRIVATE
+        rvemu_conformance
+        rvemu_core
+)
+target_compile_features(rvemu_conformance_runner PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_conformance_runner)
+
 include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(tests)

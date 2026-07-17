@@ -90,3 +90,13 @@ target_compile_features(rvemu_cpu_compressed_tests PRIVATE cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_cpu_compressed_tests)
 
 add_test(NAME rvemu.cpu_compressed COMMAND rvemu_cpu_compressed_tests)
+
+add_executable(rvemu_elf_loader_tests
+    unit/test_elf_loader.cpp
+)
+
+target_link_libraries(rvemu_elf_loader_tests PRIVATE rvemu_conformance)
+target_compile_features(rvemu_elf_loader_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_elf_loader_tests)
+
+add_test(NAME rvemu.elf_loader COMMAND rvemu_elf_loader_tests)

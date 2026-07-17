@@ -1,0 +1,10 @@
+# 文件职责：连接 ACT4 编译器、Sail 参考模型和本项目 DUT 配置文件。
+# 边界：关闭特权测试是因为本节点只认证已完成的非特权 ISA；不是把失败用例标为跳过。
+
+name: rvemu-rv64imafdc
+compiler_exe: clang
+ref_model_exe: sail_riscv_sim
+udb_config: rvemu-rv64imafdc.yaml
+linker_script: link.ld
+dut_include_dir: .
+include_priv_tests: false
