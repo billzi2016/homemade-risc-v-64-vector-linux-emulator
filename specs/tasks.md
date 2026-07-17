@@ -209,6 +209,7 @@
 - [ ] **BOOT-002** 生成与机器模型一致的 FDT，并放置于规定内存位置。
 - [ ] **BOOT-003** 设置 OpenSBI 入口寄存器、PC 和 RAM 布局。
 - [ ] **RUN-001** 实现规范 CLI 和稳定错误退出码。
+  - 完成条件：同时支持省略网络或 `--net none` 的无网络启动，以及 Linux `--net <tap>`；不得在 macOS 创建伪网络后端。
 - [ ] **RUN-002** 实现取指、执行、设备 tick、中断检查的唯一主循环。
 - [ ] **RUN-003** 实现信号处理、终端恢复、文件和 TAP 资源清理。
 
@@ -217,10 +218,11 @@
 - [ ] **SYS-001** 使用真实 OpenSBI 观察并保存 Banner 证据。
 - [ ] **SYS-002** 使用真实 Linux 内核完成启动，无 Kernel Panic。
 - [ ] **SYS-003** 挂载真实 ext4 rootfs 并进入可交互 Shell。
+- [ ] **SYS-003A** 在 macOS 使用 `--net none` 完成真实启动，并在来宾 Shell 执行 `ls /`、`pwd` 和 `cat /proc/cpuinfo`。
 - [ ] **SYS-004** 验证 UART 字符和控制组合键由来宾接收。
-- [ ] **SYS-005** 在来宾执行 `dhclient eth0` 并获取独立 IP。
-- [ ] **SYS-006** 在来宾解析 `google.com` 并执行 `ping -c 4 google.com`。
-- [ ] **SYS-007** 确认 4 个 ICMP 响应且丢包率为 0%，保存完整日志和环境说明。
+- [ ] **SYS-005** 在 Linux TAP 档位的来宾执行 `dhclient eth0` 并获取独立 IP。
+- [ ] **SYS-006** 在 Linux TAP 档位的来宾解析 `google.com` 并执行 `ping -c 4 google.com`。
+- [ ] **SYS-007** 在 Linux TAP 档位确认 4 个 ICMP 响应且丢包率为 0%，保存完整日志和环境说明。
 - [ ] **SYS-008** 完成全部需求追踪复核，无伪造、跳过或未声明偏差。
 
 ## 15. 文档站与 GitHub Pages

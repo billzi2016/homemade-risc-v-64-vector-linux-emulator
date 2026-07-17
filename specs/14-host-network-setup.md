@@ -2,7 +2,9 @@
 
 ## 1. 适用平台与权限
 
-PRD 指定 Linux TAP API，首版宿主网络支持限定为 Linux。打开 `/dev/net/tun`、创建 TAP、配置网桥/NAT 通常需要 `CAP_NET_ADMIN` 或管理员权限。任何脚本执行前必须由用户明确确认。
+PRD 指定的宿主网络支持限定为 Linux TAP。打开 `/dev/net/tun`、创建 TAP、配置网桥/NAT 通常需要 `CAP_NET_ADMIN` 或管理员权限。任何脚本执行前必须由用户明确确认。
+
+macOS 属于无网络启动档位：模拟器不得尝试打开 Linux 设备节点、创建伪 TAP 或修改宿主网络。来宾仍必须通过同一机器模型启动到 ext4 Shell；该档位不计入本文件的 DHCP/DNS/ICMP 网络验收。
 
 ## 2. 职责分离
 

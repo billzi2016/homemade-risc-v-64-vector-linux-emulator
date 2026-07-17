@@ -94,9 +94,11 @@ flowchart BT
 - VirtIO-Blk 由真实 Linux 驱动初始化。
 - ext4 rootfs 按指定设备挂载。
 - init 完成并进入可交互 Shell。
+- macOS 无网络档位必须在该真实 Shell 中成功执行 `ls /`、`pwd` 和 `cat /proc/cpuinfo`。
 
 ### Gate 4：网络
 
+- 本 Gate 仅适用于 Linux TAP 网络档位，不阻止 macOS 在 Gate 3 形成独立、可记录的本地启动验收。
 - VirtIO-Net 被识别为 `eth0`。
 - DHCP、ARP、路由和 DNS 均由真实包链路完成。
 - 公网 ICMP 达到最终标准。
@@ -105,10 +107,10 @@ flowchart BT
 
 验收记录至少包含：
 
-- 宿主 Linux 发行版、内核版本和 CPU 架构。
+- 宿主操作系统版本和 CPU 架构；Linux 网络档位还记录发行版与宿主内核版本。
 - 编译器、CMake、OpenSBI、Linux、rootfs 版本与 SHA-256。
 - 来宾内核配置和启动命令。
-- TAP/bridge/NAT 拓扑，但不包含秘密或个人信息。
+- Linux 网络档位记录 TAP/bridge/NAT 拓扑；macOS 档位明确记录 `--net none`。
 - 完整 UART 日志和关键宿主诊断。
 - `ip addr`、`ip route`、resolver 状态、DHCP 输出和 `ping` 输出。
 - 测试日期，以及任何外部网络条件。
@@ -121,10 +123,10 @@ flowchart BT
 
 1. 所有强制需求均有实现与验证映射。
 2. 必需单元、集成和一致性测试全部通过，无未解释跳过。
-3. OpenSBI、Linux、ext4 Shell 真实运行。
-4. 来宾执行 `dhclient eth0` 成功。
-5. 来宾执行 `ping -c 4 google.com` 收到 4 个响应且 0% 丢包。
+3. macOS 无网络档位真实运行 OpenSBI、Linux、ext4 Shell，并执行三条规定的基础命令。
+4. Linux 网络档位真实运行相同启动链路，并执行 `dhclient eth0` 成功。
+5. Linux 来宾执行 `ping -c 4 google.com` 收到 4 个响应且 0% 丢包。
 6. 无 Mock、固定输出、宿主代执行或多套简化逻辑参与验收。
-7. 终端和宿主网络状态安全恢复。
+7. 终端和实际启用的宿主网络状态安全恢复。
 
 环境导致最后一步暂时不可完成时，项目状态是“受阻/未验收”，不是“近似完成”。

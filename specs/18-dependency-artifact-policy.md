@@ -59,7 +59,8 @@ artifacts/
 
 - 可工作的 init 与 Shell。
 - ext4 支持匹配的用户空间。
-- `dhclient`、`ping`、IP 配置和 DNS 解析所需内容。
+- macOS 无网络验收所需的 `ls`、`pwd`、`cat` 以及可挂载的 `/proc`。
+- Linux 网络档位额外需要 `dhclient`、`ping`、IP 配置和 DNS 解析所需内容。
 - VirtIO 设备所需 `/dev`、`/proc`、`/sys` 挂载流程。
 - 不含默认密钥、外部服务凭据或个人配置。
 
@@ -100,7 +101,7 @@ core.*
 
 ## 8. 许可证与教育用途
 
-- 项目自身计划采用 MIT License，实际新增 `LICENSE` 文件必须在 GitHub/仓库操作方案获得确认后进行。
+- 项目自身已采用仓库根目录 `LICENSE` 中的 MIT License。
 - 第三方依赖保持其原许可证，MIT 不会覆盖第三方权利。
 - README 的独立、非官方、教育用途免责声明不能替代遵守第三方许可证。
 - 发布脚本、补丁或配置时必须保留所需版权和许可证通知。

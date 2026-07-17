@@ -12,7 +12,7 @@
 
 ```mermaid
 flowchart LR
-    Host[Linux 宿主机] --> Build[CMake + C++17 编译器]
+    Host[Linux / macOS 宿主机] --> Build[CMake + C++17 编译器]
     Build --> Emulator[模拟器可执行文件]
 
     Cross[RISC-V 交叉工具链] --> SBI[OpenSBI 固件]
@@ -41,7 +41,7 @@ flowchart LR
 
 ## 3. 推荐宿主环境
 
-最终运行环境是 64 位 Linux。原因不是偏好，而是网络后端按 PRD 使用 Linux 的 `/dev/net/tun`、`TUNSETIFF` 和 TAP 以太网接口。macOS 可以编译和运行不涉及 TAP 的单元测试，但不能原样完成该 Linux 专用网络链路；在 macOS 开发时，应使用 Linux 虚拟机或独立 Linux 主机完成最终启动与联网验收。
+项目支持两个宿主档位。macOS 负责真实构建、测试并以 `--net none` 启动到来宾 Shell；Linux 在相同启动能力上增加 `/dev/net/tun` TAP 网络终验。macOS 不需要安装或模拟 iproute2、nftables 与 Linux TAP。
 
 推荐条件：
 
@@ -79,6 +79,25 @@ dtc --version
 mkfs.ext4 -V
 ip -Version
 ```
+
+### 4.1 macOS/Homebrew 基础安装
+
+macOS 本地构建只安装当前需要的基础工具，不安装 Linux 网络组件：
+
+```bash
+brew install cmake ninja
+```
+
+验证：
+
+```bash
+brew --version
+cmake --version
+ninja --version
+c++ --version
+```
+
+设备树、ext4 和 RISC-V 产物工具应在进入对应构建节点时先用 `brew info <formula>` 核对当前公式，再按锁定版本安装；文档不得预先假定某个未验证公式一定提供 Linux 交叉工具链。OpenSBI、Linux 和 rootfs 仍放在被忽略的 `artifacts/`，macOS 只消费这些真实来宾产物完成无网络启动。
 
 ## 5. 各项第三方资源详解
 

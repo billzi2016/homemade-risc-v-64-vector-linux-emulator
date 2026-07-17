@@ -2,17 +2,17 @@
 
 ## 1. 适用范围
 
-本文描述项目达到最终交付状态后的最短完整启动路径：构建真实模拟器、加载真实 OpenSBI/Linux/ext4 镜像、连接真实 TAP 接口，并在来宾 Shell 中验证公网连通性。这里没有 mock、替代设备或伪造启动输出。
+本文描述项目达到最终交付状态后的两条真实启动路径：macOS 无网络档位启动到 Linux Shell，Linux TAP 档位继续验证公网连通性。二者使用同一模拟器、固件、内核和 rootfs，不建立替代硬件逻辑。
 
 README 描述最终成品，当前仓库是否已经具备某一步能力，应以 `specs/tasks.md` 的验收状态为准。如果当前提交尚未生成 `riscv_vector_emulator`，先继续完成任务清单，而不是创建同名脚本冒充可执行文件。
 
 ## 2. 前置条件
 
-- 64 位 Linux 宿主机。
+- 64 位 Linux 或 Apple Silicon/Intel macOS 宿主机。
 - CMake 3.20+ 和支持 C++17 的编译器。
-- 已安装 RISC-V 交叉工具链、DTC、e2fsprogs、iproute2 等工具。
+- 已安装当前步骤需要的 RISC-V 交叉工具链、DTC 和 e2fsprogs 等工具。
 - 已按本项目机器布局构建 OpenSBI、Linux 和 ext4 rootfs。
-- 用户有权创建或使用 TAP 接口。
+- 只有 Linux 网络档位要求用户有权创建或使用 TAP 接口。
 
 第三方组件的作用、官方来源与安装命令见 `docs/third-party.md`。
 
@@ -78,9 +78,11 @@ e2fsck -fn artifacts/disk/rootfs.ext4
 
 不要把这些文件执行 `git add -f`；它们属于本地外部产物，并已被 `.gitignore` 排除。
 
-## 6. 准备 TAP 网络
+## 6. 选择宿主档位
 
-模拟器需要一个已存在且处于 UP 状态的 TAP 接口，例如 `tap0`。首先检查 Linux TUN/TAP 能力：
+macOS 使用无网络档位，不创建 TAP，也不修改系统网络。直接进入下一节并使用 `--net none`。
+
+Linux 网络档位需要一个已存在且处于 UP 状态的 TAP 接口，例如 `tap0`。首先检查 Linux TUN/TAP 能力：
 
 ```bash
 test -c /dev/net/tun
@@ -99,6 +101,18 @@ ip -details link show tap0
 
 ## 7. 启动完整虚拟机
 
+macOS 无网络档位：
+
+```bash
+./build/riscv_vector_emulator \
+  --bios artifacts/firmware/opensbi.bin \
+  --kernel artifacts/kernel/vmlinux.bin \
+  --disk artifacts/disk/rootfs.ext4 \
+  --net none
+```
+
+Linux TAP 网络档位：
+
 ```bash
 ./build/riscv_vector_emulator \
   --bios artifacts/firmware/opensbi.bin \
@@ -111,13 +125,25 @@ ip -details link show tap0
 
 1. OpenSBI Banner 和平台信息。
 2. Linux 早期启动日志、内存与中断控制器初始化。
-3. UART、VirtIO-Blk 和 VirtIO-Net 驱动探测信息。
+3. UART 和 VirtIO-Blk 驱动探测信息；Linux 网络档位还应出现 VirtIO-Net。
 4. ext4 根文件系统挂载成功。
 5. `init` 启动并显示可输入命令的 Shell。
 
 宿主终端会进入 Raw 模式。键盘输入直接送到来宾 UART；`Ctrl+C` 应由来宾处理，而不是粗暴终止模拟器。模拟器正常退出或发生错误时必须恢复宿主终端属性。
 
-## 8. 来宾网络验收
+## 8. 来宾验收
+
+macOS 无网络档位在来宾 Shell 中执行：
+
+```bash
+ls /
+pwd
+cat /proc/cpuinfo
+```
+
+三条命令必须由真实来宾执行成功。该结果证明本地完整启动链路，不代表网络已经验收。
+
+Linux TAP 网络档位继续执行：
 
 在来宾 Shell 中执行 PRD 要求的 DHCP 和公网测试：
 
