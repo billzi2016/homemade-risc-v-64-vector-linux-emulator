@@ -11,6 +11,10 @@
 namespace rvemu::core {
 
 enum class CsrAddress : std::uint16_t {
+    Fflags = 0x001U,
+    Frm = 0x002U,
+    Fcsr = 0x003U,
+
     Sstatus = 0x100U,
     Sie = 0x104U,
     Stvec = 0x105U,
@@ -91,6 +95,15 @@ public:
     // peek 只供 CPU 内部编排和白盒架构测试读取已知 CSR，不绕过来宾访问权限写状态。
     [[nodiscard]] std::uint64_t peek(CsrAddress address) const noexcept;
 
+    // FS=Off 时浮点 CSR/指令均不可用；Initial/Clean/Dirty 都表示状态已启用。
+    [[nodiscard]] bool floating_state_enabled() const noexcept;
+    [[nodiscard]] std::uint8_t floating_rounding_mode() const noexcept;
+    [[nodiscard]] std::uint8_t floating_exception_flags() const noexcept;
+    // 浮点结果标志按 OR 累积且只保留 NV/DZ/OF/UF/NX；状态启用时同时标记 FS Dirty。
+    void accrue_floating_exception_flags(std::uint8_t flags) noexcept;
+    // 浮点寄存器或 CSR 发生架构写入时调用；FS=Off 不会被内部写入口偷偷启用。
+    void mark_floating_state_dirty() noexcept;
+
     // 将 CLINT/PLIC 等真实设备的电平状态投影到唯一 mip 底层值；清除不会影响其他中断源。
     void set_interrupt_pending(InterruptCause cause, bool pending) noexcept;
     // time 由未来 CLINT 的真实计时源更新；CSR 文件自身不创建第二套宿主时间逻辑。
@@ -151,6 +164,7 @@ private:
     void write_value(CsrAddress address, std::uint64_t value) noexcept;
 
     std::uint64_t mstatus_{0U};
+    std::uint8_t fcsr_{0U};
     std::uint64_t medeleg_{0U};
     std::uint64_t mideleg_{0U};
     std::uint64_t mie_{0U};

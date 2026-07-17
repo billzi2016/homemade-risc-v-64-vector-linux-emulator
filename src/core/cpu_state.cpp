@@ -52,10 +52,21 @@ std::uint64_t CpuState::floating(std::size_t index) const {
     return floating_registers_[index];
 }
 
-// 写入保持完整位模式，不提前规范化 NaN 或改变浮点控制状态。
+// 64 位写入保持完整位模式；若软件已通过 FS 启用浮点上下文，则唯一入口标记 Dirty。
 void CpuState::set_floating(std::size_t index, std::uint64_t value) {
     require_register_index(index);
     floating_registers_[index] = value;
+    csrs_.mark_floating_state_dirty();
+}
+
+// 非法 NaN box 在作为单精度源读取时统一变为 canonical qNaN，不污染原寄存器位模式。
+std::uint32_t CpuState::floating_single(std::size_t index) const {
+    return unbox_single_precision(floating(index));
+}
+
+// 所有单精度结果都经同一入口补齐上 32 位一，随后复用 64 位写入口更新 FS。
+void CpuState::set_floating_single(std::size_t index, std::uint32_t value) {
+    set_floating(index, box_single_precision(value));
 }
 
 // 返回固定 32 字节寄存器的只读引用，观察路径不会复制或改变 VLEN。

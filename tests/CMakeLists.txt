@@ -50,3 +50,13 @@ target_compile_features(rvemu_cpu_a_tests PRIVATE cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_cpu_a_tests)
 
 add_test(NAME rvemu.cpu_a COMMAND rvemu_cpu_a_tests)
+
+add_executable(rvemu_floating_state_tests
+    unit/test_floating_state.cpp
+)
+
+target_link_libraries(rvemu_floating_state_tests PRIVATE rvemu_core)
+target_compile_features(rvemu_floating_state_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_floating_state_tests)
+
+add_test(NAME rvemu.floating_state COMMAND rvemu_floating_state_tests)

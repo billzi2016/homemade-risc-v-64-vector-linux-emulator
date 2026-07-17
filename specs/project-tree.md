@@ -20,6 +20,7 @@
 │   │   ├── cpu_state.hpp
 │   │   ├── csr.hpp
 │   │   ├── decoder.hpp
+│   │   ├── floating_state.hpp
 │   │   ├── integer_a.hpp
 │   │   ├── integer_m.hpp
 │   │   ├── instruction.hpp

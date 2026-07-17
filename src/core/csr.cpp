@@ -3,6 +3,8 @@
 
 #include "rvemu/core/csr.hpp"
 
+#include "rvemu/core/floating_state.hpp"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -42,6 +44,11 @@ constexpr std::uint64_t kMisa =
 constexpr std::uint64_t kSatpModeMask = 0xFULL << 60U;
 constexpr std::uint64_t kSatpSv39Mode = 8ULL << 60U;
 
+[[nodiscard]] constexpr bool is_floating_csr(CsrAddress address) noexcept {
+    return address == CsrAddress::Fflags || address == CsrAddress::Frm ||
+           address == CsrAddress::Fcsr;
+}
+
 // PrivilegeMode 编码与架构等级一致，但比较集中在此处，避免调用点散落强制转换。
 [[nodiscard]] constexpr std::uint8_t privilege_rank(PrivilegeMode privilege) noexcept {
     return static_cast<std::uint8_t>(privilege);
@@ -61,6 +68,7 @@ constexpr std::uint64_t kSatpSv39Mode = 8ULL << 60U;
 
 void CsrFile::reset() noexcept {
     mstatus_ = kXlenFields;
+    fcsr_ = 0U;
     medeleg_ = 0U;
     mideleg_ = 0U;
     mie_ = 0U;
@@ -86,6 +94,9 @@ void CsrFile::reset() noexcept {
 // 地址存在性使用穷举列表，而非为 4096 个 CSR 分配通用数组，避免保留地址被误实现。
 bool CsrFile::exists(CsrAddress address) const noexcept {
     switch (address) {
+    case CsrAddress::Fflags:
+    case CsrAddress::Frm:
+    case CsrAddress::Fcsr:
     case CsrAddress::Sstatus:
     case CsrAddress::Sie:
     case CsrAddress::Stvec:
@@ -128,6 +139,11 @@ bool CsrFile::access_allowed(
     PrivilegeMode privilege,
     bool write) const noexcept {
     if (!exists(address)) {
+        return false;
+    }
+
+    // 浮点 CSR 属于 U 级地址，但 mstatus.FS=Off 会关闭其上下文，任何层级访问都非法。
+    if (is_floating_csr(address) && !floating_state_enabled()) {
         return false;
     }
 
@@ -190,9 +206,43 @@ std::uint64_t CsrFile::peek(CsrAddress address) const noexcept {
     return exists(address) ? read_value(address) : 0U;
 }
 
+bool CsrFile::floating_state_enabled() const noexcept {
+    return ((mstatus_ >> 13U) & 0x3U) != 0U;
+}
+
+std::uint8_t CsrFile::floating_rounding_mode() const noexcept {
+    return static_cast<std::uint8_t>((fcsr_ >> 5U) & 0x7U);
+}
+
+std::uint8_t CsrFile::floating_exception_flags() const noexcept {
+    return static_cast<std::uint8_t>(fcsr_ & kFloatingExceptionMask);
+}
+
+void CsrFile::accrue_floating_exception_flags(std::uint8_t flags) noexcept {
+    if (!floating_state_enabled()) {
+        return;
+    }
+    fcsr_ = static_cast<std::uint8_t>(
+        fcsr_ | normalize_floating_exception_flags(flags));
+    mark_floating_state_dirty();
+}
+
+void CsrFile::mark_floating_state_dirty() noexcept {
+    if (!floating_state_enabled()) {
+        return;
+    }
+    mstatus_ = (mstatus_ & ~(0x3ULL << 13U)) | (0x3ULL << 13U);
+}
+
 // Supervisor CSR 在此处直接从 Machine 底层字段投影，保证别名永远不可能分叉。
 std::uint64_t CsrFile::read_value(CsrAddress address) const noexcept {
     switch (address) {
+    case CsrAddress::Fflags:
+        return floating_exception_flags();
+    case CsrAddress::Frm:
+        return floating_rounding_mode();
+    case CsrAddress::Fcsr:
+        return fcsr_;
     case CsrAddress::Sstatus:
         return read_value(CsrAddress::Mstatus) & kSstatusReadMask;
     case CsrAddress::Sie:
@@ -264,6 +314,20 @@ std::uint64_t CsrFile::read_value(CsrAddress address) const noexcept {
 // 每个 case 只更新自身可写域；只读、WPRI 和未委托位在进入这里前后都不会形成隐藏状态。
 void CsrFile::write_value(CsrAddress address, std::uint64_t value) noexcept {
     switch (address) {
+    case CsrAddress::Fflags:
+        fcsr_ = static_cast<std::uint8_t>(
+            (fcsr_ & 0xE0U) | (value & kFloatingExceptionMask));
+        mark_floating_state_dirty();
+        break;
+    case CsrAddress::Frm:
+        fcsr_ = static_cast<std::uint8_t>(
+            (fcsr_ & kFloatingExceptionMask) | ((value & 0x7U) << 5U));
+        mark_floating_state_dirty();
+        break;
+    case CsrAddress::Fcsr:
+        fcsr_ = static_cast<std::uint8_t>(value & 0xFFU);
+        mark_floating_state_dirty();
+        break;
     case CsrAddress::Sstatus:
         mstatus_ = (mstatus_ & ~kSstatusWriteMask) | (value & kSstatusWriteMask);
         break;

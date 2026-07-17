@@ -121,7 +121,11 @@
   - 验证命令：`ctest --test-dir build --output-on-failure`；`ctest --test-dir build/sanitize --output-on-failure`
   - 验证结果：AMOSWAP/ADD/XOR/AND/OR/MIN/MAX/MINU/MAXU 的 `.W/.D` 全部 18 种形式、旧值写回、32 位符号扩展、回绕、aq/rl、别名、x0、保留编码和原子提交测试通过；普通与 ASan/UBSan 完整测试均为 5/5 通过。
   - 对应需求：`ISA-REQ-003`、`BUS-REQ-003`、`BUS-REQ-010`
-- [ ] **ISA-104** 实现浮点状态、舍入模式、异常标志和 NaN boxing。
+- [x] **ISA-104** 实现浮点状态、舍入模式、异常标志和 NaN boxing。
+  - 实现文件：`include/rvemu/core/floating_state.hpp`、`src/core/floating_state.cpp`、`include/rvemu/core/csr.hpp`、`src/core/csr.cpp`、`include/rvemu/core/cpu_state.hpp`、`src/core/cpu_state.cpp`
+  - 验证命令：`ctest --test-dir build --output-on-failure`；`ctest --test-dir build/sanitize --output-on-failure`
+  - 验证结果：`fflags/frm/fcsr` 别名、FS=Off 门控、FS Dirty/SD 派生、五类异常标志累积、静态/动态舍入解析、保留编码拒绝及合法/非法 NaN box 测试通过；普通与 ASan/UBSan 完整测试均为 6/6 通过。
+  - 对应需求：`CPU-REQ-002`、`CPU-REQ-016`、`CPU-REQ-017`、`CPU-REQ-018`、`CPU-REQ-019`、`ISA-REQ-004`
 - [ ] **ISA-105** 完整实现声明范围内的 F/D 指令。
 - [ ] **ISA-106** 完整实现 RV64C 解压与执行映射。
 - [ ] **ISA-107** 运行正式 ISA/一致性测试并记录结果。

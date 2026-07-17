@@ -5,6 +5,7 @@
 
 #include "rvemu/bus/access.hpp"
 #include "rvemu/core/csr.hpp"
+#include "rvemu/core/floating_state.hpp"
 
 #include <array>
 #include <cstddef>
@@ -29,6 +30,9 @@ public:
 
     [[nodiscard]] std::uint64_t floating(std::size_t index) const;
     void set_floating(std::size_t index, std::uint64_t value);
+    // 单精度入口统一实施 NaN boxing/unboxing；调用者不得手工复制上 32 位检查。
+    [[nodiscard]] std::uint32_t floating_single(std::size_t index) const;
+    void set_floating_single(std::size_t index, std::uint32_t value);
 
     [[nodiscard]] const VectorRegister& vector(std::size_t index) const;
     void set_vector(std::size_t index, const VectorRegister& value);
