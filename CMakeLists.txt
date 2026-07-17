@@ -29,6 +29,21 @@ target_include_directories(rvemu_bus_memory
 target_compile_features(rvemu_bus_memory PUBLIC cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_bus_memory)
 
+add_library(rvemu_core STATIC
+    src/core/cpu.cpp
+    src/core/cpu_state.cpp
+    src/core/decoder.cpp
+)
+
+target_include_directories(rvemu_core
+    PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+)
+
+target_link_libraries(rvemu_core PUBLIC rvemu_bus_memory)
+target_compile_features(rvemu_core PUBLIC cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_core)
+
 include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(tests)
