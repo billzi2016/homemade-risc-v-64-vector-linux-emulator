@@ -177,7 +177,7 @@ void test_reset_permissions_and_warl(TestContext& context) {
     context.expect((misa & bit('I' - 'A')) != 0U, "misa 必须声明已实现 I 扩展");
     context.expect((misa & bit('S' - 'A')) != 0U, "misa 必须声明 S-mode");
     context.expect((misa & bit('U' - 'A')) != 0U, "misa 必须声明 U-mode");
-    context.expect((misa & bit('M' - 'A')) == 0U, "misa 不得提前声明未实现 M 扩展");
+    context.expect((misa & bit('M' - 'A')) != 0U, "RV64M 完整实现后 misa 必须声明 M 扩展");
 
     const auto missing = csrs.access(rvemu::core::CsrAccessRequest{
         static_cast<rvemu::core::CsrAddress>(0x777U),

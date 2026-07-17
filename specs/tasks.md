@@ -107,7 +107,10 @@
 
 ## 7. 阶段 5：M、A、F、D、C 扩展
 
-- [ ] **ISA-101** 完整实现 M 扩展及除零、溢出语义。
+- [x] **ISA-101** 完整实现 M 扩展及除零、溢出语义。
+  - 实现文件：`include/rvemu/core/integer_m.hpp`、`src/core/integer_m.cpp`、`src/core/cpu.cpp`、`src/core/csr.cpp`
+  - 验证命令：`ctest --test-dir build --output-on-failure`；`ctest --test-dir build/sanitize --output-on-failure`
+  - 验证结果：全部 13 条 RV64M/M-W 指令、乘法高半部、除零、最小负数除以负一、`.W` 符号扩展、寄存器别名、x0 和保留编码测试通过；普通与 ASan/UBSan 完整测试均为 4/4 通过。
 - [ ] **ISA-102** 实现 LR/SC 保留集、失效条件和 `.W/.D` 语义。
 - [ ] **ISA-103** 实现规范要求的 AMO 运算与内存原子性。
 - [ ] **ISA-104** 实现浮点状态、舍入模式、异常标志和 NaN boxing。

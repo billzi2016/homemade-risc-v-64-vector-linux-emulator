@@ -4,6 +4,7 @@
 #include "rvemu/core/cpu.hpp"
 
 #include "rvemu/core/decoder.hpp"
+#include "rvemu/core/integer_m.hpp"
 
 #include <cstdint>
 #include <limits>
@@ -455,7 +456,14 @@ StepResult Cpu::execute(const InstructionPacket& packet) {
 
     case 0x33U: {  // OP
         std::uint64_t result = 0U;
-        if (instruction.function7 == 0U) {
+        if (instruction.function7 == 0x01U) {
+            const auto multiplied_or_divided = execute_integer_m(
+                instruction.function3, source1, source2, false);
+            if (!multiplied_or_divided.has_value()) {
+                return illegal(packet);
+            }
+            result = *multiplied_or_divided;
+        } else if (instruction.function7 == 0U) {
             switch (instruction.function3) {
             case 0x0U:
                 result = source1 + source2;
@@ -498,6 +506,15 @@ StepResult Cpu::execute(const InstructionPacket& packet) {
         const auto lhs = static_cast<std::uint32_t>(source1 & 0xFFFF'FFFFULL);
         const auto rhs = static_cast<std::uint32_t>(source2 & 0xFFFF'FFFFULL);
         std::uint32_t result = 0U;
+        if (instruction.function7 == 0x01U) {
+            const auto multiplied_or_divided = execute_integer_m(
+                instruction.function3, source1, source2, true);
+            if (!multiplied_or_divided.has_value()) {
+                return illegal(packet);
+            }
+            return write_and_retire(
+                instruction.destination, *multiplied_or_divided, sequential_pc);
+        }
         if (instruction.function7 == 0U && instruction.function3 == 0x0U) {
             result = lhs + rhs;
         } else if (instruction.function7 == 0x20U && instruction.function3 == 0x0U) {

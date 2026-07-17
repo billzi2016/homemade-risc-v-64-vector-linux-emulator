@@ -527,8 +527,8 @@ void test_fences_system_and_illegal(TestContext& context) {
     expect_trap(context, result, rvemu::core::ExceptionCause::Breakpoint, "EBREAK");
 
     fixture.cpu().state().set_integer(3U, 0x55U);
-    result = fixture.execute(encode_r(0x33U, 3U, 0U, 1U, 2U, 1U));
-    expect_trap(context, result, rvemu::core::ExceptionCause::IllegalInstruction, "未实现 M 扩展编码");
+    result = fixture.execute(encode_r(0x33U, 3U, 0U, 1U, 2U, 2U));
+    expect_trap(context, result, rvemu::core::ExceptionCause::IllegalInstruction, "保留 OP 编码");
     context.expect(fixture.cpu().state().integer(3U) == 0x55U, "非法指令不得写目标寄存器");
 
     result = fixture.execute(encode_i(0x73U, 1U, 1U, 0U, 0U));

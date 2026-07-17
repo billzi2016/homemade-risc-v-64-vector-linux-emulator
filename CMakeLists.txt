@@ -34,6 +34,7 @@ add_library(rvemu_core STATIC
     src/core/cpu.cpp
     src/core/cpu_state.cpp
     src/core/decoder.cpp
+    src/core/integer_m.cpp
 )
 
 target_include_directories(rvemu_core
