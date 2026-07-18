@@ -7,6 +7,7 @@
 #include "rvemu/core/cpu_state.hpp"
 #include "rvemu/core/instruction.hpp"
 #include "rvemu/core/trap.hpp"
+#include "rvemu/memory/mmu.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -42,7 +43,7 @@ struct TrapDelivery final {
 
 class Cpu final {
 public:
-    explicit Cpu(bus::Bus& bus) noexcept : bus_(bus) {}
+    explicit Cpu(bus::Bus& bus) noexcept : bus_(bus), mmu_(bus) {}
 
     // 暴露本 Hart 的唯一架构状态，平台与测试不得另建寄存器或 CSR 副本。
     [[nodiscard]] CpuState& state() noexcept { return state_; }
@@ -60,6 +61,43 @@ private:
         std::optional<InstructionPacket> instruction{};
         std::optional<Trap> trap{};
     };
+
+    struct GuestAccessResult final {
+        bus::AccessResult access{};
+        std::optional<Trap> trap{};
+        bus::ReservationToken token{};
+    };
+
+    [[nodiscard]] memory::MmuContext fetch_context() const noexcept;
+    [[nodiscard]] memory::MmuContext data_context() const noexcept;
+    [[nodiscard]] GuestAccessResult guest_read(
+        const InstructionPacket& packet,
+        std::uint64_t virtual_address,
+        bus::AccessWidth width,
+        memory::MmuAccessKind kind,
+        bus::AccessType bus_type);
+    [[nodiscard]] GuestAccessResult guest_write(
+        const InstructionPacket& packet,
+        std::uint64_t virtual_address,
+        bus::AccessWidth width,
+        std::uint64_t value,
+        bus::AccessType bus_type);
+    [[nodiscard]] GuestAccessResult guest_load_reserved(
+        const InstructionPacket& packet,
+        std::uint64_t virtual_address,
+        bus::AccessWidth width);
+    [[nodiscard]] GuestAccessResult guest_store_conditional(
+        const InstructionPacket& packet,
+        bus::ReservationToken token,
+        std::uint64_t virtual_address,
+        bus::AccessWidth width,
+        std::uint64_t value);
+    [[nodiscard]] GuestAccessResult guest_compare_exchange(
+        const InstructionPacket& packet,
+        std::uint64_t virtual_address,
+        bus::AccessWidth width,
+        std::uint64_t expected,
+        std::uint64_t desired);
 
     // 先取低半字判断 16/32 位长度，再按真实总线边界取完整指令，失败时保存精确地址。
     [[nodiscard]] FetchResult fetch();
@@ -82,6 +120,7 @@ private:
     [[nodiscard]] StepResult illegal(const InstructionPacket& packet) const;
 
     bus::Bus& bus_;
+    memory::Mmu mmu_;
     CpuState state_{};
     bool suppress_cycle_increment_{false};
     bool suppress_instret_increment_{false};

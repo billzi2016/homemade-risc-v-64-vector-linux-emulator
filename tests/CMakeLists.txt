@@ -11,6 +11,16 @@ rvemu_enable_strict_warnings(rvemu_bus_memory_tests)
 
 add_test(NAME rvemu.bus_memory COMMAND rvemu_bus_memory_tests)
 
+add_executable(rvemu_mmu_tests
+    unit/test_mmu.cpp
+)
+
+target_link_libraries(rvemu_mmu_tests PRIVATE rvemu_core)
+target_compile_features(rvemu_mmu_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_mmu_tests)
+
+add_test(NAME rvemu.mmu COMMAND rvemu_mmu_tests)
+
 add_executable(rvemu_cpu_rv64i_tests
     unit/test_cpu_rv64i.cpp
 )

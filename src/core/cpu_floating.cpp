@@ -43,13 +43,6 @@ void write_floating_result(
     state.csrs().accrue_floating_exception_flags(result.flags);
 }
 
-[[nodiscard]] Trap access_trap(
-    const InstructionPacket& packet,
-    ExceptionCause cause,
-    std::uint64_t address) noexcept {
-    return Trap{cause, address, packet.program_counter, packet.bits};
-}
-
 }  // namespace
 
 StepResult Cpu::execute_floating(
@@ -83,17 +76,20 @@ StepResult Cpu::execute_floating(
             return illegal(packet);
         }
         const auto address = state_.integer(instruction.source1) + immediate_i(packet.bits);
-        const auto loaded = bus_.read(
-            bus::PhysicalAddress{address}, width, bus::AccessType::Load);
-        if (!loaded.ok()) {
-            return StepResult::failure(
-                access_trap(packet, ExceptionCause::LoadAccessFault, address), packet.length);
+        const auto loaded = guest_read(
+            packet,
+            address,
+            width,
+            memory::MmuAccessKind::Load,
+            bus::AccessType::Load);
+        if (loaded.trap.has_value()) {
+            return StepResult::failure(*loaded.trap, packet.length);
         }
         if (format == FloatingFormat::Single) {
             state_.set_floating_single(
-                instruction.destination, static_cast<std::uint32_t>(loaded.value));
+                instruction.destination, static_cast<std::uint32_t>(loaded.access.value));
         } else {
-            state_.set_floating(instruction.destination, loaded.value);
+            state_.set_floating(instruction.destination, loaded.access.value);
         }
         return retire();
     }
@@ -109,14 +105,14 @@ StepResult Cpu::execute_floating(
         }
         const auto address = state_.integer(instruction.source1) + immediate_s(packet.bits);
         // FSW 是位模式传输，不执行 NaN-box 合法性检查；这与计算型单精度源不同。
-        const auto stored = bus_.write(
-            bus::PhysicalAddress{address},
+        const auto stored = guest_write(
+            packet,
+            address,
             width,
             state_.floating(instruction.source2),
             bus::AccessType::Store);
-        if (!stored.ok()) {
-            return StepResult::failure(
-                access_trap(packet, ExceptionCause::StoreAccessFault, address), packet.length);
+        if (stored.trap.has_value()) {
+            return StepResult::failure(*stored.trap, packet.length);
         }
         return retire();
     }

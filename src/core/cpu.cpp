@@ -92,7 +92,167 @@ void apply_acquire_ordering(bool acquire) noexcept {
     return ExceptionCause::IllegalInstruction;
 }
 
+[[nodiscard]] PrivilegeMode privilege_from_mpp(std::uint64_t mstatus) noexcept {
+    const auto mpp = static_cast<std::uint8_t>((mstatus >> 11U) & 0x3U);
+    if (mpp == static_cast<std::uint8_t>(PrivilegeMode::Supervisor)) {
+        return PrivilegeMode::Supervisor;
+    }
+    if (mpp == static_cast<std::uint8_t>(PrivilegeMode::Machine)) {
+        return PrivilegeMode::Machine;
+    }
+    return PrivilegeMode::User;
+}
+
+[[nodiscard]] ExceptionCause access_fault_cause(memory::MmuAccessKind kind) noexcept {
+    switch (kind) {
+    case memory::MmuAccessKind::InstructionFetch:
+        return ExceptionCause::InstructionAccessFault;
+    case memory::MmuAccessKind::Load:
+        return ExceptionCause::LoadAccessFault;
+    case memory::MmuAccessKind::Store:
+    case memory::MmuAccessKind::Atomic:
+        return ExceptionCause::StoreAccessFault;
+    }
+    return ExceptionCause::LoadAccessFault;
+}
+
 }  // namespace
+
+memory::MmuContext Cpu::fetch_context() const noexcept {
+    return memory::MmuContext{
+        state_.privilege(),
+        state_.csrs().peek(CsrAddress::Satp),
+        state_.csrs().peek(CsrAddress::Mstatus)};
+}
+
+memory::MmuContext Cpu::data_context() const noexcept {
+    const auto mstatus = state_.csrs().peek(CsrAddress::Mstatus);
+    auto privilege = state_.privilege();
+    if (privilege == PrivilegeMode::Machine && (mstatus & (1ULL << 17U)) != 0U) {
+        privilege = privilege_from_mpp(mstatus);
+    }
+    return memory::MmuContext{privilege, state_.csrs().peek(CsrAddress::Satp), mstatus};
+}
+
+Cpu::GuestAccessResult Cpu::guest_read(
+    const InstructionPacket& packet,
+    std::uint64_t virtual_address,
+    bus::AccessWidth width,
+    memory::MmuAccessKind kind,
+    bus::AccessType bus_type) {
+    const auto context = kind == memory::MmuAccessKind::InstructionFetch ?
+                             fetch_context() : data_context();
+    const auto translated = mmu_.translate(virtual_address, width, kind, context);
+    if (translated.fault.has_value()) {
+        return GuestAccessResult{
+            bus::AccessResult{},
+            Trap{translated.fault->cause, translated.fault->value, packet.program_counter, packet.bits},
+            bus::ReservationToken{}};
+    }
+    const auto loaded = bus_.read(*translated.physical_address, width, bus_type);
+    if (!loaded.ok()) {
+        return GuestAccessResult{
+            loaded,
+            Trap{access_fault_cause(kind), virtual_address, packet.program_counter, packet.bits},
+            bus::ReservationToken{}};
+    }
+    return GuestAccessResult{loaded, std::nullopt, bus::ReservationToken{}};
+}
+
+Cpu::GuestAccessResult Cpu::guest_write(
+    const InstructionPacket& packet,
+    std::uint64_t virtual_address,
+    bus::AccessWidth width,
+    std::uint64_t value,
+    bus::AccessType bus_type) {
+    const auto translated = mmu_.translate(
+        virtual_address, width, memory::MmuAccessKind::Atomic, data_context());
+    if (translated.fault.has_value()) {
+        return GuestAccessResult{
+            bus::AccessResult{},
+            Trap{translated.fault->cause, translated.fault->value, packet.program_counter, packet.bits},
+            bus::ReservationToken{}};
+    }
+    const auto stored = bus_.write(*translated.physical_address, width, value, bus_type);
+    if (!stored.ok()) {
+        return GuestAccessResult{
+            stored,
+            Trap{ExceptionCause::StoreAccessFault, virtual_address, packet.program_counter, packet.bits},
+            bus::ReservationToken{}};
+    }
+    return GuestAccessResult{stored, std::nullopt, bus::ReservationToken{}};
+}
+
+Cpu::GuestAccessResult Cpu::guest_load_reserved(
+    const InstructionPacket& packet,
+    std::uint64_t virtual_address,
+    bus::AccessWidth width) {
+    const auto translated = mmu_.translate(
+        virtual_address, width, memory::MmuAccessKind::Load, data_context());
+    if (translated.fault.has_value()) {
+        return GuestAccessResult{
+            bus::AccessResult{},
+            Trap{translated.fault->cause, translated.fault->value, packet.program_counter, packet.bits},
+            bus::ReservationToken{}};
+    }
+    const auto loaded = bus_.load_reserved(*translated.physical_address, width);
+    if (!loaded.access.ok()) {
+        return GuestAccessResult{
+            loaded.access,
+            Trap{ExceptionCause::LoadAccessFault, virtual_address, packet.program_counter, packet.bits},
+            bus::ReservationToken{}};
+    }
+    return GuestAccessResult{loaded.access, std::nullopt, loaded.token};
+}
+
+Cpu::GuestAccessResult Cpu::guest_store_conditional(
+    const InstructionPacket& packet,
+    bus::ReservationToken token,
+    std::uint64_t virtual_address,
+    bus::AccessWidth width,
+    std::uint64_t value) {
+    const auto translated = mmu_.translate(
+        virtual_address, width, memory::MmuAccessKind::Store, data_context());
+    if (translated.fault.has_value()) {
+        return GuestAccessResult{
+            bus::AccessResult{},
+            Trap{translated.fault->cause, translated.fault->value, packet.program_counter, packet.bits},
+            bus::ReservationToken{}};
+    }
+    const auto stored = bus_.store_conditional(token, *translated.physical_address, width, value);
+    if (!stored.ok()) {
+        return GuestAccessResult{
+            stored,
+            Trap{ExceptionCause::StoreAccessFault, virtual_address, packet.program_counter, packet.bits},
+            bus::ReservationToken{}};
+    }
+    return GuestAccessResult{stored, std::nullopt, bus::ReservationToken{}};
+}
+
+Cpu::GuestAccessResult Cpu::guest_compare_exchange(
+    const InstructionPacket& packet,
+    std::uint64_t virtual_address,
+    bus::AccessWidth width,
+    std::uint64_t expected,
+    std::uint64_t desired) {
+    const auto translated = mmu_.translate(
+        virtual_address, width, memory::MmuAccessKind::Store, data_context());
+    if (translated.fault.has_value()) {
+        return GuestAccessResult{
+            bus::AccessResult{},
+            Trap{translated.fault->cause, translated.fault->value, packet.program_counter, packet.bits},
+            bus::ReservationToken{}};
+    }
+    const auto exchanged = bus_.compare_exchange(
+        *translated.physical_address, width, expected, desired);
+    if (!exchanged.ok()) {
+        return GuestAccessResult{
+            exchanged,
+            Trap{ExceptionCause::StoreAccessFault, virtual_address, packet.program_counter, packet.bits},
+            bus::ReservationToken{}};
+    }
+    return GuestAccessResult{exchanged, std::nullopt, bus::ReservationToken{}};
+}
 
 Cpu::FetchResult Cpu::fetch() {
     const auto pc = state_.program_counter();
@@ -102,17 +262,18 @@ Cpu::FetchResult Cpu::fetch() {
             Trap{ExceptionCause::InstructionAddressMisaligned, pc, pc, 0U}};
     }
 
-    const auto lower_result = bus_.read(
-        bus::PhysicalAddress{pc},
+    const auto fetch_packet = InstructionPacket{pc, 0U, 0U};
+    const auto lower_result = guest_read(
+        fetch_packet,
+        pc,
         bus::AccessWidth::HalfWord,
+        memory::MmuAccessKind::InstructionFetch,
         bus::AccessType::InstructionFetch);
-    if (!lower_result.ok()) {
-        return FetchResult{
-            std::nullopt,
-            Trap{ExceptionCause::InstructionAccessFault, pc, pc, 0U}};
+    if (lower_result.trap.has_value()) {
+        return FetchResult{std::nullopt, *lower_result.trap};
     }
 
-    const auto lower = static_cast<std::uint16_t>(lower_result.value & 0xFFFFU);
+    const auto lower = static_cast<std::uint16_t>(lower_result.access.value & 0xFFFFU);
     if ((lower & 0x3U) != 0x3U) {
         return FetchResult{InstructionPacket{pc, lower, 2U}, std::nullopt};
     }
@@ -125,17 +286,18 @@ Cpu::FetchResult Cpu::fetch() {
     }
 
     const auto upper_address = pc + 2U;
-    const auto upper_result = bus_.read(
-        bus::PhysicalAddress{upper_address},
+    auto upper_result = guest_read(
+        fetch_packet,
+        upper_address,
         bus::AccessWidth::HalfWord,
+        memory::MmuAccessKind::InstructionFetch,
         bus::AccessType::InstructionFetch);
-    if (!upper_result.ok()) {
-        return FetchResult{
-            std::nullopt,
-            Trap{ExceptionCause::InstructionAccessFault, upper_address, pc, lower}};
+    if (upper_result.trap.has_value()) {
+        upper_result.trap->instruction = lower;
+        return FetchResult{std::nullopt, *upper_result.trap};
     }
 
-    const auto upper = static_cast<std::uint32_t>(upper_result.value & 0xFFFFU);
+    const auto upper = static_cast<std::uint32_t>(upper_result.access.value & 0xFFFFU);
     const auto bits = static_cast<std::uint32_t>(lower) | (upper << 16U);
     return FetchResult{InstructionPacket{pc, bits, 4U}, std::nullopt};
 }
@@ -364,16 +526,18 @@ StepResult Cpu::execute_standard(const InstructionPacket& packet) {
         }
 
         const auto address = source1 + immediate_i(packet.bits);
-        const auto loaded = bus_.read(
-            bus::PhysicalAddress{address},
+        const auto loaded = guest_read(
+            packet,
+            address,
             width,
+            memory::MmuAccessKind::Load,
             bus::AccessType::Load);
-        if (!loaded.ok()) {
-            return StepResult::failure(
-                make_trap(packet, ExceptionCause::LoadAccessFault, address),
-                packet.length);
+        if (loaded.trap.has_value()) {
+            return StepResult::failure(*loaded.trap, packet.length);
         }
-        const auto value = sign_result ? sign_extend(loaded.value, sign_width) : loaded.value;
+        const auto value = sign_result ?
+                               sign_extend(loaded.access.value, sign_width) :
+                               loaded.access.value;
         return write_and_retire(instruction.destination, value, sequential_pc);
     }
 
@@ -396,15 +560,14 @@ StepResult Cpu::execute_standard(const InstructionPacket& packet) {
         }
 
         const auto address = source1 + immediate_s(packet.bits);
-        const auto stored = bus_.write(
-            bus::PhysicalAddress{address},
+        const auto stored = guest_write(
+            packet,
+            address,
             width,
             source2,
             bus::AccessType::Store);
-        if (!stored.ok()) {
-            return StepResult::failure(
-                make_trap(packet, ExceptionCause::StoreAccessFault, address),
-                packet.length);
+        if (stored.trap.has_value()) {
+            return StepResult::failure(*stored.trap, packet.length);
         }
         return retire(sequential_pc);
     }
@@ -591,11 +754,9 @@ StepResult Cpu::execute_standard(const InstructionPacket& packet) {
             }
 
             apply_release_ordering(release);
-            const auto loaded = bus_.load_reserved(bus::PhysicalAddress{address}, width);
-            if (!loaded.access.ok()) {
-                return StepResult::failure(
-                    make_trap(packet, ExceptionCause::LoadAccessFault, address),
-                    packet.length);
+            const auto loaded = guest_load_reserved(packet, address, width);
+            if (loaded.trap.has_value()) {
+                return StepResult::failure(*loaded.trap, packet.length);
             }
             state_.set_reservation_token(loaded.token);
             apply_acquire_ordering(acquire);
@@ -615,16 +776,14 @@ StepResult Cpu::execute_standard(const InstructionPacket& packet) {
             apply_release_ordering(release);
             const auto token = state_.reservation_token();
             state_.clear_reservation_token();
-            const auto stored = bus_.store_conditional(
-                token, bus::PhysicalAddress{address}, width, source2);
-            if (!stored.ok()) {
-                return StepResult::failure(
-                    make_trap(packet, ExceptionCause::StoreAccessFault, address),
-                    packet.length);
+            const auto stored = guest_store_conditional(
+                packet, token, address, width, source2);
+            if (stored.trap.has_value()) {
+                return StepResult::failure(*stored.trap, packet.length);
             }
             apply_acquire_ordering(acquire);
             return write_and_retire(
-                instruction.destination, stored.exchanged ? 0U : 1U, sequential_pc);
+                instruction.destination, stored.access.exchanged ? 0U : 1U, sequential_pc);
         }
 
         const auto operation = decode_atomic_operation(function5);
@@ -638,30 +797,27 @@ StepResult Cpu::execute_standard(const InstructionPacket& packet) {
         }
 
         apply_release_ordering(release);
-        auto observed = bus_.read(bus::PhysicalAddress{address}, width, bus::AccessType::Atomic);
-        if (!observed.ok()) {
-            return StepResult::failure(
-                make_trap(packet, ExceptionCause::StoreAccessFault, address),
-                packet.length);
+        auto observed = guest_read(
+            packet, address, width, memory::MmuAccessKind::Atomic, bus::AccessType::Atomic);
+        if (observed.trap.has_value()) {
+            return StepResult::failure(*observed.trap, packet.length);
         }
 
         // CAS 失败说明另一个总线主设备已更新内存；使用它返回的新观察值重算，直至
         // 某次比较与写入在 RAM 锁内原子提交，期间不会把过期结果写回。
-        std::uint64_t original = observed.value;
+        std::uint64_t original = observed.access.value;
         for (;;) {
             const auto desired = execute_atomic_operation(
                 *operation, original, source2, word_operation);
-            const auto exchanged = bus_.compare_exchange(
-                bus::PhysicalAddress{address}, width, original, desired);
-            if (!exchanged.ok()) {
-                return StepResult::failure(
-                    make_trap(packet, ExceptionCause::StoreAccessFault, address),
-                    packet.length);
+            const auto exchanged = guest_compare_exchange(
+                packet, address, width, original, desired);
+            if (exchanged.trap.has_value()) {
+                return StepResult::failure(*exchanged.trap, packet.length);
             }
-            if (exchanged.exchanged) {
+            if (exchanged.access.exchanged) {
                 break;
             }
-            original = exchanged.value;
+            original = exchanged.access.value;
         }
 
         apply_acquire_ordering(acquire);
@@ -707,6 +863,25 @@ StepResult Cpu::execute_system(
     std::uint64_t sequential_pc) {
     // funct3=0 使用完整机器码区分特权指令；其余 funct3 才解释为 Zicsr 操作。
     if (instruction.function3 == 0U) {
+        if ((packet.bits & 0xFE00'707FU) == 0x1200'0073U) {  // SFENCE.VMA
+            const auto privilege = state_.privilege();
+            const auto tvm = (state_.csrs().peek(CsrAddress::Mstatus) & (1ULL << 20U)) != 0U;
+            if (privilege == PrivilegeMode::User ||
+                (privilege == PrivilegeMode::Supervisor && tvm)) {
+                return illegal(packet);
+            }
+            const auto virtual_address = instruction.source1 == 0U ?
+                                             std::optional<std::uint64_t>{} :
+                                             std::optional<std::uint64_t>{source1};
+            const auto asid = instruction.source2 == 0U ?
+                                  std::optional<std::uint16_t>{} :
+                                  std::optional<std::uint16_t>{
+                                      static_cast<std::uint16_t>(
+                                          state_.integer(instruction.source2) & 0xFFFFU)};
+            mmu_.sfence_vma(virtual_address, asid);
+            state_.set_program_counter(sequential_pc);
+            return StepResult::success(packet.length);
+        }
         if (packet.bits == 0x0000'0073U) {  // ECALL
             return StepResult::failure(
                 make_trap(packet, environment_call_cause(state_.privilege()), 0U),

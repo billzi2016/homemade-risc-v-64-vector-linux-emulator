@@ -142,23 +142,44 @@
 
 ## 8. 阶段 6：MMU、Sv39 与 TLB
 
-- [ ] **MMU-001** 实现 `satp` Bare/Sv39 模式及规范虚拟地址检查。
-- [ ] **MMU-002** 实现三级页表漫游和物理 PTE 读取。
-- [ ] **MMU-003** 实现 4 KiB、2 MiB、1 GiB 叶子页和错位超级页错误。
-- [ ] **MMU-004** 实现 U/S、R/W/X、SUM、MXR 和有效性权限规则。
+- [x] **MMU-001** 实现 `satp` Bare/Sv39 模式及规范虚拟地址检查。
+  - 实现文件：`include/rvemu/memory/mmu.hpp`、`src/memory/mmu.cpp`
+  - 验证命令：`./build/tests/rvemu_mmu_tests`
+  - 验证结果：Bare 直通、Sv39 模式识别和非规范 VA 页错误通过。
+- [x] **MMU-002** 实现三级页表漫游和物理 PTE 读取。
+  - 实现文件：`include/rvemu/memory/mmu.hpp`、`src/memory/mmu.cpp`
+  - 验证命令：`./build/tests/rvemu_mmu_tests`
+  - 验证结果：三级根表、非叶子 PTE、叶子 PTE 和物理 PTE 小端读取通过。
+- [x] **MMU-003** 实现 4 KiB、2 MiB、1 GiB 叶子页和错位超级页错误。
+  - 实现文件：`src/memory/mmu.cpp`
+  - 验证命令：`./build/tests/rvemu_mmu_tests`
+  - 验证结果：4 KiB、2 MiB、1 GiB 地址合成和 2 MiB/1 GiB 错位超级页错误通过。
+- [x] **MMU-004** 实现 U/S、R/W/X、SUM、MXR 和有效性权限规则。
+  - 实现文件：`src/memory/mmu.cpp`、`src/core/cpu.cpp`、`src/core/cpu_floating.cpp`
+  - 验证命令：`./build/tests/rvemu_mmu_tests`；`ctest --test-dir build --output-on-failure`
+  - 验证结果：U/S 页权限、R/W/X、SUM、MXR、AMO R/W 联合权限和 CPU 统一访存入口通过。
 - [ ] **MMU-005** 完成叶子 PTE 的 A/D 位原子更新父级里程碑。
-  - [ ] **MMU-005A** 在叶子有效性和权限检查成功后确定 A/D 更新集合。
-  - [ ] **MMU-005B** 提供唯一的物理总线原子读改写事务，不拆成可插入事件的普通读写。
-  - [ ] **MMU-005C** 使用原始 PTE 值进行条件比较并原子提交更新。
+  - [x] **MMU-005A** 在叶子有效性和权限检查成功后确定 A/D 更新集合。
+  - [x] **MMU-005B** 提供唯一的物理总线原子读改写事务，不拆成可插入事件的普通读写。
+  - [x] **MMU-005C** 使用原始 PTE 值进行条件比较并原子提交更新。
   - [ ] **MMU-005D** 检测 PTE 在提交前发生变化，并从根页表重新执行漫游。
   - [ ] **MMU-005E** 正确处理 PTE 物理区域不可写、越界和总线更新失败。
   - [ ] **MMU-005F** 保证失败时不填充 TLB、不执行最终访存且不留下部分 PTE 修改。
-  - [ ] **MMU-005G** 验证加载只置 A，存储同时置 A/D，权限拒绝不修改 A/D。
+  - [x] **MMU-005G** 验证加载只置 A，存储同时置 A/D，权限拒绝不修改 A/D。
   - [ ] **MMU-005H** 验证 TLB 填充严格发生在 PTE 更新成功之后。
+  - 已验证结果：加载只置 A、存储置 A/D、权限拒绝不修改 A/D；A/D 更新使用物理总线 `compare_exchange`。父级暂不勾选，因为 PTE 竞争变化和更新失败路径仍需专项生产测试。
   - 完成条件：以上子任务全部完成，并通过 PTE 竞争变化、总线失败和无副作用测试。
-- [ ] **MMU-006** 实现至少 64 项 TLB，标签包含必要地址空间信息。
-- [ ] **MMU-007** 实现 `SFENCE.VMA` 全局与选择性失效语义。
-- [ ] **MMU-008** 分别验证取指、加载和存储页错误的 `cause/tval`。
+- [x] **MMU-006** 实现至少 64 项 TLB，标签包含必要地址空间信息。
+  - 实现文件：`include/rvemu/memory/mmu.hpp`、`src/memory/mmu.cpp`
+  - 验证命令：`./build/tests/rvemu_mmu_tests`
+  - 验证结果：TLB 填充、命中旧翻译、ASID/global 标签字段和 64 项容量实现通过代码与测试覆盖。
+- [x] **MMU-007** 实现 `SFENCE.VMA` 全局与选择性失效语义。
+  - 实现文件：`src/memory/mmu.cpp`、`src/core/cpu.cpp`
+  - 验证命令：`./build/tests/rvemu_mmu_tests`
+  - 验证结果：按 VA 失效后重新页表漫游并观察新 PTE；CPU 解码 `SFENCE.VMA` 并调用唯一 TLB 失效入口。
+- [x] **MMU-008** 分别验证取指、加载和存储页错误的 `cause/tval`。
+  - 验证命令：`./build/tests/rvemu_mmu_tests`
+  - 验证结果：instruction/load/store page fault 的 cause 与原始虚拟地址 tval 均通过。
 
 ## 9. 阶段 7：RVV 1.0
 

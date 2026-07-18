@@ -41,6 +41,7 @@ add_library(rvemu_core STATIC
     src/core/integer_m.cpp
     src/core/soft_float_arithmetic.cpp
     src/core/soft_float_conversion.cpp
+    src/memory/mmu.cpp
 )
 
 target_include_directories(rvemu_core
