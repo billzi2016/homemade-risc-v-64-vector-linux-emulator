@@ -679,15 +679,15 @@ StepResult Cpu::execute_standard(const InstructionPacket& packet) {
         return execute_floating(packet, instruction, sequential_pc);
 
     case 0x0FU:  // FENCE / FENCE.I
-        if (instruction.destination != 0U || instruction.source1 != 0U) {
-            return illegal(packet);
-        }
         if (instruction.function3 == 0U) {
-            // 单 Hart、无缓存模型中，所有先前总线事务已同步提交，因此 FENCE 无额外状态。
+            // 单 Hart、无缓存模型中，所有先前总线事务已同步提交，因此 FENCE、FENCE.TSO、
+            // 保留字段和 hint fence 都没有额外状态；接受完整编码空间可避免把规范 hint
+            // 或未来细粒度 fence 字段误判成非法指令。
             return retire(sequential_pc);
         }
-        if (instruction.function3 == 1U && (packet.bits >> 20U) == 0U) {
-            // 当前解释器没有指令缓存，FENCE.I 的同步要求天然满足。
+        if (instruction.function3 == 1U) {
+            // Zifencei 把 rd/rs1/imm 保留给未来更细粒度的同步形式；基础实现必须按完整
+            // instruction-stream 同步处理这些字段，不能因测试使用非零保留字段而陷入非法指令。
             return retire(sequential_pc);
         }
         return illegal(packet);

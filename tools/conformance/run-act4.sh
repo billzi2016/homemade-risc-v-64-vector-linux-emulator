@@ -67,7 +67,7 @@ for elf in $(find "$elf_dir" -type f -name '*.elf' | sort); do
     fi
 done
 
-echo "ACT4 总数=$total，通过=$passed，失败或超时=$failed"
+echo "ACT4 总数=${total}，通过=${passed}，失败或超时=${failed}"
 echo "完整日志：$result_log"
 if [ "$total" -eq 0 ] || [ "$failed" -ne 0 ]; then
     exit 1

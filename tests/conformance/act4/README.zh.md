@@ -18,3 +18,7 @@ tools/conformance/run-act4.sh
 
 生成的测试、ELF、签名和日志全部位于 `artifacts/`。只有日志显示所有生成 ELF
 均由 `rvemu_conformance_runner` 实际通过时，`ISA-107` 才能标记完成。
+
+`rvmodel_macros.h` 中的中断注入宏在本档位定义为空操作，仅用于满足 ACT4 通用
+环境头的宏完整性检查。当前配置没有启用特权、中断、CLINT 或 PLIC 一致性测试；
+这些空操作不得作为 `PRV-004`、`DEV-001` 或 `DEV-002` 的完成证据。

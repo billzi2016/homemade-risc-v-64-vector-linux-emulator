@@ -30,6 +30,21 @@
 
 #define RVMODEL_IO_INIT(_R1, _R2, _R3)
 
+// ACT4 4.0.0 的通用环境头会无条件检查中断注入宏是否存在，即使当前
+// `test_config.yaml` 已关闭特权/中断测试。这里显式定义为无操作，是为了表达
+// “当前非特权 ISA 一致性档位不提供外部中断注入后端”，不能作为 CLINT/PLIC、
+// PRV 委托或中断抢占语义已经通过的证据。
+#define RVMODEL_INTERRUPT_LATENCY 1
+#define RVMODEL_TIMER_INT_SOON_DELAY 1
+#define RVMODEL_SET_MEXT_INT(_R1, _R2)
+#define RVMODEL_CLR_MEXT_INT(_R1, _R2)
+#define RVMODEL_SET_MSW_INT(_R1, _R2)
+#define RVMODEL_CLR_MSW_INT(_R1, _R2)
+#define RVMODEL_SET_SEXT_INT(_R1, _R2)
+#define RVMODEL_CLR_SEXT_INT(_R1, _R2)
+#define RVMODEL_SET_SSW_INT(_R1, _R2)
+#define RVMODEL_CLR_SSW_INT(_R1, _R2)
+
 // HTIF 控制字的高 32 位编码设备 1/命令 1，低字节保存字符。临时寄存器只使用
 // ACT4 显式授权的 _R1/_R2/_R3，防止诊断打印破坏被测寄存器上下文。
 #define RVMODEL_IO_WRITE_STR(_R1, _R2, _R3, _STR_PTR) \

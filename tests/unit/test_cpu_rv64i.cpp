@@ -505,8 +505,46 @@ void test_fences_system_and_illegal(TestContext& context) {
     CpuFixture fixture;
     auto result = fixture.execute(0x0FF0'000FU);
     expect_retired(context, result, "FENCE");
+    result = fixture.execute(0x8330'000FU);
+    expect_retired(context, result, "FENCE.TSO");
+    result = fixture.execute(0x0331'000FU);
+    expect_retired(context, result, "FENCE 非零 rs1 保留字段");
+    result = fixture.execute(0x0330'008FU);
+    expect_retired(context, result, "FENCE 非零 rd 保留字段");
+    result = fixture.execute(0x1330'000FU);
+    expect_retired(context, result, "FENCE 非零 fm 保留字段");
+    result = fixture.execute(0x0031'000FU);
+    expect_retired(context, result, "FENCE hint pred 为空");
     result = fixture.execute(0x0000'100FU);
     expect_retired(context, result, "FENCE.I");
+    result = fixture.execute(0x0001'100FU);
+    expect_retired(context, result, "FENCE.I 非零 rs1 保留字段");
+    result = fixture.execute(0x0000'108FU);
+    expect_retired(context, result, "FENCE.I 非零 rd 保留字段");
+    result = fixture.execute(0x0010'100FU);
+    expect_retired(context, result, "FENCE.I 非零 imm 保留字段");
+
+    // ACT4 的 Zifencei 用例会把后续指令改写为新的 ADDI，再依赖 FENCE.I 使后续取指
+    // 观察到该写入。本模拟器没有独立 I-cache，关键不变量是 STORE 和取指共享同一总线/RAM。
+    constexpr std::uint64_t modified_instruction_address = kRamBase + 8U;
+    const auto seed = fixture.bus().write(
+        rvemu::bus::PhysicalAddress{modified_instruction_address},
+        rvemu::bus::AccessWidth::Word,
+        encode_i(0x13U, 24U, 0U, 24U, 1U),
+        rvemu::bus::AccessType::Initialization);
+    context.expect(seed.ok(), "自修改测试初始指令写入必须成功");
+    fixture.cpu().state().reset(kRamBase);
+    fixture.cpu().state().set_integer(1U, modified_instruction_address);
+    fixture.cpu().state().set_integer(16U, encode_i(0x13U, 24U, 0U, 24U, 5U));
+    fixture.cpu().state().set_integer(24U, 3U);
+    result = fixture.execute(encode_s(2U, 1U, 16U, 0U), kRamBase);
+    expect_retired(context, result, "自修改代码 SW");
+    result = fixture.execute(0x0000'100FU, kRamBase + 4U);
+    expect_retired(context, result, "自修改代码 FENCE.I");
+    fixture.cpu().state().set_program_counter(modified_instruction_address);
+    result = fixture.cpu().step();
+    expect_retired(context, result, "自修改代码重新取指");
+    context.expect(fixture.cpu().state().integer(24U) == 8U, "FENCE.I 后必须执行被 SW 改写的新指令");
 
     const std::array<rvemu::core::PrivilegeMode, 3U> modes{
         rvemu::core::PrivilegeMode::User,

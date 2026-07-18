@@ -608,7 +608,10 @@ FloatingResult floating_divide(
         return FloatingResult{soft_float_detail::signed_zero(format, sign), 0U};
     }
 
-    const auto precision = static_cast<std::size_t>(format.fraction_bits) + 5U;
+    // 除法结果可能在最终编码时继续右移到次正规量化单位；只多算少量 guard 位会在
+    // 极小商上丢掉决定舍入方向的有效位。这里保留 128 个额外商位，再由统一舍入入口
+    // 折叠为 half/sticky，覆盖 binary32/binary64 的 ACT4 次正规边界。
+    const auto precision = static_cast<std::size_t>(format.fraction_bits) + 128U;
     bool remainder = false;
     auto quotient = soft_float_detail::divide_significands(
         lhs.significand, rhs.significand, precision, remainder);

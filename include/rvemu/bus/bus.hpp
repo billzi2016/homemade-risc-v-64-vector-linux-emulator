@@ -36,7 +36,7 @@ public:
         std::uint64_t desired,
         AccessType type = AccessType::Atomic);
 
-    // 在同一总线事务内读取并建立精确到操作数字节范围的单 Hart 保留。
+    // 在同一总线事务内读取并建立单 Hart 保留；当前模型使用固定 8 字节保留粒度。
     [[nodiscard]] LoadReservedResult load_reserved(
         PhysicalAddress address,
         AccessWidth width);
@@ -61,11 +61,12 @@ private:
 
     struct ReservationRecord final {
         ReservationToken token{};
-        PhysicalAddress address{};
+        PhysicalAddress load_address{};
+        PhysicalAddress reserved_base{};
         std::uint64_t length{0U};
     };
 
-    // 调用方必须持有 transaction_mutex_；成功写入统一经过此处使重叠保留失效。
+    // 调用方必须持有 transaction_mutex_；外部 DMA 写入和成功 AMO 通过此处使重叠保留失效。
     void invalidate_reservation_locked(PhysicalAddress address, std::uint64_t length) noexcept;
     [[nodiscard]] ReservationToken next_reservation_token_locked() noexcept;
 

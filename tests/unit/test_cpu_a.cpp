@@ -50,6 +50,18 @@ private:
            ((destination & 0x1FU) << 7U) | 0x2FU;
 }
 
+// 普通 store 用于验证同 Hart LR/SC 之间的非原子写入不会被误当成外部失效事件。
+[[nodiscard]] constexpr std::uint32_t encode_store(
+    std::uint32_t function3,
+    std::uint32_t source1,
+    std::uint32_t source2,
+    std::uint32_t immediate12) noexcept {
+    const auto upper = (immediate12 >> 5U) & 0x7FU;
+    const auto lower = immediate12 & 0x1FU;
+    return (upper << 25U) | ((source2 & 0x1FU) << 20U) | ((source1 & 0x1FU) << 15U) |
+           ((function3 & 0x07U) << 12U) | (lower << 7U) | 0x23U;
+}
+
 class CpuFixture final {
 public:
     CpuFixture()
@@ -169,6 +181,48 @@ void test_lr_sc_basic(TestContext& context) {
     context.expect(
         double_word.read_data(kDataAddress, false) == 0xFEDC'BA98'7654'3210ULL,
         "SC.D 必须提交完整双字");
+
+    CpuFixture lr_word_sc_double;
+    lr_word_sc_double.write_data(kDataAddress, false, 0x1111'2222'3333'4444ULL);
+    lr_word_sc_double.cpu().state().set_integer(1U, kDataAddress);
+    result = lr_word_sc_double.execute(encode_atomic(0x02U, true, 5U, 1U, 0U));
+    expect_retired(context, result, "LR.W 后接 SC.D 前置 LR");
+    lr_word_sc_double.cpu().state().set_integer(2U, 0xAAAA'BBBB'CCCC'DDDDULL);
+    result = lr_word_sc_double.execute(encode_atomic(0x03U, false, 6U, 1U, 2U));
+    expect_retired(context, result, "LR.W 后接 SC.D");
+    context.expect(lr_word_sc_double.cpu().state().integer(6U) == 0U, "同地址 LR.W 后 SC.D 必须成功");
+    context.expect(
+        lr_word_sc_double.read_data(kDataAddress, false) == 0xAAAA'BBBB'CCCC'DDDDULL,
+        "LR.W 后 SC.D 必须提交完整双字");
+
+    CpuFixture lr_double_sc_word;
+    lr_double_sc_word.write_data(kDataAddress, false, 0x9999'8888'7777'6666ULL);
+    lr_double_sc_word.cpu().state().set_integer(1U, kDataAddress);
+    result = lr_double_sc_word.execute(encode_atomic(0x02U, false, 5U, 1U, 0U));
+    expect_retired(context, result, "LR.D 后接 SC.W 前置 LR");
+    lr_double_sc_word.cpu().state().set_integer(2U, 0x1234'5678U);
+    result = lr_double_sc_word.execute(encode_atomic(0x03U, true, 6U, 1U, 2U));
+    expect_retired(context, result, "LR.D 后接 SC.W");
+    context.expect(lr_double_sc_word.cpu().state().integer(6U) == 0U, "同地址 LR.D 后 SC.W 必须成功");
+    context.expect(
+        lr_double_sc_word.read_data(kDataAddress, false) == 0x9999'8888'1234'5678ULL,
+        "LR.D 后 SC.W 只提交低 32 位并保留高 32 位");
+
+    CpuFixture store_between;
+    store_between.write_data(kDataAddress, false, 0x0102'0304'0506'0708ULL);
+    store_between.cpu().state().set_integer(1U, kDataAddress);
+    result = store_between.execute(encode_atomic(0x02U, false, 5U, 1U, 0U));
+    expect_retired(context, result, "LR.D 后接同 Hart SB 前置 LR");
+    store_between.cpu().state().set_integer(2U, 0xAAU);
+    result = store_between.execute(encode_store(0U, 1U, 2U, 0U));
+    expect_retired(context, result, "LR.D 后同 Hart SB");
+    store_between.cpu().state().set_integer(2U, 0xDEAD'BEEF'CAFE'BABEULL);
+    result = store_between.execute(encode_atomic(0x03U, false, 6U, 1U, 2U));
+    expect_retired(context, result, "同 Hart SB 后 SC.D");
+    context.expect(store_between.cpu().state().integer(6U) == 0U, "同 Hart 普通 store 不得使 SC.D 失败");
+    context.expect(
+        store_between.read_data(kDataAddress, false) == 0xDEAD'BEEF'CAFE'BABEULL,
+        "同 Hart SB 后成功 SC.D 必须提交最终双字");
 }
 
 // 精确保留范围允许不重叠写；普通写、DMA 和 AMO 对重叠字节必须使 SC 失败。

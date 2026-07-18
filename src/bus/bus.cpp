@@ -11,6 +11,8 @@
 namespace rvemu::bus {
 namespace {
 
+constexpr std::uint64_t kReservationGranuleBytes = 8U;
+
 [[nodiscard]] BusError make_error(
     BusErrorCode code,
     PhysicalAddress address,
@@ -18,6 +20,10 @@ namespace {
     std::string region,
     std::string detail) {
     return BusError{code, address, length, std::move(region), std::move(detail)};
+}
+
+[[nodiscard]] constexpr PhysicalAddress reservation_base(PhysicalAddress address) noexcept {
+    return PhysicalAddress{address.value() & ~(kReservationGranuleBytes - 1U)};
 }
 
 }  // namespace
@@ -129,7 +135,7 @@ AccessResult Bus::write(
         return located.failure;
     }
     const auto result = located.region->write(located.offset, width, value, type);
-    if (result.ok()) {
+    if (result.ok() && type == AccessType::DmaWrite) {
         invalidate_reservation_locked(address, width_in_bytes(width));
     }
     return result;
@@ -167,7 +173,11 @@ LoadReservedResult Bus::load_reserved(PhysicalAddress address, AccessWidth width
     }
 
     const auto token = next_reservation_token_locked();
-    reservation_ = ReservationRecord{token, address, width_in_bytes(width)};
+    reservation_ = ReservationRecord{
+        token,
+        address,
+        reservation_base(address),
+        kReservationGranuleBytes};
     return LoadReservedResult{loaded, token};
 }
 
@@ -190,8 +200,9 @@ AccessResult Bus::store_conditional(
     const auto length = width_in_bytes(width);
     const auto matches = token.valid() && prior_reservation.has_value() &&
                          prior_reservation->token.value == token.value &&
-                         prior_reservation->address == address &&
-                         prior_reservation->length == length;
+                         prior_reservation->load_address == address &&
+                         reservation_base(address) == prior_reservation->reserved_base &&
+                         length <= prior_reservation->length;
     if (!matches) {
         return AccessResult::success(0U, false);
     }
@@ -213,7 +224,7 @@ void Bus::invalidate_reservation_locked(
 
     const auto write_first = address.value();
     const auto write_last = write_first + length - 1U;
-    const auto reserved_first = reservation_->address.value();
+    const auto reserved_first = reservation_->reserved_base.value();
     const auto reserved_last = reserved_first + reservation_->length - 1U;
     if (write_first <= reserved_last && reserved_first <= write_last) {
         reservation_.reset();
