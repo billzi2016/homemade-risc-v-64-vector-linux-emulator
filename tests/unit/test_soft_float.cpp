@@ -97,6 +97,34 @@ void test_fused_and_rounding(TestContext& context) {
     context.expect(fused.bits == 0x2880'0000U && fused.flags == 0U,
                    "FMA 必须保留精确乘积并只舍入一次");
 
+    const auto fma_tiny_after_rounding = rvemu::core::floating_fused_multiply_add(
+        Format::Single,
+        0x0080'0000U,
+        0x32C1'1A50U,
+        0x007F'FFFFU,
+        false,
+        false,
+        Mode::Up);
+    const auto underflow_flags = static_cast<std::uint8_t>(
+        flag(rvemu::core::FloatingExceptionFlag::Underflow) |
+        flag(rvemu::core::FloatingExceptionFlag::Inexact));
+    context.expect(fma_tiny_after_rounding.bits == 0x0080'0000U &&
+                       fma_tiny_after_rounding.flags == underflow_flags,
+                   "FMA 舍到最小正规数时仍需按无界指数 after-rounding tininess 设置 UF|NX");
+
+    const auto fma_not_tiny_after_rounding = rvemu::core::floating_fused_multiply_add(
+        Format::Single,
+        0x3F00'FBFFU,
+        0x8000'0001U,
+        0x807F'FFFFU,
+        false,
+        false,
+        Mode::Down);
+    context.expect(fma_not_tiny_after_rounding.bits == 0x8080'0000U &&
+                       fma_not_tiny_after_rounding.flags ==
+                           flag(rvemu::core::FloatingExceptionFlag::Inexact),
+                   "FMA 无界指数舍入已回到最小正规数时不得误报 UF");
+
     const auto rne = rvemu::core::floating_from_integer(
         Format::Single, 0x0100'0001U, true, 32U, Mode::NearestTiesToEven);
     const auto rmm = rvemu::core::floating_from_integer(

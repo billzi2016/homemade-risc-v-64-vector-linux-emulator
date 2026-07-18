@@ -63,7 +63,7 @@
 - `fflags` 的 NV/DZ/OF/UF/NX 由每条实际执行的浮点运算按 OR 累积；被非法编码或 FS=Off 拦截的指令不得更新标志。
 - 单精度值在 64 位浮点寄存器中必须把上 32 位全部置一形成 NaN box；计算、比较、分类和格式转换读取单精度源时，非法 box 按 `0x7FC00000` canonical quiet NaN 处理且不改写原寄存器。`FSW` 与 `FMV.X.W` 是原始位模式传输，必须保留并使用寄存器低 32 位，不执行 box 检查。
 - 除规范单独规定的操作外，NaN 结果使用 canonical NaN。`FMIN/FMAX` 在单个 NaN 输入时返回数值输入、两个 NaN 时返回 canonical NaN，任何 signaling NaN 输入设置 NV；`FEQ` 仅对 signaling NaN 设置 NV，`FLT/FLE` 对任何 NaN 设置 NV。
-- 次正规数不得 flush-to-zero；tininess 在舍入后检测。融合乘加必须对完整乘积与加数的精确和只舍入一次，不能拆成乘法和加法两条软件运算。
+- 次正规数不得 flush-to-zero；tininess 按 RISC-V/IEEE 754 after-rounding 规则检测。该检测必须先假设指数范围无界、仅按目标格式有效数精度舍入，再检查无界舍入结果是否小于最小正规指数；不得简化为“最终编码为次正规数才设置 UF”。融合乘加必须对完整乘积与加数的精确和只舍入一次，不能拆成乘法和加法两条软件运算。
 - 浮点转整数越界、无穷和 NaN 按 F/D 2.2 规定的上下界饱和并设置 NV；仅发生舍入差异且未设置 NV 时设置 NX。RV64 的 32 位转换结果统一符号扩展至 XLEN，包括无符号 `FCVT.WU.S/D`。
 - `mstatus.FS=Off` 时，浮点 CSR、加载、存储、运算和搬运都不可执行；任何浮点架构状态写入都必须把已启用的 FS 标记为 Dirty。
 - 生产执行路径使用项目内整数软件浮点实现，不读取宿主 `float/double/long double` 或 `fenv`。所有格式共用一个解包、固定宽度精确有效数和 guard/round/sticky 舍入入口，禁止按指令族复制第二套舍入逻辑。

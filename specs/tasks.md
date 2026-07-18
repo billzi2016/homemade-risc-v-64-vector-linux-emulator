@@ -136,7 +136,9 @@
   - 验证命令：`ctest --test-dir build --output-on-failure`；`ctest --test-dir build/sanitize --output-on-failure`
   - 验证结果：RV64C 三个 quadrant 的整数、控制流、栈指针访存、双精度压缩访存、六位移位量、负跳转/分支、HINT、reserved 编码、原始 16 位 Trap 和 16/32 位半字交错均通过正式 CPU/Bus/RAM 机器码测试；普通与 ASan/UBSan 完整测试均为 9/9 通过。
   - 对应需求：`ISA-REQ-005`、`ISA-REQ-004`、`CPU-REQ-017`
-- [ ] **ISA-107** 运行正式 ISA/一致性测试并记录结果。
+- [x] **ISA-107** 运行正式 ISA/一致性测试并记录结果。
+  - 验证命令：`tools/conformance/run-act4.sh`
+  - 验证结果：ACT4 RV64IMAFDC 正式一致性测试总数 348，通过 348，失败或超时 0；完整日志见 `artifacts/logs/act4-rv64imafdc.log`。
 
 ## 8. 阶段 6：MMU、Sv39 与 TLB
 

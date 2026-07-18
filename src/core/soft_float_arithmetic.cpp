@@ -75,6 +75,40 @@ constexpr Format kDoubleFormat{
            (rounding == FloatingRoundingMode::Down && sign);
 }
 
+// RISC-V 采用 IEEE 754 的“舍入后检测微小性”，但这里的“舍入后”不是看最终编码
+// 是否仍为次正规数。规范要求先假设指数范围无界，仅按目标格式的有效数精度进行一次
+// 舍入，再检查该无界舍入结果的指数是否小于最小正规指数。这样可以区分两个非常相近
+// 的边界：有些结果最终编码为最小正规数但仍应报告 UF，有些则不应报告 UF。
+[[nodiscard]] bool tiny_after_unbounded_rounding(
+    const Format& format,
+    bool sign,
+    WideUnsigned magnitude,
+    std::int32_t exponent,
+    FloatingRoundingMode rounding) noexcept {
+    if (magnitude.zero()) {
+        return false;
+    }
+
+    const auto precision = static_cast<std::size_t>(format.fraction_bits) + 1U;
+    auto bit_length = magnitude.bit_length();
+    auto rounded_exponent = exponent + static_cast<std::int32_t>(bit_length) - 1;
+
+    bool ignored_inexact = false;
+    if (bit_length > precision) {
+        magnitude = rounded_right_shift(
+            magnitude, bit_length - precision, sign, rounding, ignored_inexact);
+    } else if (bit_length < precision) {
+        magnitude.shift_left(precision - bit_length);
+    }
+
+    if (magnitude.bit_length() > precision) {
+        magnitude.shift_right(1U);
+        ++rounded_exponent;
+    }
+
+    return rounded_exponent < format.minimum_exponent;
+}
+
 [[nodiscard]] FloatingResult invalid_result(const Format& format) noexcept {
     return FloatingResult{format.canonical_nan, invalid_flag()};
 }
@@ -352,6 +386,8 @@ FloatingResult round_and_pack(
     const auto precision = static_cast<std::size_t>(format.fraction_bits) + 1U;
     auto bit_length = magnitude.bit_length();
     auto result_exponent = exponent + static_cast<std::int32_t>(bit_length) - 1;
+    const auto tiny_after_rounding = tiny_after_unbounded_rounding(
+        format, sign, magnitude, exponent, rounding);
     bool inexact = false;
 
     if (result_exponent >= format.minimum_exponent) {
@@ -379,8 +415,11 @@ FloatingResult round_and_pack(
         }
         const auto exponent_field = static_cast<std::uint64_t>(result_exponent + format.bias);
         const auto fraction = magnitude.low64() & format.fraction_mask;
-        const auto flags = static_cast<std::uint8_t>(inexact ?
+        auto flags = static_cast<std::uint8_t>(inexact ?
             static_cast<std::uint8_t>(FloatingExceptionFlag::Inexact) : 0U);
+        if (inexact && tiny_after_rounding) {
+            flags |= static_cast<std::uint8_t>(FloatingExceptionFlag::Underflow);
+        }
         return FloatingResult{
             (sign ? format.sign_mask : 0U) |
                 (exponent_field << format.fraction_bits) | fraction,
@@ -411,7 +450,7 @@ FloatingResult round_and_pack(
     std::uint8_t flags = 0U;
     if (inexact) {
         flags |= static_cast<std::uint8_t>(FloatingExceptionFlag::Inexact);
-        if (encoded_magnitude < minimum_normal) {
+        if (tiny_after_rounding) {
             flags |= static_cast<std::uint8_t>(FloatingExceptionFlag::Underflow);
         }
     }
