@@ -274,6 +274,37 @@ void CsrFile::mark_vector_state_dirty() noexcept {
     mstatus_ = (mstatus_ & ~(0x3ULL << 9U)) | (0x3ULL << 9U);
 }
 
+std::uint64_t CsrFile::vector_start() const noexcept {
+    return vstart_;
+}
+
+std::uint8_t CsrFile::vector_rounding_mode() const noexcept {
+    return vxrm_;
+}
+
+bool CsrFile::vector_saturation() const noexcept {
+    return vxsat_ != 0U;
+}
+
+void CsrFile::set_vector_start_for_trap(std::uint64_t element_index) noexcept {
+    // VLEN=256、SEW=8、LMUL=8 时最大 VLMAX 为 256，故 vstart 只需要 8 位可写状态。
+    vstart_ = element_index & 0xFFU;
+    mark_vector_state_dirty();
+}
+
+void CsrFile::clear_vector_start_after_instruction() noexcept {
+    vstart_ = 0U;
+    mark_vector_state_dirty();
+}
+
+void CsrFile::accrue_vector_saturation(bool saturated) noexcept {
+    if (!saturated) {
+        return;
+    }
+    vxsat_ = 1U;
+    mark_vector_state_dirty();
+}
+
 void CsrFile::commit_vector_configuration(std::uint64_t vtype, std::uint64_t vl) noexcept {
     // 此入口不负责重新解释 vtype，避免 CSR 与 CPU 各自形成一套能力表；调用方已使用唯一配置模块归一。
     vtype_ = vtype;
@@ -392,7 +423,7 @@ void CsrFile::write_value(CsrAddress address, std::uint64_t value) noexcept {
         mark_floating_state_dirty();
         break;
     case CsrAddress::Vstart:
-        vstart_ = value;
+        vstart_ = value & 0xFFU;
         mark_vector_state_dirty();
         break;
     case CsrAddress::Vxsat:

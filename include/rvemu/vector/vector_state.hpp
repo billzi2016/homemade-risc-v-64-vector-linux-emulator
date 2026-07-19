@@ -23,6 +23,9 @@ public:
     [[nodiscard]] const Register& register_value(std::size_t index) const;
     // 原子替换单个完整 256 位寄存器；逐元素提交和 vstart 语义由执行器在调用前决定。
     void set_register_value(std::size_t index, const Register& value);
+    // 元素布局层通过此唯一字节入口实现小端读写；两个索引越界均表示模拟器内部调用缺陷。
+    [[nodiscard]] std::uint8_t byte_value(std::size_t register_index, std::size_t byte_index) const;
+    void set_byte_value(std::size_t register_index, std::size_t byte_index, std::uint8_t value);
 
 private:
     std::array<Register, kRegisterCount> registers_{};

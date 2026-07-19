@@ -115,6 +115,16 @@ public:
     [[nodiscard]] bool vector_state_enabled() const noexcept;
     // 向量寄存器、可写向量 CSR 或后续 vset* 成功改变状态时调用；VS=Off 不会被内部打开。
     void mark_vector_state_dirty() noexcept;
+    // 提供向量执行器所需的唯一 CSR 视图；读操作不改变 VS，写操作只经下方受限入口提交。
+    [[nodiscard]] std::uint64_t vector_start() const noexcept;
+    [[nodiscard]] std::uint8_t vector_rounding_mode() const noexcept;
+    [[nodiscard]] bool vector_saturation() const noexcept;
+    // 可重启异常记录当前元素；固定 VLEN=256 只保留可表示 VLMAX 最大值的低 8 位。
+    void set_vector_start_for_trap(std::uint64_t element_index) noexcept;
+    // 每条成功完成的向量指令必须通过此入口清零 vstart 并标记 VS Dirty。
+    void clear_vector_start_after_instruction() noexcept;
+    // vxsat 是黏滞标志：只有实际饱和时才能置一，清零必须使用来宾 CSR 写入语义。
+    void accrue_vector_saturation(bool saturated) noexcept;
     // 仅由 CPU 已完成编码、权限和完整 vtype 校验的 vset* 路径调用，原子提交 vl/vtype 并标记 VS Dirty。
     // 来宾通用 CSR 指令不能到达该入口；非法配置也必须已归一为 vill=1、vl=0 后才可提交。
     void commit_vector_configuration(std::uint64_t vtype, std::uint64_t vl) noexcept;

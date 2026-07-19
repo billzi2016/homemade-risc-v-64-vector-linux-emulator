@@ -200,7 +200,11 @@
   - 实现文件：`include/rvemu/vector/vector_configuration.hpp`、`src/vector/vector_configuration.cpp`、`include/rvemu/core/cpu.hpp`、`src/core/cpu.cpp`、`include/rvemu/core/csr.hpp`、`src/core/csr.cpp`、`tests/unit/test_cpu_vector_configuration.cpp`
   - 验证命令：`cmake --build build --parallel`；`./build/tests/rvemu_cpu_vector_configuration_tests`；`ctest --test-dir build --output-on-failure`；`cmake --build build/sanitize --parallel`；`ctest --test-dir build/sanitize --output-on-failure`；`git diff --check`
   - 验证结果：严格构建和专项测试通过；常规与 ASan/UBSan CTest 均为 13/13 通过；补丁格式检查无输出。
-- [ ] **RVV-003** 实现 SEW、LMUL、寄存器组对齐、`vstart/vxrm/vxsat`。
+- [x] **RVV-003** 实现 SEW、LMUL、寄存器组对齐、`vstart/vxrm/vxsat`。
+  - 完成条件：唯一布局层覆盖 e8/e16/e32/e64、整数/分数 LMUL、小端元素定位、整数 LMUL 对齐和 v31 边界；CpuState 的受控元素提交统一标记 VS Dirty；`vstart` 固定 8 位、成功完成清零、`vxrm` 唯一读取和 `vxsat` 黏滞累积均已实现。
+  - 实现文件：`include/rvemu/vector/vector_register_group.hpp`、`src/vector/vector_register_group.cpp`、`include/rvemu/vector/vector_state.hpp`、`src/vector/vector_state.cpp`、`include/rvemu/core/cpu_state.hpp`、`src/core/cpu_state.cpp`、`include/rvemu/core/csr.hpp`、`src/core/csr.cpp`、`tests/unit/test_vector_register_group.cpp`
+  - 验证命令：`cmake --build build --parallel`；`./build/tests/rvemu_vector_register_group_tests`；`ctest --test-dir build --output-on-failure`；`cmake --build build/sanitize --parallel`；`ctest --test-dir build/sanitize --output-on-failure`；`git diff --check`
+  - 验证结果：严格构建和专项测试通过；常规与 ASan/UBSan CTest 均为 14/14 通过；补丁格式检查无输出。
 - [ ] **RVV-004** 实现单元步长与跨步向量加载/存储及逐元素异常。
 - [ ] **RVV-005** 实现规定范围的整数算术、乘除和掩码语义。
 - [ ] **RVV-006** 实现规定范围的向量浮点四则运算和浮点状态更新。

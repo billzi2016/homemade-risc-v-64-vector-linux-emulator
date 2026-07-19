@@ -79,4 +79,25 @@ void CpuState::set_vector(std::size_t index, const VectorRegister& value) {
     csrs_.mark_vector_state_dirty();
 }
 
+std::optional<std::uint64_t> CpuState::vector_element(
+    const vector::VectorRegisterGroup& group,
+    std::uint64_t element_index) const {
+    return group.read_element(vector_state_, element_index);
+}
+
+bool CpuState::set_vector_element(
+    const vector::VectorRegisterGroup& group,
+    std::uint64_t element_index,
+    std::uint64_t value) {
+    if (!group.write_element(vector_state_, element_index, value)) {
+        return false;
+    }
+    csrs_.mark_vector_state_dirty();
+    return true;
+}
+
+std::optional<bool> CpuState::vector_mask_bit(std::uint64_t element_index) const noexcept {
+    return vector::VectorRegisterGroup::mask_bit(vector_state_, element_index);
+}
+
 }  // namespace rvemu::core
