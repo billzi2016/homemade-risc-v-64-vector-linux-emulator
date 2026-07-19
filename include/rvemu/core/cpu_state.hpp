@@ -6,6 +6,7 @@
 #include "rvemu/bus/access.hpp"
 #include "rvemu/core/csr.hpp"
 #include "rvemu/core/floating_state.hpp"
+#include "rvemu/vector/vector_state.hpp"
 
 #include <array>
 #include <cstddef>
@@ -16,8 +17,8 @@ namespace rvemu::core {
 class CpuState final {
 public:
     static constexpr std::size_t kRegisterCount = 32U;
-    static constexpr std::size_t kVectorRegisterBytes = 32U;
-    using VectorRegister = std::array<std::uint8_t, kVectorRegisterBytes>;
+    static constexpr std::size_t kVectorRegisterBytes = vector::VectorState::kRegisterBytes;
+    using VectorRegister = vector::VectorState::Register;
 
     CpuState() = default;
 
@@ -34,6 +35,7 @@ public:
     [[nodiscard]] std::uint32_t floating_single(std::size_t index) const;
     void set_floating_single(std::size_t index, std::uint32_t value);
 
+    // 向量寄存器由独立的 VectorState 统一保存；CPU 状态层只负责与本 Hart 的 VS Dirty 语义衔接。
     [[nodiscard]] const VectorRegister& vector(std::size_t index) const;
     void set_vector(std::size_t index, const VectorRegister& value);
 
@@ -62,7 +64,7 @@ public:
 private:
     std::array<std::uint64_t, kRegisterCount> integer_registers_{};
     std::array<std::uint64_t, kRegisterCount> floating_registers_{};
-    std::array<VectorRegister, kRegisterCount> vector_registers_{};
+    vector::VectorState vector_state_{};
     CsrFile csrs_{};
     std::uint64_t program_counter_{0U};
     PrivilegeMode privilege_{PrivilegeMode::Machine};

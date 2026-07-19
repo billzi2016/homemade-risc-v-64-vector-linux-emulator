@@ -46,10 +46,20 @@ constexpr std::uint64_t kMisa =
     bit(static_cast<std::uint8_t>('U' - 'A'));
 constexpr std::uint64_t kSatpModeMask = 0xFULL << 60U;
 constexpr std::uint64_t kSatpSv39Mode = 8ULL << 60U;
+constexpr std::uint64_t kVectorVtypeVill = bit(63U);
+constexpr std::uint64_t kVectorRegisterBytes = 32U;
 
 [[nodiscard]] constexpr bool is_floating_csr(CsrAddress address) noexcept {
     return address == CsrAddress::Fflags || address == CsrAddress::Frm ||
            address == CsrAddress::Fcsr;
+}
+
+// 向量上下文门控必须同时覆盖低地址可写 CSR 和高地址只读配置 CSR，不能仅依赖 CSR 编码权限。
+[[nodiscard]] constexpr bool is_vector_csr(CsrAddress address) noexcept {
+    return address == CsrAddress::Vstart || address == CsrAddress::Vxsat ||
+           address == CsrAddress::Vxrm || address == CsrAddress::Vcsr ||
+           address == CsrAddress::Vl || address == CsrAddress::Vtype ||
+           address == CsrAddress::Vlenb;
 }
 
 // PrivilegeMode 编码与架构等级一致，但比较集中在此处，避免调用点散落强制转换。
@@ -72,6 +82,12 @@ constexpr std::uint64_t kSatpSv39Mode = 8ULL << 60U;
 void CsrFile::reset() noexcept {
     mstatus_ = kXlenFields;
     fcsr_ = 0U;
+    vstart_ = 0U;
+    vxsat_ = 0U;
+    vxrm_ = 0U;
+    vl_ = 0U;
+    // 复位配置不能被当作可执行的 SEW/LMUL；软件必须经后续 vset* 选择合法配置。
+    vtype_ = kVectorVtypeVill;
     medeleg_ = 0U;
     mideleg_ = 0U;
     mie_ = 0U;
@@ -100,6 +116,10 @@ bool CsrFile::exists(CsrAddress address) const noexcept {
     case CsrAddress::Fflags:
     case CsrAddress::Frm:
     case CsrAddress::Fcsr:
+    case CsrAddress::Vstart:
+    case CsrAddress::Vxsat:
+    case CsrAddress::Vxrm:
+    case CsrAddress::Vcsr:
     case CsrAddress::Sstatus:
     case CsrAddress::Sie:
     case CsrAddress::Stvec:
@@ -113,6 +133,9 @@ bool CsrFile::exists(CsrAddress address) const noexcept {
     case CsrAddress::Cycle:
     case CsrAddress::Time:
     case CsrAddress::Instret:
+    case CsrAddress::Vl:
+    case CsrAddress::Vtype:
+    case CsrAddress::Vlenb:
     case CsrAddress::Mstatus:
     case CsrAddress::Misa:
     case CsrAddress::Medeleg:
@@ -147,6 +170,9 @@ bool CsrFile::access_allowed(
 
     // 浮点 CSR 属于 U 级地址，但 mstatus.FS=Off 会关闭其上下文，任何层级访问都非法。
     if (is_floating_csr(address) && !floating_state_enabled()) {
+        return false;
+    }
+    if (is_vector_csr(address) && !vector_state_enabled()) {
         return false;
     }
 
@@ -237,6 +263,17 @@ void CsrFile::mark_floating_state_dirty() noexcept {
     mstatus_ = (mstatus_ & ~(0x3ULL << 13U)) | (0x3ULL << 13U);
 }
 
+bool CsrFile::vector_state_enabled() const noexcept {
+    return ((mstatus_ >> 9U) & 0x3U) != 0U;
+}
+
+void CsrFile::mark_vector_state_dirty() noexcept {
+    if (!vector_state_enabled()) {
+        return;
+    }
+    mstatus_ = (mstatus_ & ~(0x3ULL << 9U)) | (0x3ULL << 9U);
+}
+
 // Supervisor CSR 在此处直接从 Machine 底层字段投影，保证别名永远不可能分叉。
 std::uint64_t CsrFile::read_value(CsrAddress address) const noexcept {
     switch (address) {
@@ -246,6 +283,14 @@ std::uint64_t CsrFile::read_value(CsrAddress address) const noexcept {
         return floating_rounding_mode();
     case CsrAddress::Fcsr:
         return fcsr_;
+    case CsrAddress::Vstart:
+        return vstart_;
+    case CsrAddress::Vxsat:
+        return vxsat_;
+    case CsrAddress::Vxrm:
+        return vxrm_;
+    case CsrAddress::Vcsr:
+        return (static_cast<std::uint64_t>(vxrm_) << 1U) | vxsat_;
     case CsrAddress::Sstatus:
         return read_value(CsrAddress::Mstatus) & kSstatusReadMask;
     case CsrAddress::Sie:
@@ -274,6 +319,12 @@ std::uint64_t CsrFile::read_value(CsrAddress address) const noexcept {
     case CsrAddress::Instret:
     case CsrAddress::Minstret:
         return instret_;
+    case CsrAddress::Vl:
+        return vl_;
+    case CsrAddress::Vtype:
+        return vtype_;
+    case CsrAddress::Vlenb:
+        return kVectorRegisterBytes;
     case CsrAddress::Mstatus: {
         auto value = (mstatus_ & ~bit(63U)) | kXlenFields;
         const auto fs = (value >> 13U) & 0x3U;
@@ -331,6 +382,23 @@ void CsrFile::write_value(CsrAddress address, std::uint64_t value) noexcept {
         fcsr_ = static_cast<std::uint8_t>(value & 0xFFU);
         mark_floating_state_dirty();
         break;
+    case CsrAddress::Vstart:
+        vstart_ = value;
+        mark_vector_state_dirty();
+        break;
+    case CsrAddress::Vxsat:
+        vxsat_ = static_cast<std::uint8_t>(value & 0x1U);
+        mark_vector_state_dirty();
+        break;
+    case CsrAddress::Vxrm:
+        vxrm_ = static_cast<std::uint8_t>(value & 0x3U);
+        mark_vector_state_dirty();
+        break;
+    case CsrAddress::Vcsr:
+        vxsat_ = static_cast<std::uint8_t>(value & 0x1U);
+        vxrm_ = static_cast<std::uint8_t>((value >> 1U) & 0x3U);
+        mark_vector_state_dirty();
+        break;
     case CsrAddress::Sstatus:
         mstatus_ = (mstatus_ & ~kSstatusWriteMask) | (value & kSstatusWriteMask);
         break;
@@ -371,6 +439,12 @@ void CsrFile::write_value(CsrAddress address, std::uint64_t value) noexcept {
         }
         break;
     }
+    // 三个配置 CSR 都由其只读地址编码和 access_allowed 拒绝来宾写入；后续 vset*
+    // 将经过唯一的内部配置入口更新 vl/vtype，避免普通 CSR 指令绕过配置校验。
+    case CsrAddress::Vl:
+    case CsrAddress::Vtype:
+    case CsrAddress::Vlenb:
+        break;
     case CsrAddress::Mstatus: {
         auto desired = (mstatus_ & ~kMstatusWriteMask) | (value & kMstatusWriteMask);
         const auto mpp = (desired >> 11U) & 0x3U;

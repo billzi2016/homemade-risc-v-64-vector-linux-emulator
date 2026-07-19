@@ -41,6 +41,16 @@ rvemu_enable_strict_warnings(rvemu_cpu_privilege_tests)
 
 add_test(NAME rvemu.cpu_privilege COMMAND rvemu_cpu_privilege_tests)
 
+add_executable(rvemu_vector_state_tests
+    unit/test_vector_state.cpp
+)
+
+target_link_libraries(rvemu_vector_state_tests PRIVATE rvemu_core)
+target_compile_features(rvemu_vector_state_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_vector_state_tests)
+
+add_test(NAME rvemu.vector_state COMMAND rvemu_vector_state_tests)
+
 add_executable(rvemu_cpu_m_tests
     unit/test_cpu_m.cpp
 )

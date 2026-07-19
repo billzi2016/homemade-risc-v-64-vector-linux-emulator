@@ -22,9 +22,7 @@ void require_register_index(std::size_t index) {
 void CpuState::reset(std::uint64_t reset_pc) noexcept {
     integer_registers_.fill(0U);
     floating_registers_.fill(0U);
-    for (auto& register_value : vector_registers_) {
-        register_value.fill(0U);
-    }
+    vector_state_.reset();
     csrs_.reset();
     program_counter_ = reset_pc;
     privilege_ = PrivilegeMode::Machine;
@@ -71,14 +69,14 @@ void CpuState::set_floating_single(std::size_t index, std::uint32_t value) {
 
 // 返回固定 32 字节寄存器的只读引用，观察路径不会复制或改变 VLEN。
 const CpuState::VectorRegister& CpuState::vector(std::size_t index) const {
-    require_register_index(index);
-    return vector_registers_[index];
+    return vector_state_.register_value(index);
 }
 
-// 整体提交一个 256 位寄存器；逐元素异常提交策略由后续 RVV 执行器负责。
+// 整体提交一个 256 位寄存器；逐元素异常提交策略由后续 RVV 执行器负责。只有已经启用的
+// 向量上下文会变为 Dirty，避免测试或内部复位路径在 VS=Off 时偷偷打开来宾扩展状态。
 void CpuState::set_vector(std::size_t index, const VectorRegister& value) {
-    require_register_index(index);
-    vector_registers_[index] = value;
+    vector_state_.set_register_value(index, value);
+    csrs_.mark_vector_state_dirty();
 }
 
 }  // namespace rvemu::core

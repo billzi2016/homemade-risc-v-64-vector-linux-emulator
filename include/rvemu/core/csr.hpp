@@ -14,6 +14,10 @@ enum class CsrAddress : std::uint16_t {
     Fflags = 0x001U,
     Frm = 0x002U,
     Fcsr = 0x003U,
+    Vstart = 0x008U,
+    Vxsat = 0x009U,
+    Vxrm = 0x00AU,
+    Vcsr = 0x00FU,
 
     Sstatus = 0x100U,
     Sie = 0x104U,
@@ -29,6 +33,9 @@ enum class CsrAddress : std::uint16_t {
     Cycle = 0xC00U,
     Time = 0xC01U,
     Instret = 0xC02U,
+    Vl = 0xC20U,
+    Vtype = 0xC21U,
+    Vlenb = 0xC22U,
 
     Mstatus = 0x300U,
     Misa = 0x301U,
@@ -104,6 +111,11 @@ public:
     // 浮点寄存器或 CSR 发生架构写入时调用；FS=Off 不会被内部写入口偷偷启用。
     void mark_floating_state_dirty() noexcept;
 
+    // VS=Off 时向量 CSR 与向量指令均不可用；Initial/Clean/Dirty 都代表可访问的上下文。
+    [[nodiscard]] bool vector_state_enabled() const noexcept;
+    // 向量寄存器、可写向量 CSR 或后续 vset* 成功改变状态时调用；VS=Off 不会被内部打开。
+    void mark_vector_state_dirty() noexcept;
+
     // 将 CLINT/PLIC 等真实设备的电平状态投影到唯一 mip 底层值；清除不会影响其他中断源。
     void set_interrupt_pending(InterruptCause cause, bool pending) noexcept;
     // time 由未来 CLINT 的真实计时源更新；CSR 文件自身不创建第二套宿主时间逻辑。
@@ -165,6 +177,11 @@ private:
 
     std::uint64_t mstatus_{0U};
     std::uint8_t fcsr_{0U};
+    std::uint64_t vstart_{0U};
+    std::uint8_t vxsat_{0U};
+    std::uint8_t vxrm_{0U};
+    std::uint64_t vl_{0U};
+    std::uint64_t vtype_{0U};
     std::uint64_t medeleg_{0U};
     std::uint64_t mideleg_{0U};
     std::uint64_t mie_{0U};
