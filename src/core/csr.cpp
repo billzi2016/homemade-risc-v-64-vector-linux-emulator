@@ -274,6 +274,15 @@ void CsrFile::mark_vector_state_dirty() noexcept {
     mstatus_ = (mstatus_ & ~(0x3ULL << 9U)) | (0x3ULL << 9U);
 }
 
+void CsrFile::commit_vector_configuration(std::uint64_t vtype, std::uint64_t vl) noexcept {
+    // 此入口不负责重新解释 vtype，避免 CSR 与 CPU 各自形成一套能力表；调用方已使用唯一配置模块归一。
+    vtype_ = vtype;
+    vl_ = vl;
+    // vset* 是成功完成的向量指令，必须结束此前可重启元素状态，不能把旧 vstart 泄漏给新配置。
+    vstart_ = 0U;
+    mark_vector_state_dirty();
+}
+
 // Supervisor CSR 在此处直接从 Machine 底层字段投影，保证别名永远不可能分叉。
 std::uint64_t CsrFile::read_value(CsrAddress address) const noexcept {
     switch (address) {

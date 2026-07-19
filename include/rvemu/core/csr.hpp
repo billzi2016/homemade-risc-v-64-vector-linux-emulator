@@ -115,6 +115,9 @@ public:
     [[nodiscard]] bool vector_state_enabled() const noexcept;
     // 向量寄存器、可写向量 CSR 或后续 vset* 成功改变状态时调用；VS=Off 不会被内部打开。
     void mark_vector_state_dirty() noexcept;
+    // 仅由 CPU 已完成编码、权限和完整 vtype 校验的 vset* 路径调用，原子提交 vl/vtype 并标记 VS Dirty。
+    // 来宾通用 CSR 指令不能到达该入口；非法配置也必须已归一为 vill=1、vl=0 后才可提交。
+    void commit_vector_configuration(std::uint64_t vtype, std::uint64_t vl) noexcept;
 
     // 将 CLINT/PLIC 等真实设备的电平状态投影到唯一 mip 底层值；清除不会影响其他中断源。
     void set_interrupt_pending(InterruptCause cause, bool pending) noexcept;

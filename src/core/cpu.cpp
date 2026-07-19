@@ -7,6 +7,7 @@
 #include "rvemu/core/decoder.hpp"
 #include "rvemu/core/integer_a.hpp"
 #include "rvemu/core/integer_m.hpp"
+#include "rvemu/vector/vector_configuration.hpp"
 
 #include <atomic>
 #include <cstdint>
@@ -422,6 +423,9 @@ StepResult Cpu::execute_standard(const InstructionPacket& packet) {
     };
 
     switch (instruction.opcode) {
+    case 0x57U:  // OP-V：当前阶段只开放 vsetvli/vsetivli/vsetvl，其余向量指令不能被宽松接受。
+        return execute_vector_configuration(packet, instruction, sequential_pc);
+
     case 0x37U:  // LUI
         return write_and_retire(instruction.destination, immediate_u(packet.bits), sequential_pc);
 
@@ -977,6 +981,68 @@ StepResult Cpu::execute_system(
     }
 
     state_.set_integer(instruction.destination, accessed.value);
+    state_.set_program_counter(sequential_pc);
+    return StepResult::success(packet.length);
+}
+
+StepResult Cpu::execute_vector_configuration(
+    const InstructionPacket& packet,
+    const DecodedInstruction& instruction,
+    std::uint64_t sequential_pc) {
+    // OP-V 的 funct3=111 专用于三种向量配置指令；其余编码属于后续元素运算，当前不能猜测执行。
+    if (instruction.function3 != 0x7U || !state_.csrs().vector_state_enabled()) {
+        return illegal(packet);
+    }
+
+    const auto source1 = state_.integer(instruction.source1);
+    const auto source2 = state_.integer(instruction.source2);
+    const auto function7 = static_cast<std::uint8_t>((packet.bits >> 25U) & 0x7FU);
+
+    std::uint64_t requested_vtype = 0U;
+    std::uint64_t application_vector_length = 0U;
+    bool preserve_vector_length = false;
+
+    if (function7 == 0x40U) {  // vsetvl：rs2 提供完整 XLEN 宽 vtype。
+        requested_vtype = source2;
+        if (instruction.source1 == 0U && instruction.destination == 0U) {
+            preserve_vector_length = true;
+        } else {
+            // rs1=x0 且 rd 非零时的 AVL 是全一 XLEN 值，而非 x0 中保存的零。
+            application_vector_length = instruction.source1 == 0U ? ~0ULL : source1;
+        }
+    } else if ((packet.bits & (1U << 31U)) == 0U) {  // vsetvli：bit31 固定为零，vtypei 占 bit30:20。
+        requested_vtype = static_cast<std::uint64_t>((packet.bits >> 20U) & 0x7FFU);
+        if (instruction.source1 == 0U && instruction.destination == 0U) {
+            preserve_vector_length = true;
+        } else {
+            application_vector_length = instruction.source1 == 0U ? ~0ULL : source1;
+        }
+    } else if ((packet.bits & (0x3U << 30U)) == (0x3U << 30U)) {  // vsetivli：uimm AVL 位于 rs1 字段。
+        requested_vtype = static_cast<std::uint64_t>((packet.bits >> 20U) & 0x3FFU);
+        application_vector_length = instruction.source1;
+    } else {
+        return illegal(packet);
+    }
+
+    const auto configuration = vector::decode_vector_configuration(requested_vtype);
+    if (preserve_vector_length) {
+        // 该紧凑形式只允许保持同一 VLMAX；旧 vill、非法新值或容量变化均是保留指令形式。
+        if (!vector::can_preserve_vector_length(
+                state_.csrs().peek(CsrAddress::Vtype), requested_vtype)) {
+            return illegal(packet);
+        }
+        state_.csrs().commit_vector_configuration(configuration.vtype, state_.csrs().peek(CsrAddress::Vl));
+    } else if (configuration.valid) {
+        const auto vector_length = vector::select_vector_length(
+            application_vector_length, configuration.vlmax);
+        state_.csrs().commit_vector_configuration(configuration.vtype, vector_length);
+        state_.set_integer(instruction.destination, vector_length);
+    } else {
+        // 非法完整 vtype 不是指令非法：RVV 要求 vset* 成功提交 vill=1、vl=0 以供软件探测能力。
+        state_.csrs().commit_vector_configuration(vector::kVtypeVill, 0U);
+        state_.set_integer(instruction.destination, 0U);
+    }
+
     state_.set_program_counter(sequential_pc);
     return StepResult::success(packet.length);
 }

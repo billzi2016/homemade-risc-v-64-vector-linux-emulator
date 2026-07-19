@@ -56,6 +56,25 @@
 - 非法或不支持的 `vtype` 设置 `vill` 并按规范设置 `vl`。
 - 必须实现 `rd=x0`、`rs1=x0` 等特殊 AVL 组合，不能一律按普通寄存器值处理。
 
+### 3.1 编码、提交与确定性策略
+
+三种配置指令均使用 `OP-V=0x57` 与 `funct3=0b111`：`vsetvli` 要求 bit31 为零并从
+bit30:20 取得 11 位 `vtypei`；`vsetivli` 要求 bit31:30 为二进制 `11`，从 bit29:20
+取得 10 位 `vtypei`，并将 rs1 字段作为零扩展的 5 位 AVL；`vsetvl` 要求
+`funct7=0b1000000`，从 rs2 取得完整 XLEN 宽 `vtype`。不符合这些判别字段的 OP-V
+编码在本阶段必须是非法指令，不能被当作某种配置近似执行。
+
+合法配置的 `VLMAX=(VLEN/SEW)×LMUL`。当 `rs1!=x0` 时 AVL 来自 x[rs1]；对于
+`vsetvli/vsetvl`，`rs1=x0, rd!=x0` 表示 AVL 为全一 XLEN 值，`vsetivli` 则始终以其
+5 位立即数作为 AVL。项目冻结确定性选择 `vl=min(AVL,VLMAX)`：它精确满足
+`AVL≤VLMAX`，且在 `AVL>VLMAX` 的规范允许范围选择 `VLMAX`。成功的 `vset*` 必须
+写回 `rd`、提交 `vl/vtype`、标记 VS Dirty 并把 `vstart` 清零。
+
+`rs1=x0, rd=x0` 的保持 `vl` 形式仅在旧、新 `vtype` 都合法且 VLMAX 相同的情况下
+允许；它保留现有 `vl`。其他这种保留形式必须触发非法指令，避免容量变化时让旧 `vl`
+越过新 VLMAX。请求非法完整 `vtype` 本身不是非法指令：`vset*` 必须提交仅置 vill 的
+`vtype`、`vl=0` 和 `rd=0`，供来宾软件探测实现能力。
+
 ## 4. 寄存器分组与重叠
 
 - LMUL>1 时目标寄存器号必须满足分组对齐且不得超出 v31。

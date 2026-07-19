@@ -111,6 +111,11 @@ private:
         const DecodedInstruction& instruction,
         std::uint64_t source1,
         std::uint64_t sequential_pc);
+    // 执行 OP-V 中仅负责配置的三种 vset*；未声明的 OP-V 编码必须统一返回非法指令。
+    [[nodiscard]] StepResult execute_vector_configuration(
+        const InstructionPacket& packet,
+        const DecodedInstruction& instruction,
+        std::uint64_t sequential_pc);
     // 集中处理 LOAD/STORE-FP、OP-FP 与 R4 FMA，校验完成后才提交浮点副作用。
     [[nodiscard]] StepResult execute_floating(
         const InstructionPacket& packet,

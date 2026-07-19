@@ -195,7 +195,11 @@
   - 实现文件：`include/rvemu/vector/vector_state.hpp`、`src/vector/vector_state.cpp`、`include/rvemu/core/cpu_state.hpp`、`src/core/cpu_state.cpp`、`include/rvemu/core/csr.hpp`、`src/core/csr.cpp`
   - 验证命令：`cmake --build build --parallel`；`./build/tests/rvemu_vector_state_tests`；`ctest --test-dir build --output-on-failure`；`cmake --build build/sanitize --parallel`；`ctest --test-dir build/sanitize --output-on-failure`
   - 验证结果：严格构建和专项 RVV 状态测试通过；常规与 ASan/UBSan CTest 均为 12/12 通过。
-- [ ] **RVV-002** 实现 `vsetvl/vsetvli/vsetivli` 和合法 `vtype/vl` 计算。
+- [x] **RVV-002** 实现 `vsetvl/vsetvli/vsetivli` 和合法 `vtype/vl` 计算。
+  - 完成条件：三种 OP-V 配置编码、VS=Off 非法、整数/分数 LMUL、保留位/保留 LMUL 的 `vill=1, vl=0` 提交、AVL 特殊形式、相同 VLMAX 的 `vl` 保持与成功后 `vstart` 清零均由唯一配置模块和 CPU 路径完成。
+  - 实现文件：`include/rvemu/vector/vector_configuration.hpp`、`src/vector/vector_configuration.cpp`、`include/rvemu/core/cpu.hpp`、`src/core/cpu.cpp`、`include/rvemu/core/csr.hpp`、`src/core/csr.cpp`、`tests/unit/test_cpu_vector_configuration.cpp`
+  - 验证命令：`cmake --build build --parallel`；`./build/tests/rvemu_cpu_vector_configuration_tests`；`ctest --test-dir build --output-on-failure`；`cmake --build build/sanitize --parallel`；`ctest --test-dir build/sanitize --output-on-failure`；`git diff --check`
+  - 验证结果：严格构建和专项测试通过；常规与 ASan/UBSan CTest 均为 13/13 通过；补丁格式检查无输出。
 - [ ] **RVV-003** 实现 SEW、LMUL、寄存器组对齐、`vstart/vxrm/vxsat`。
 - [ ] **RVV-004** 实现单元步长与跨步向量加载/存储及逐元素异常。
 - [ ] **RVV-005** 实现规定范围的整数算术、乘除和掩码语义。
