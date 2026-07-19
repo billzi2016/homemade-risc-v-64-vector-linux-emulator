@@ -99,6 +99,16 @@ target_compile_features(rvemu_cpu_vector_rvv_boundaries_tests PRIVATE cxx_std_17
 rvemu_enable_strict_warnings(rvemu_cpu_vector_rvv_boundaries_tests)
 add_test(NAME rvemu.cpu_vector_rvv_boundaries COMMAND rvemu_cpu_vector_rvv_boundaries_tests)
 
+add_executable(rvemu_clint_tests
+    unit/test_clint.cpp
+)
+
+target_link_libraries(rvemu_clint_tests PRIVATE rvemu_devices)
+target_compile_features(rvemu_clint_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_clint_tests)
+
+add_test(NAME rvemu.clint COMMAND rvemu_clint_tests)
+
 add_executable(rvemu_cpu_m_tests
     unit/test_cpu_m.cpp
 )

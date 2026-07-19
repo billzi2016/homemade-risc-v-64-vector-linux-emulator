@@ -225,7 +225,13 @@
 
 ## 10. 阶段 8：CLINT、PLIC 与 UART
 
-- [ ] **DEV-001** 实现 CLINT `mtime/mtimecmp/msip` 及中断挂起同步。
+- [x] **DEV-001** 实现 CLINT `mtime/mtimecmp/msip` 及中断挂起同步。
+  - 证据：`include/rvemu/devices/clint.hpp`、`src/devices/clint.cpp` 与
+    `tests/unit/test_clint.cpp`；寄存器布局遵循 `INT-REQ-001..005`，只通过
+    `CsrFile::set_interrupt_pending` 投影 MSIP/MTIP，不复制委托或 Trap 逻辑。
+  - 验证结果：CLINT 专项测试通过；clang-format 严格检查通过；严格构建和完整 CTest 为
+    19/19 通过；`build/sanitize` 的 AddressSanitizer/UndefinedBehaviorSanitizer 构建与完整
+    CTest 为 19/19 通过；`git diff --check` 无输出。
 - [ ] **DEV-002** 实现 PLIC 优先级、pending、enable、threshold、claim/complete。
 - [ ] **DEV-003** 实现 UART THR/RBR/LSR 及必要的 16550A 寄存器行为。
 - [ ] **DEV-004** 实现宿主终端 Raw 模式、非阻塞输入和异常退出恢复。

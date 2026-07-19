@@ -59,6 +59,19 @@ target_link_libraries(rvemu_core PUBLIC rvemu_bus_memory)
 target_compile_features(rvemu_core PUBLIC cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_core)
 
+add_library(rvemu_devices STATIC
+    src/devices/clint.cpp
+)
+
+target_include_directories(rvemu_devices
+    PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+)
+
+target_link_libraries(rvemu_devices PUBLIC rvemu_core)
+target_compile_features(rvemu_devices PUBLIC cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_devices)
+
 add_library(rvemu_conformance STATIC
     src/conformance/elf_loader.cpp
 )
