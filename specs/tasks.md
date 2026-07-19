@@ -205,7 +205,11 @@
   - 实现文件：`include/rvemu/vector/vector_register_group.hpp`、`src/vector/vector_register_group.cpp`、`include/rvemu/vector/vector_state.hpp`、`src/vector/vector_state.cpp`、`include/rvemu/core/cpu_state.hpp`、`src/core/cpu_state.cpp`、`include/rvemu/core/csr.hpp`、`src/core/csr.cpp`、`tests/unit/test_vector_register_group.cpp`
   - 验证命令：`cmake --build build --parallel`；`./build/tests/rvemu_vector_register_group_tests`；`ctest --test-dir build --output-on-failure`；`cmake --build build/sanitize --parallel`；`ctest --test-dir build/sanitize --output-on-failure`；`git diff --check`
   - 验证结果：严格构建和专项测试通过；常规与 ASan/UBSan CTest 均为 14/14 通过；补丁格式检查无输出。
-- [ ] **RVV-004** 实现单元步长与跨步向量加载/存储及逐元素异常。
+- [x] **RVV-004** 实现单元步长与跨步向量加载/存储及逐元素异常。
+  - 完成条件：普通非分段 unit-stride/strided 的 e8/e16/e32/e64 译码、EEW→EMUL 数据组校验、掩码活动元素、非对齐逐字节 MMU/总线访问、负 stride、tail/mask 策略、逐元素异常后的 `vstart` 和先前元素保留均由唯一 CPU 访存路径实现。
+  - 实现文件：`include/rvemu/vector/vector_memory.hpp`、`src/vector/vector_memory.cpp`、`include/rvemu/vector/vector_configuration.hpp`、`src/vector/vector_configuration.cpp`、`include/rvemu/core/cpu.hpp`、`src/core/cpu.cpp`、`tests/unit/test_cpu_vector_memory.cpp`
+  - 验证命令：`cmake --build build --parallel`；`./build/tests/rvemu_cpu_vector_memory_tests`；`ctest --test-dir build --output-on-failure`；`cmake --build build/sanitize --parallel`；`ctest --test-dir build/sanitize --output-on-failure`；`git diff --check`
+  - 验证结果：严格构建和专项测试通过；常规与 ASan/UBSan CTest 均为 15/15 通过；补丁格式检查无输出。
 - [ ] **RVV-005** 实现规定范围的整数算术、乘除和掩码语义。
 - [ ] **RVV-006** 实现规定范围的向量浮点四则运算和浮点状态更新。
 - [ ] **RVV-007** 通过 RVV 边界、tail/mask、重叠和异常重启测试。

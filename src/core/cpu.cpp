@@ -830,7 +830,15 @@ StepResult Cpu::execute_standard(const InstructionPacket& packet) {
     }
 
     case 0x07U:  // LOAD-FP
-    case 0x27U:  // STORE-FP
+    case 0x27U: {  // STORE-FP
+        const auto vector_memory = vector::decode_vector_memory_operation(
+            packet.bits, instruction.opcode == 0x07U);
+        if (vector_memory.has_value()) {
+            return execute_vector_memory(packet, *vector_memory, sequential_pc);
+        }
+        return execute_floating(packet, instruction, sequential_pc);
+    }
+
     case 0x43U:  // FMADD
     case 0x47U:  // FMSUB
     case 0x4BU:  // FNMSUB
@@ -1043,6 +1051,112 @@ StepResult Cpu::execute_vector_configuration(
         state_.set_integer(instruction.destination, 0U);
     }
 
+    state_.set_program_counter(sequential_pc);
+    return StepResult::success(packet.length);
+}
+
+StepResult Cpu::execute_vector_memory(
+    const InstructionPacket& packet,
+    const vector::VectorMemoryOperation& operation,
+    std::uint64_t sequential_pc) {
+    if (!state_.csrs().vector_state_enabled()) {
+        return illegal(packet);
+    }
+    const auto current = vector::decode_vector_configuration(
+        state_.csrs().peek(CsrAddress::Vtype));
+    const auto memory_configuration = vector::derive_memory_configuration(
+        current, operation.element_width_bits);
+    if (!memory_configuration.has_value()) {
+        return illegal(packet);
+    }
+    const auto group = vector::VectorRegisterGroup::create(
+        *memory_configuration, operation.vector_register);
+    if (!group.has_value() || state_.csrs().peek(CsrAddress::Vl) > current.vlmax ||
+        (operation.load && operation.masked && operation.vector_register == 0U)) {
+        // 掩码加载目的组不得覆盖 v0，否则从非零 vstart 重启时会破坏尚未使用的控制位。
+        return illegal(packet);
+    }
+
+    const auto vector_length = state_.csrs().peek(CsrAddress::Vl);
+    const auto start = state_.csrs().vector_start();
+    const auto base = state_.integer(operation.base_register);
+    const auto stride = operation.addressing_mode == vector::VectorMemoryAddressingMode::Strided ?
+                            state_.integer(operation.stride_register) :
+                            static_cast<std::uint64_t>(operation.element_width_bits / 8U);
+    const auto agnostic_value = operation.element_width_bits == 64U ?
+                                    ~0ULL :
+                                    (1ULL << operation.element_width_bits) - 1ULL;
+    const auto vtype = state_.csrs().peek(CsrAddress::Vtype);
+    const auto mask_agnostic = (vtype & (1ULL << 7U)) != 0U;
+    const auto tail_agnostic = (vtype & (1ULL << 6U)) != 0U;
+
+    // 无符号乘加刻意依赖 XLEN 位模式回绕；负 stride 已以二补码保存在 x 寄存器中。
+    const auto element_address = [base, stride](std::uint64_t element_index) noexcept {
+        return base + element_index * stride;
+    };
+    const auto transfer_bytes = operation.element_width_bits / 8U;
+
+    if (start < vector_length) {
+        for (auto element = start; element < vector_length; ++element) {
+            const auto active = !operation.masked || state_.vector_mask_bit(element).value_or(false);
+            if (!active) {
+                if (operation.load && mask_agnostic &&
+                    !state_.set_vector_element(*group, element, agnostic_value)) {
+                    return illegal(packet);
+                }
+                continue;
+            }
+
+            const auto address = element_address(element);
+            if (operation.load) {
+                std::uint64_t value = 0U;
+                for (std::uint64_t byte = 0U; byte < transfer_bytes; ++byte) {
+                    const auto loaded = guest_read(
+                        packet,
+                        address + byte,
+                        bus::AccessWidth::Byte,
+                        memory::MmuAccessKind::Load,
+                        bus::AccessType::Load);
+                    if (loaded.trap.has_value()) {
+                        state_.csrs().set_vector_start_for_trap(element);
+                        return StepResult::failure(*loaded.trap, packet.length);
+                    }
+                    value |= (loaded.access.value & 0xFFU) << (byte * 8U);
+                }
+                if (!state_.set_vector_element(*group, element, value)) {
+                    return illegal(packet);
+                }
+            } else {
+                const auto value = state_.vector_element(*group, element);
+                if (!value.has_value()) {
+                    return illegal(packet);
+                }
+                for (std::uint64_t byte = 0U; byte < transfer_bytes; ++byte) {
+                    const auto stored = guest_write(
+                        packet,
+                        address + byte,
+                        bus::AccessWidth::Byte,
+                        *value >> (byte * 8U),
+                        bus::AccessType::Store);
+                    if (stored.trap.has_value()) {
+                        state_.csrs().set_vector_start_for_trap(element);
+                        return StepResult::failure(*stored.trap, packet.length);
+                    }
+                }
+            }
+        }
+
+        // 仅在存在 body 元素时允许处理尾部；vstart>=vl 或 vl=0 时规范要求目的寄存器完全不变。
+        if (operation.load && tail_agnostic) {
+            for (auto element = vector_length; element < current.vlmax; ++element) {
+                if (!state_.set_vector_element(*group, element, agnostic_value)) {
+                    return illegal(packet);
+                }
+            }
+        }
+    }
+
+    state_.csrs().clear_vector_start_after_instruction();
     state_.set_program_counter(sequential_pc);
     return StepResult::success(packet.length);
 }

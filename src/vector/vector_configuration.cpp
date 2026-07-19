@@ -103,4 +103,41 @@ bool can_preserve_vector_length(
     return previous.valid && requested.valid && previous.vlmax == requested.vlmax;
 }
 
+std::optional<VectorConfiguration> derive_memory_configuration(
+    const VectorConfiguration& current,
+    std::uint64_t element_width_bits) noexcept {
+    if (!current.valid || element_width_bits < 8U || element_width_bits > 64U ||
+        (element_width_bits & (element_width_bits - 1U)) != 0U) {
+        return std::nullopt;
+    }
+    // EMUL=(EEW/SEW)*LMUL；所有量都很小，但先约分可避免把合法 mf* 组合错误拒绝。
+    auto numerator = current.lmul_numerator * element_width_bits;
+    auto denominator = current.lmul_denominator * current.sew_bits;
+    while ((numerator & 1U) == 0U && (denominator & 1U) == 0U) {
+        numerator >>= 1U;
+        denominator >>= 1U;
+    }
+    std::uint64_t ignored_numerator = 0U;
+    std::uint64_t ignored_denominator = 1U;
+    bool supported = false;
+    for (std::uint8_t encoding = 0U; encoding < 8U; ++encoding) {
+        if (decode_lmul(encoding, ignored_numerator, ignored_denominator) &&
+            ignored_numerator == numerator && ignored_denominator == denominator) {
+            supported = true;
+            break;
+        }
+    }
+    if (!supported) {
+        return std::nullopt;
+    }
+    return VectorConfiguration{
+        true,
+        current.vtype,
+        element_width_bits,
+        numerator,
+        denominator,
+        current.vlmax,
+    };
+}
+
 }  // namespace rvemu::vector

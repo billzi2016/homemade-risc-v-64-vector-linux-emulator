@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace rvemu::vector {
 
@@ -37,5 +38,11 @@ struct VectorConfiguration final {
 [[nodiscard]] bool can_preserve_vector_length(
     std::uint64_t previous_vtype,
     std::uint64_t requested_vtype) noexcept;
+
+// 为 EEW 不同于 SEW 的向量访存计算数据寄存器使用的 EMUL；返回空表示 EMUL 超出本实现范围。
+// 结果保留原 VLMAX，因而可直接交给寄存器组布局层定位同一逻辑元素序列。
+[[nodiscard]] std::optional<VectorConfiguration> derive_memory_configuration(
+    const VectorConfiguration& current,
+    std::uint64_t element_width_bits) noexcept;
 
 }  // namespace rvemu::vector

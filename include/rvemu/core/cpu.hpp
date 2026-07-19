@@ -8,6 +8,7 @@
 #include "rvemu/core/instruction.hpp"
 #include "rvemu/core/trap.hpp"
 #include "rvemu/memory/mmu.hpp"
+#include "rvemu/vector/vector_memory.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -115,6 +116,11 @@ private:
     [[nodiscard]] StepResult execute_vector_configuration(
         const InstructionPacket& packet,
         const DecodedInstruction& instruction,
+        std::uint64_t sequential_pc);
+    // 执行已严格译码的 RVV unit-stride/strided 访存；逐元素复用统一 MMU/总线路径以保持精确异常。
+    [[nodiscard]] StepResult execute_vector_memory(
+        const InstructionPacket& packet,
+        const vector::VectorMemoryOperation& operation,
         std::uint64_t sequential_pc);
     // 集中处理 LOAD/STORE-FP、OP-FP 与 R4 FMA，校验完成后才提交浮点副作用。
     [[nodiscard]] StepResult execute_floating(

@@ -118,6 +118,20 @@ CSR 写零才能清除。
 - 发生元素异常时，精确设置 `vstart`，先前已提交元素保持，后续元素不执行。
 - 首版是否支持 fault-only-first、indexed 或 segment 访存必须在 ISA 清单中明确；未实现编码必须非法，而不是静默近似。
 
+### 6.1 首版访存编码与精确提交
+
+首版只接受普通非分段 `vle8/16/32/64.v`、`vse8/16/32/64.v`、
+`vlse8/16/32/64.v` 与 `vsse8/16/32/64.v`：`nf=0`、`mew=0`，unit-stride 的
+`lumop/sumop=0`，以及 `mop=00` 或 `mop=10`。indexed、segment、whole-register、
+mask load/store 和 fault-only-first 的编码必须非法，不能退化为普通访问。EEW 使用指令
+编码的 8/16/32/64 位值，数据寄存器组必须按 `EMUL=(EEW/SEW)×LMUL` 独立验证。
+
+为保证非对齐和跨页访问不绕过地址翻译，每个活动元素的每个字节都必须经 CPU 的统一
+`guest_read/guest_write`、MMU 和总线入口。load 仅在组成完整元素后写入目标组；当任何
+字节发生异常时，已经完成的较早元素保持，当前元素写入 `vstart`，当前及后续元素不再
+执行。掩码关闭元素绝不访问内存或产生异常；首版对 agnostic 目的元素统一写全一，
+undisturbed 元素保持旧值。成功完成后清零 `vstart`。
+
 ## 7. 整数与掩码运算
 
 声明范围至少覆盖 PRD 要求的向量整数加、减、乘、除和掩码控制。必须正确处理：
