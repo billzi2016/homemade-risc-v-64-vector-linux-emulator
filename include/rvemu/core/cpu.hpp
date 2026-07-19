@@ -8,6 +8,7 @@
 #include "rvemu/core/instruction.hpp"
 #include "rvemu/core/trap.hpp"
 #include "rvemu/memory/mmu.hpp"
+#include "rvemu/vector/vector_floating.hpp"
 #include "rvemu/vector/vector_memory.hpp"
 #include "rvemu/vector/vector_integer.hpp"
 
@@ -44,12 +45,17 @@ struct TrapDelivery final {
 };
 
 class Cpu final {
-public:
-    explicit Cpu(bus::Bus& bus) noexcept : bus_(bus), mmu_(bus) {}
+   public:
+    explicit Cpu(bus::Bus& bus) noexcept : bus_(bus), mmu_(bus) {
+    }
 
     // 暴露本 Hart 的唯一架构状态，平台与测试不得另建寄存器或 CSR 副本。
-    [[nodiscard]] CpuState& state() noexcept { return state_; }
-    [[nodiscard]] const CpuState& state() const noexcept { return state_; }
+    [[nodiscard]] CpuState& state() noexcept {
+        return state_;
+    }
+    [[nodiscard]] const CpuState& state() const noexcept {
+        return state_;
+    }
 
     // 完成一次取指与执行步进；同步异常精确返回给主循环，WFI 停顿以 stalled 明示。
     [[nodiscard]] StepResult step();
@@ -58,7 +64,7 @@ public:
     // 从 mie/mip/委托/全局使能中选择并注入一个最高优先级中断；无可接收项返回空。
     [[nodiscard]] std::optional<TrapDelivery> take_pending_interrupt() noexcept;
 
-private:
+   private:
     struct FetchResult final {
         std::optional<InstructionPacket> instruction{};
         std::optional<Trap> trap{};
@@ -72,34 +78,29 @@ private:
 
     [[nodiscard]] memory::MmuContext fetch_context() const noexcept;
     [[nodiscard]] memory::MmuContext data_context() const noexcept;
-    [[nodiscard]] GuestAccessResult guest_read(
-        const InstructionPacket& packet,
-        std::uint64_t virtual_address,
-        bus::AccessWidth width,
-        memory::MmuAccessKind kind,
-        bus::AccessType bus_type);
-    [[nodiscard]] GuestAccessResult guest_write(
-        const InstructionPacket& packet,
-        std::uint64_t virtual_address,
-        bus::AccessWidth width,
-        std::uint64_t value,
-        bus::AccessType bus_type);
-    [[nodiscard]] GuestAccessResult guest_load_reserved(
-        const InstructionPacket& packet,
-        std::uint64_t virtual_address,
-        bus::AccessWidth width);
-    [[nodiscard]] GuestAccessResult guest_store_conditional(
-        const InstructionPacket& packet,
-        bus::ReservationToken token,
-        std::uint64_t virtual_address,
-        bus::AccessWidth width,
-        std::uint64_t value);
-    [[nodiscard]] GuestAccessResult guest_compare_exchange(
-        const InstructionPacket& packet,
-        std::uint64_t virtual_address,
-        bus::AccessWidth width,
-        std::uint64_t expected,
-        std::uint64_t desired);
+    [[nodiscard]] GuestAccessResult guest_read(const InstructionPacket& packet,
+                                               std::uint64_t virtual_address,
+                                               bus::AccessWidth width,
+                                               memory::MmuAccessKind kind,
+                                               bus::AccessType bus_type);
+    [[nodiscard]] GuestAccessResult guest_write(const InstructionPacket& packet,
+                                                std::uint64_t virtual_address,
+                                                bus::AccessWidth width,
+                                                std::uint64_t value,
+                                                bus::AccessType bus_type);
+    [[nodiscard]] GuestAccessResult guest_load_reserved(const InstructionPacket& packet,
+                                                        std::uint64_t virtual_address,
+                                                        bus::AccessWidth width);
+    [[nodiscard]] GuestAccessResult guest_store_conditional(const InstructionPacket& packet,
+                                                            bus::ReservationToken token,
+                                                            std::uint64_t virtual_address,
+                                                            bus::AccessWidth width,
+                                                            std::uint64_t value);
+    [[nodiscard]] GuestAccessResult guest_compare_exchange(const InstructionPacket& packet,
+                                                           std::uint64_t virtual_address,
+                                                           bus::AccessWidth width,
+                                                           std::uint64_t expected,
+                                                           std::uint64_t desired);
 
     // 先取低半字判断 16/32 位长度，再按真实总线边界取完整指令，失败时保存精确地址。
     [[nodiscard]] FetchResult fetch();
@@ -108,31 +109,32 @@ private:
     // 执行已确认的 32 位语义编码；packet.length 仍保留原始 2/4 字节长度用于 PC 和链接值。
     [[nodiscard]] StepResult execute_standard(const InstructionPacket& packet);
     // 集中处理 ECALL/EBREAK/xRET/WFI 和六种 Zicsr 编码，避免 SYSTEM 语义散落到主 switch。
-    [[nodiscard]] StepResult execute_system(
-        const InstructionPacket& packet,
-        const DecodedInstruction& instruction,
-        std::uint64_t source1,
-        std::uint64_t sequential_pc);
+    [[nodiscard]] StepResult execute_system(const InstructionPacket& packet,
+                                            const DecodedInstruction& instruction,
+                                            std::uint64_t source1,
+                                            std::uint64_t sequential_pc);
     // 执行 OP-V 中仅负责配置的三种 vset*；未声明的 OP-V 编码必须统一返回非法指令。
-    [[nodiscard]] StepResult execute_vector_configuration(
-        const InstructionPacket& packet,
-        const DecodedInstruction& instruction,
-        std::uint64_t sequential_pc);
+    [[nodiscard]] StepResult execute_vector_configuration(const InstructionPacket& packet,
+                                                          const DecodedInstruction& instruction,
+                                                          std::uint64_t sequential_pc);
     // 执行已严格译码的 RVV unit-stride/strided 访存；逐元素复用统一 MMU/总线路径以保持精确异常。
-    [[nodiscard]] StepResult execute_vector_memory(
-        const InstructionPacket& packet,
-        const vector::VectorMemoryOperation& operation,
-        std::uint64_t sequential_pc);
+    [[nodiscard]] StepResult execute_vector_memory(const InstructionPacket& packet,
+                                                   const vector::VectorMemoryOperation& operation,
+                                                   std::uint64_t sequential_pc);
     // 执行已声明的 OP-V 单宽度整数运算；寄存器组、掩码、tail 和 vstart 只通过统一状态接口处理。
     [[nodiscard]] StepResult execute_vector_integer(
         const InstructionPacket& packet,
         const vector::VectorIntegerInstruction& instruction,
         std::uint64_t sequential_pc);
-    // 集中处理 LOAD/STORE-FP、OP-FP 与 R4 FMA，校验完成后才提交浮点副作用。
-    [[nodiscard]] StepResult execute_floating(
+    // 执行已声明的 RVV 浮点 vv/vf 四则运算；元素计算复用唯一软浮点核心并按活动元素累积 fflags。
+    [[nodiscard]] StepResult execute_vector_floating(
         const InstructionPacket& packet,
-        const DecodedInstruction& instruction,
+        const vector::VectorFloatingInstruction& instruction,
         std::uint64_t sequential_pc);
+    // 集中处理 LOAD/STORE-FP、OP-FP 与 R4 FMA，校验完成后才提交浮点副作用。
+    [[nodiscard]] StepResult execute_floating(const InstructionPacket& packet,
+                                              const DecodedInstruction& instruction,
+                                              std::uint64_t sequential_pc);
     // 构造统一非法指令结果，tval 使用原始指令编码且 PC 保持故障指令地址。
     [[nodiscard]] StepResult illegal(const InstructionPacket& packet) const;
 

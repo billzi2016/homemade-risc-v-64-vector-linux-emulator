@@ -43,6 +43,7 @@ add_library(rvemu_core STATIC
     src/core/soft_float_conversion.cpp
     src/memory/mmu.cpp
     src/vector/vector_configuration.cpp
+    src/vector/vector_floating.cpp
     src/vector/vector_memory.cpp
     src/vector/vector_integer.cpp
     src/vector/vector_register_group.cpp

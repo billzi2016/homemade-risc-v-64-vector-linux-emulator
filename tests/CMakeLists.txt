@@ -87,6 +87,12 @@ target_compile_features(rvemu_cpu_vector_integer_tests PRIVATE cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_cpu_vector_integer_tests)
 add_test(NAME rvemu.cpu_vector_integer COMMAND rvemu_cpu_vector_integer_tests)
 
+add_executable(rvemu_cpu_vector_floating_tests unit/test_cpu_vector_floating.cpp)
+target_link_libraries(rvemu_cpu_vector_floating_tests PRIVATE rvemu_core)
+target_compile_features(rvemu_cpu_vector_floating_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_cpu_vector_floating_tests)
+add_test(NAME rvemu.cpu_vector_floating COMMAND rvemu_cpu_vector_floating_tests)
+
 add_executable(rvemu_cpu_m_tests
     unit/test_cpu_m.cpp
 )

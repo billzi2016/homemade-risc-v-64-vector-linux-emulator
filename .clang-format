@@ -1,0 +1,23 @@
+# 文件职责：固定本仓库 C++17 源码的可读格式，避免不同编辑器把复杂硬件语义压缩为难以审阅的单行。
+# 边界：仅定义排版规则，不改变编译选项、程序语义、头文件依赖顺序或任何运行时行为。
+
+BasedOnStyle: Google
+Language: Cpp
+Standard: c++17
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 100
+BreakBeforeBraces: Attach
+PointerAlignment: Left
+ReferenceAlignment: Left
+SortIncludes: Never
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: None
+AllowShortLoopsOnASingleLine: false
+BinPackArguments: false
+BinPackParameters: false
+BreakBeforeBinaryOperators: NonAssignment
+SpaceBeforeParens: ControlStatements

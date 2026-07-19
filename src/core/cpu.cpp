@@ -5,6 +5,7 @@
 
 #include "rvemu/core/compressed_decoder.hpp"
 #include "rvemu/core/decoder.hpp"
+#include "rvemu/core/floating_state.hpp"
 #include "rvemu/core/integer_a.hpp"
 #include "rvemu/core/integer_m.hpp"
 #include "rvemu/vector/vector_configuration.hpp"
@@ -20,10 +21,9 @@ namespace {
 constexpr std::uint64_t kInterruptFlag = 1ULL << 63U;
 
 // 把执行器发现的同步错误绑定原始指令 PC/编码，Trap 入口不再猜测故障现场。
-[[nodiscard]] Trap make_trap(
-    const InstructionPacket& packet,
-    ExceptionCause cause,
-    std::uint64_t value) noexcept {
+[[nodiscard]] Trap make_trap(const InstructionPacket& packet,
+                             ExceptionCause cause,
+                             std::uint64_t value) noexcept {
     return Trap{cause, value, packet.program_counter, packet.bits};
 }
 
@@ -34,9 +34,8 @@ constexpr std::uint64_t kInterruptFlag = 1ULL << 63U;
 }
 
 // 显式补符号位实现 64 位算术右移，不依赖 C++ 对负数右移的实现定义行为。
-[[nodiscard]] std::uint64_t arithmetic_shift_right64(
-    std::uint64_t value,
-    std::uint8_t amount) noexcept {
+[[nodiscard]] std::uint64_t arithmetic_shift_right64(std::uint64_t value,
+                                                     std::uint8_t amount) noexcept {
     if (amount == 0U) {
         return value;
     }
@@ -48,9 +47,8 @@ constexpr std::uint64_t kInterruptFlag = 1ULL << 63U;
 }
 
 // 32 位版本在无符号域完成移位和补位，避免整数提升引入宿主相关语义。
-[[nodiscard]] std::uint32_t arithmetic_shift_right32(
-    std::uint32_t value,
-    std::uint8_t amount) noexcept {
+[[nodiscard]] std::uint32_t arithmetic_shift_right32(std::uint32_t value,
+                                                     std::uint8_t amount) noexcept {
     if (amount == 0U) {
         return value;
     }
@@ -83,12 +81,12 @@ void apply_acquire_ordering(bool acquire) noexcept {
 // ECALL cause 只取决于发起模式；集中映射避免 SYSTEM 分支散落原因常量。
 [[nodiscard]] ExceptionCause environment_call_cause(PrivilegeMode privilege) noexcept {
     switch (privilege) {
-    case PrivilegeMode::User:
-        return ExceptionCause::EnvironmentCallFromUser;
-    case PrivilegeMode::Supervisor:
-        return ExceptionCause::EnvironmentCallFromSupervisor;
-    case PrivilegeMode::Machine:
-        return ExceptionCause::EnvironmentCallFromMachine;
+        case PrivilegeMode::User:
+            return ExceptionCause::EnvironmentCallFromUser;
+        case PrivilegeMode::Supervisor:
+            return ExceptionCause::EnvironmentCallFromSupervisor;
+        case PrivilegeMode::Machine:
+            return ExceptionCause::EnvironmentCallFromMachine;
     }
     return ExceptionCause::IllegalInstruction;
 }
@@ -106,13 +104,13 @@ void apply_acquire_ordering(bool acquire) noexcept {
 
 [[nodiscard]] ExceptionCause access_fault_cause(memory::MmuAccessKind kind) noexcept {
     switch (kind) {
-    case memory::MmuAccessKind::InstructionFetch:
-        return ExceptionCause::InstructionAccessFault;
-    case memory::MmuAccessKind::Load:
-        return ExceptionCause::LoadAccessFault;
-    case memory::MmuAccessKind::Store:
-    case memory::MmuAccessKind::Atomic:
-        return ExceptionCause::StoreAccessFault;
+        case memory::MmuAccessKind::InstructionFetch:
+            return ExceptionCause::InstructionAccessFault;
+        case memory::MmuAccessKind::Load:
+            return ExceptionCause::LoadAccessFault;
+        case memory::MmuAccessKind::Store:
+        case memory::MmuAccessKind::Atomic:
+            return ExceptionCause::StoreAccessFault;
     }
     return ExceptionCause::LoadAccessFault;
 }
@@ -120,10 +118,9 @@ void apply_acquire_ordering(bool acquire) noexcept {
 }  // namespace
 
 memory::MmuContext Cpu::fetch_context() const noexcept {
-    return memory::MmuContext{
-        state_.privilege(),
-        state_.csrs().peek(CsrAddress::Satp),
-        state_.csrs().peek(CsrAddress::Mstatus)};
+    return memory::MmuContext{state_.privilege(),
+                              state_.csrs().peek(CsrAddress::Satp),
+                              state_.csrs().peek(CsrAddress::Mstatus)};
 }
 
 memory::MmuContext Cpu::data_context() const noexcept {
@@ -135,20 +132,21 @@ memory::MmuContext Cpu::data_context() const noexcept {
     return memory::MmuContext{privilege, state_.csrs().peek(CsrAddress::Satp), mstatus};
 }
 
-Cpu::GuestAccessResult Cpu::guest_read(
-    const InstructionPacket& packet,
-    std::uint64_t virtual_address,
-    bus::AccessWidth width,
-    memory::MmuAccessKind kind,
-    bus::AccessType bus_type) {
-    const auto context = kind == memory::MmuAccessKind::InstructionFetch ?
-                             fetch_context() : data_context();
+Cpu::GuestAccessResult Cpu::guest_read(const InstructionPacket& packet,
+                                       std::uint64_t virtual_address,
+                                       bus::AccessWidth width,
+                                       memory::MmuAccessKind kind,
+                                       bus::AccessType bus_type) {
+    const auto context =
+        kind == memory::MmuAccessKind::InstructionFetch ? fetch_context() : data_context();
     const auto translated = mmu_.translate(virtual_address, width, kind, context);
     if (translated.fault.has_value()) {
-        return GuestAccessResult{
-            bus::AccessResult{},
-            Trap{translated.fault->cause, translated.fault->value, packet.program_counter, packet.bits},
-            bus::ReservationToken{}};
+        return GuestAccessResult{bus::AccessResult{},
+                                 Trap{translated.fault->cause,
+                                      translated.fault->value,
+                                      packet.program_counter,
+                                      packet.bits},
+                                 bus::ReservationToken{}};
     }
     const auto loaded = bus_.read(*translated.physical_address, width, bus_type);
     if (!loaded.ok()) {
@@ -160,97 +158,109 @@ Cpu::GuestAccessResult Cpu::guest_read(
     return GuestAccessResult{loaded, std::nullopt, bus::ReservationToken{}};
 }
 
-Cpu::GuestAccessResult Cpu::guest_write(
-    const InstructionPacket& packet,
-    std::uint64_t virtual_address,
-    bus::AccessWidth width,
-    std::uint64_t value,
-    bus::AccessType bus_type) {
-    const auto translated = mmu_.translate(
-        virtual_address, width, memory::MmuAccessKind::Atomic, data_context());
+Cpu::GuestAccessResult Cpu::guest_write(const InstructionPacket& packet,
+                                        std::uint64_t virtual_address,
+                                        bus::AccessWidth width,
+                                        std::uint64_t value,
+                                        bus::AccessType bus_type) {
+    const auto translated =
+        mmu_.translate(virtual_address, width, memory::MmuAccessKind::Atomic, data_context());
     if (translated.fault.has_value()) {
-        return GuestAccessResult{
-            bus::AccessResult{},
-            Trap{translated.fault->cause, translated.fault->value, packet.program_counter, packet.bits},
-            bus::ReservationToken{}};
+        return GuestAccessResult{bus::AccessResult{},
+                                 Trap{translated.fault->cause,
+                                      translated.fault->value,
+                                      packet.program_counter,
+                                      packet.bits},
+                                 bus::ReservationToken{}};
     }
     const auto stored = bus_.write(*translated.physical_address, width, value, bus_type);
     if (!stored.ok()) {
-        return GuestAccessResult{
-            stored,
-            Trap{ExceptionCause::StoreAccessFault, virtual_address, packet.program_counter, packet.bits},
-            bus::ReservationToken{}};
+        return GuestAccessResult{stored,
+                                 Trap{ExceptionCause::StoreAccessFault,
+                                      virtual_address,
+                                      packet.program_counter,
+                                      packet.bits},
+                                 bus::ReservationToken{}};
     }
     return GuestAccessResult{stored, std::nullopt, bus::ReservationToken{}};
 }
 
-Cpu::GuestAccessResult Cpu::guest_load_reserved(
-    const InstructionPacket& packet,
-    std::uint64_t virtual_address,
-    bus::AccessWidth width) {
-    const auto translated = mmu_.translate(
-        virtual_address, width, memory::MmuAccessKind::Load, data_context());
+Cpu::GuestAccessResult Cpu::guest_load_reserved(const InstructionPacket& packet,
+                                                std::uint64_t virtual_address,
+                                                bus::AccessWidth width) {
+    const auto translated =
+        mmu_.translate(virtual_address, width, memory::MmuAccessKind::Load, data_context());
     if (translated.fault.has_value()) {
-        return GuestAccessResult{
-            bus::AccessResult{},
-            Trap{translated.fault->cause, translated.fault->value, packet.program_counter, packet.bits},
-            bus::ReservationToken{}};
+        return GuestAccessResult{bus::AccessResult{},
+                                 Trap{translated.fault->cause,
+                                      translated.fault->value,
+                                      packet.program_counter,
+                                      packet.bits},
+                                 bus::ReservationToken{}};
     }
     const auto loaded = bus_.load_reserved(*translated.physical_address, width);
     if (!loaded.access.ok()) {
-        return GuestAccessResult{
-            loaded.access,
-            Trap{ExceptionCause::LoadAccessFault, virtual_address, packet.program_counter, packet.bits},
-            bus::ReservationToken{}};
+        return GuestAccessResult{loaded.access,
+                                 Trap{ExceptionCause::LoadAccessFault,
+                                      virtual_address,
+                                      packet.program_counter,
+                                      packet.bits},
+                                 bus::ReservationToken{}};
     }
     return GuestAccessResult{loaded.access, std::nullopt, loaded.token};
 }
 
-Cpu::GuestAccessResult Cpu::guest_store_conditional(
-    const InstructionPacket& packet,
-    bus::ReservationToken token,
-    std::uint64_t virtual_address,
-    bus::AccessWidth width,
-    std::uint64_t value) {
-    const auto translated = mmu_.translate(
-        virtual_address, width, memory::MmuAccessKind::Store, data_context());
+Cpu::GuestAccessResult Cpu::guest_store_conditional(const InstructionPacket& packet,
+                                                    bus::ReservationToken token,
+                                                    std::uint64_t virtual_address,
+                                                    bus::AccessWidth width,
+                                                    std::uint64_t value) {
+    const auto translated =
+        mmu_.translate(virtual_address, width, memory::MmuAccessKind::Store, data_context());
     if (translated.fault.has_value()) {
-        return GuestAccessResult{
-            bus::AccessResult{},
-            Trap{translated.fault->cause, translated.fault->value, packet.program_counter, packet.bits},
-            bus::ReservationToken{}};
+        return GuestAccessResult{bus::AccessResult{},
+                                 Trap{translated.fault->cause,
+                                      translated.fault->value,
+                                      packet.program_counter,
+                                      packet.bits},
+                                 bus::ReservationToken{}};
     }
     const auto stored = bus_.store_conditional(token, *translated.physical_address, width, value);
     if (!stored.ok()) {
-        return GuestAccessResult{
-            stored,
-            Trap{ExceptionCause::StoreAccessFault, virtual_address, packet.program_counter, packet.bits},
-            bus::ReservationToken{}};
+        return GuestAccessResult{stored,
+                                 Trap{ExceptionCause::StoreAccessFault,
+                                      virtual_address,
+                                      packet.program_counter,
+                                      packet.bits},
+                                 bus::ReservationToken{}};
     }
     return GuestAccessResult{stored, std::nullopt, bus::ReservationToken{}};
 }
 
-Cpu::GuestAccessResult Cpu::guest_compare_exchange(
-    const InstructionPacket& packet,
-    std::uint64_t virtual_address,
-    bus::AccessWidth width,
-    std::uint64_t expected,
-    std::uint64_t desired) {
-    const auto translated = mmu_.translate(
-        virtual_address, width, memory::MmuAccessKind::Store, data_context());
+Cpu::GuestAccessResult Cpu::guest_compare_exchange(const InstructionPacket& packet,
+                                                   std::uint64_t virtual_address,
+                                                   bus::AccessWidth width,
+                                                   std::uint64_t expected,
+                                                   std::uint64_t desired) {
+    const auto translated =
+        mmu_.translate(virtual_address, width, memory::MmuAccessKind::Store, data_context());
     if (translated.fault.has_value()) {
-        return GuestAccessResult{
-            bus::AccessResult{},
-            Trap{translated.fault->cause, translated.fault->value, packet.program_counter, packet.bits},
-            bus::ReservationToken{}};
+        return GuestAccessResult{bus::AccessResult{},
+                                 Trap{translated.fault->cause,
+                                      translated.fault->value,
+                                      packet.program_counter,
+                                      packet.bits},
+                                 bus::ReservationToken{}};
     }
-    const auto exchanged = bus_.compare_exchange(
-        *translated.physical_address, width, expected, desired);
+    const auto exchanged =
+        bus_.compare_exchange(*translated.physical_address, width, expected, desired);
     if (!exchanged.ok()) {
-        return GuestAccessResult{
-            exchanged,
-            Trap{ExceptionCause::StoreAccessFault, virtual_address, packet.program_counter, packet.bits},
-            bus::ReservationToken{}};
+        return GuestAccessResult{exchanged,
+                                 Trap{ExceptionCause::StoreAccessFault,
+                                      virtual_address,
+                                      packet.program_counter,
+                                      packet.bits},
+                                 bus::ReservationToken{}};
     }
     return GuestAccessResult{exchanged, std::nullopt, bus::ReservationToken{}};
 }
@@ -258,18 +268,16 @@ Cpu::GuestAccessResult Cpu::guest_compare_exchange(
 Cpu::FetchResult Cpu::fetch() {
     const auto pc = state_.program_counter();
     if ((pc & 0x1U) != 0U) {
-        return FetchResult{
-            std::nullopt,
-            Trap{ExceptionCause::InstructionAddressMisaligned, pc, pc, 0U}};
+        return FetchResult{std::nullopt,
+                           Trap{ExceptionCause::InstructionAddressMisaligned, pc, pc, 0U}};
     }
 
     const auto fetch_packet = InstructionPacket{pc, 0U, 0U};
-    const auto lower_result = guest_read(
-        fetch_packet,
-        pc,
-        bus::AccessWidth::HalfWord,
-        memory::MmuAccessKind::InstructionFetch,
-        bus::AccessType::InstructionFetch);
+    const auto lower_result = guest_read(fetch_packet,
+                                         pc,
+                                         bus::AccessWidth::HalfWord,
+                                         memory::MmuAccessKind::InstructionFetch,
+                                         bus::AccessType::InstructionFetch);
     if (lower_result.trap.has_value()) {
         return FetchResult{std::nullopt, *lower_result.trap};
     }
@@ -281,18 +289,16 @@ Cpu::FetchResult Cpu::fetch() {
 
     const auto maximum = std::numeric_limits<std::uint64_t>::max();
     if (pc > maximum - 2U) {
-        return FetchResult{
-            std::nullopt,
-            Trap{ExceptionCause::InstructionAccessFault, pc, pc, lower}};
+        return FetchResult{std::nullopt,
+                           Trap{ExceptionCause::InstructionAccessFault, pc, pc, lower}};
     }
 
     const auto upper_address = pc + 2U;
-    auto upper_result = guest_read(
-        fetch_packet,
-        upper_address,
-        bus::AccessWidth::HalfWord,
-        memory::MmuAccessKind::InstructionFetch,
-        bus::AccessType::InstructionFetch);
+    auto upper_result = guest_read(fetch_packet,
+                                   upper_address,
+                                   bus::AccessWidth::HalfWord,
+                                   memory::MmuAccessKind::InstructionFetch,
+                                   bus::AccessType::InstructionFetch);
     if (upper_result.trap.has_value()) {
         upper_result.trap->instruction = lower;
         return FetchResult{std::nullopt, *upper_result.trap};
@@ -334,8 +340,9 @@ StepResult Cpu::step() {
 TrapDelivery Cpu::take_trap(const Trap& trap) noexcept {
     const auto source = state_.privilege();
     const auto cause = static_cast<std::uint64_t>(trap.cause);
-    const auto target = state_.csrs().exception_delegated(source, trap.cause) ?
-                            PrivilegeMode::Supervisor : PrivilegeMode::Machine;
+    const auto target = state_.csrs().exception_delegated(source, trap.cause)
+                            ? PrivilegeMode::Supervisor
+                            : PrivilegeMode::Machine;
 
     if (target == PrivilegeMode::Supervisor) {
         state_.csrs().enter_supervisor_trap(source, trap.program_counter, cause, trap.value);
@@ -375,9 +382,8 @@ std::optional<TrapDelivery> Cpu::take_pending_interrupt() noexcept {
 }
 
 StepResult Cpu::illegal(const InstructionPacket& packet) const {
-    return StepResult::failure(
-        make_trap(packet, ExceptionCause::IllegalInstruction, packet.bits),
-        packet.length);
+    return StepResult::failure(make_trap(packet, ExceptionCause::IllegalInstruction, packet.bits),
+                               packet.length);
 }
 
 StepResult Cpu::execute(const InstructionPacket& packet) {
@@ -413,499 +419,492 @@ StepResult Cpu::execute_standard(const InstructionPacket& packet) {
         state_.set_program_counter(next_pc);
         return StepResult::success(packet.length);
     };
-    const auto write_and_retire = [this, &packet](
-                                      std::uint8_t destination,
-                                      std::uint64_t value,
-                                      std::uint64_t next_pc) {
-        state_.set_integer(destination, value);
-        state_.set_program_counter(next_pc);
-        return StepResult::success(packet.length);
-    };
+    const auto write_and_retire =
+        [this, &packet](std::uint8_t destination, std::uint64_t value, std::uint64_t next_pc) {
+            state_.set_integer(destination, value);
+            state_.set_program_counter(next_pc);
+            return StepResult::success(packet.length);
+        };
 
     switch (instruction.opcode) {
-    case 0x57U:  // OP-V：当前阶段只开放 vsetvli/vsetivli/vsetvl，其余向量指令不能被宽松接受。
-        if (const auto integer = vector::decode_vector_integer_instruction(packet.bits); integer.has_value()) {
-            return execute_vector_integer(packet, *integer, sequential_pc);
-        }
-        return execute_vector_configuration(packet, instruction, sequential_pc);
-
-    case 0x37U:  // LUI
-        return write_and_retire(instruction.destination, immediate_u(packet.bits), sequential_pc);
-
-    case 0x17U:  // AUIPC
-        return write_and_retire(
-            instruction.destination,
-            packet.program_counter + immediate_u(packet.bits),
-            sequential_pc);
-
-    case 0x6FU: {  // JAL
-        const auto target = packet.program_counter + immediate_j(packet.bits);
-        if ((target & 0x1U) != 0U) {
-            return StepResult::failure(
-                make_trap(packet, ExceptionCause::InstructionAddressMisaligned, target),
-                packet.length);
-        }
-        return write_and_retire(instruction.destination, sequential_pc, target);
-    }
-
-    case 0x67U: {  // JALR
-        if (instruction.function3 != 0U) {
-            return illegal(packet);
-        }
-        const auto target = (source1 + immediate_i(packet.bits)) & ~1ULL;
-        if ((target & 0x1U) != 0U) {
-            return StepResult::failure(
-                make_trap(packet, ExceptionCause::InstructionAddressMisaligned, target),
-                packet.length);
-        }
-        return write_and_retire(instruction.destination, sequential_pc, target);
-    }
-
-    case 0x63U: {  // 条件分支
-        bool taken = false;
-        switch (instruction.function3) {
-        case 0x0U:
-            taken = source1 == source2;
-            break;
-        case 0x1U:
-            taken = source1 != source2;
-            break;
-        case 0x4U:
-            taken = signed_less(source1, source2);
-            break;
-        case 0x5U:
-            taken = !signed_less(source1, source2);
-            break;
-        case 0x6U:
-            taken = source1 < source2;
-            break;
-        case 0x7U:
-            taken = source1 >= source2;
-            break;
-        default:
-            return illegal(packet);
-        }
-
-        if (!taken) {
-            return retire(sequential_pc);
-        }
-        const auto target = packet.program_counter + immediate_b(packet.bits);
-        if ((target & 0x1U) != 0U) {
-            return StepResult::failure(
-                make_trap(packet, ExceptionCause::InstructionAddressMisaligned, target),
-                packet.length);
-        }
-        return retire(target);
-    }
-
-    case 0x03U: {  // 标量加载
-        bus::AccessWidth width = bus::AccessWidth::Byte;
-        bool sign_result = true;
-        std::uint8_t sign_width = 8U;
-        switch (instruction.function3) {
-        case 0x0U:  // LB
-            break;
-        case 0x1U:  // LH
-            width = bus::AccessWidth::HalfWord;
-            sign_width = 16U;
-            break;
-        case 0x2U:  // LW
-            width = bus::AccessWidth::Word;
-            sign_width = 32U;
-            break;
-        case 0x3U:  // LD
-            width = bus::AccessWidth::DoubleWord;
-            sign_width = 64U;
-            break;
-        case 0x4U:  // LBU
-            sign_result = false;
-            break;
-        case 0x5U:  // LHU
-            width = bus::AccessWidth::HalfWord;
-            sign_result = false;
-            break;
-        case 0x6U:  // LWU
-            width = bus::AccessWidth::Word;
-            sign_result = false;
-            break;
-        default:
-            return illegal(packet);
-        }
-
-        const auto address = source1 + immediate_i(packet.bits);
-        const auto loaded = guest_read(
-            packet,
-            address,
-            width,
-            memory::MmuAccessKind::Load,
-            bus::AccessType::Load);
-        if (loaded.trap.has_value()) {
-            return StepResult::failure(*loaded.trap, packet.length);
-        }
-        const auto value = sign_result ?
-                               sign_extend(loaded.access.value, sign_width) :
-                               loaded.access.value;
-        return write_and_retire(instruction.destination, value, sequential_pc);
-    }
-
-    case 0x23U: {  // 标量存储
-        bus::AccessWidth width = bus::AccessWidth::Byte;
-        switch (instruction.function3) {
-        case 0x0U:
-            break;
-        case 0x1U:
-            width = bus::AccessWidth::HalfWord;
-            break;
-        case 0x2U:
-            width = bus::AccessWidth::Word;
-            break;
-        case 0x3U:
-            width = bus::AccessWidth::DoubleWord;
-            break;
-        default:
-            return illegal(packet);
-        }
-
-        const auto address = source1 + immediate_s(packet.bits);
-        const auto stored = guest_write(
-            packet,
-            address,
-            width,
-            source2,
-            bus::AccessType::Store);
-        if (stored.trap.has_value()) {
-            return StepResult::failure(*stored.trap, packet.length);
-        }
-        return retire(sequential_pc);
-    }
-
-    case 0x13U: {  // OP-IMM
-        const auto immediate = immediate_i(packet.bits);
-        std::uint64_t result = 0U;
-        switch (instruction.function3) {
-        case 0x0U:
-            result = source1 + immediate;
-            break;
-        case 0x2U:
-            result = signed_less(source1, immediate) ? 1U : 0U;
-            break;
-        case 0x3U:
-            result = source1 < immediate ? 1U : 0U;
-            break;
-        case 0x4U:
-            result = source1 ^ immediate;
-            break;
-        case 0x6U:
-            result = source1 | immediate;
-            break;
-        case 0x7U:
-            result = source1 & immediate;
-            break;
-        case 0x1U: {
-            const auto function6 = static_cast<std::uint8_t>((packet.bits >> 26U) & 0x3FU);
-            if (function6 != 0U) {
-                return illegal(packet);
+        case 0x57U:  // OP-V：先按已声明元素指令严格译码，再落入唯一的 vset* 配置入口。
+            if (const auto floating = vector::decode_vector_floating_instruction(packet.bits);
+                floating.has_value()) {
+                return execute_vector_floating(packet, *floating, sequential_pc);
             }
-            const auto amount = static_cast<std::uint8_t>((packet.bits >> 20U) & 0x3FU);
-            result = source1 << amount;
-            break;
-        }
-        case 0x5U: {
-            const auto function6 = static_cast<std::uint8_t>((packet.bits >> 26U) & 0x3FU);
-            const auto amount = static_cast<std::uint8_t>((packet.bits >> 20U) & 0x3FU);
-            if (function6 == 0U) {
-                result = source1 >> amount;
-            } else if (function6 == 0x10U) {
-                result = arithmetic_shift_right64(source1, amount);
-            } else {
-                return illegal(packet);
+            if (const auto integer = vector::decode_vector_integer_instruction(packet.bits);
+                integer.has_value()) {
+                return execute_vector_integer(packet, *integer, sequential_pc);
             }
-            break;
-        }
-        default:
-            return illegal(packet);
-        }
-        return write_and_retire(instruction.destination, result, sequential_pc);
-    }
+            return execute_vector_configuration(packet, instruction, sequential_pc);
 
-    case 0x1BU: {  // OP-IMM-32
-        std::uint32_t result = 0U;
-        const auto source_word = static_cast<std::uint32_t>(source1 & 0xFFFF'FFFFULL);
-        switch (instruction.function3) {
-        case 0x0U:
-            result = source_word + static_cast<std::uint32_t>(immediate_i(packet.bits));
-            break;
-        case 0x1U: {
-            if (instruction.function7 != 0U) {
-                return illegal(packet);
-            }
-            const auto amount = static_cast<std::uint8_t>((packet.bits >> 20U) & 0x1FU);
-            result = static_cast<std::uint32_t>(source_word << amount);
-            break;
-        }
-        case 0x5U: {
-            const auto amount = static_cast<std::uint8_t>((packet.bits >> 20U) & 0x1FU);
-            if (instruction.function7 == 0U) {
-                result = source_word >> amount;
-            } else if (instruction.function7 == 0x20U) {
-                result = arithmetic_shift_right32(source_word, amount);
-            } else {
-                return illegal(packet);
-            }
-            break;
-        }
-        default:
-            return illegal(packet);
-        }
-        return write_and_retire(instruction.destination, sign_extend_word(result), sequential_pc);
-    }
-
-    case 0x33U: {  // OP
-        std::uint64_t result = 0U;
-        if (instruction.function7 == 0x01U) {
-            const auto multiplied_or_divided = execute_integer_m(
-                instruction.function3, source1, source2, false);
-            if (!multiplied_or_divided.has_value()) {
-                return illegal(packet);
-            }
-            result = *multiplied_or_divided;
-        } else if (instruction.function7 == 0U) {
-            switch (instruction.function3) {
-            case 0x0U:
-                result = source1 + source2;
-                break;
-            case 0x1U:
-                result = source1 << (source2 & 0x3FU);
-                break;
-            case 0x2U:
-                result = signed_less(source1, source2) ? 1U : 0U;
-                break;
-            case 0x3U:
-                result = source1 < source2 ? 1U : 0U;
-                break;
-            case 0x4U:
-                result = source1 ^ source2;
-                break;
-            case 0x5U:
-                result = source1 >> (source2 & 0x3FU);
-                break;
-            case 0x6U:
-                result = source1 | source2;
-                break;
-            case 0x7U:
-                result = source1 & source2;
-                break;
-            default:
-                return illegal(packet);
-            }
-        } else if (instruction.function7 == 0x20U && instruction.function3 == 0x0U) {
-            result = source1 - source2;
-        } else if (instruction.function7 == 0x20U && instruction.function3 == 0x5U) {
-            result = arithmetic_shift_right64(source1, static_cast<std::uint8_t>(source2 & 0x3FU));
-        } else {
-            return illegal(packet);
-        }
-        return write_and_retire(instruction.destination, result, sequential_pc);
-    }
-
-    case 0x3BU: {  // OP-32
-        const auto lhs = static_cast<std::uint32_t>(source1 & 0xFFFF'FFFFULL);
-        const auto rhs = static_cast<std::uint32_t>(source2 & 0xFFFF'FFFFULL);
-        std::uint32_t result = 0U;
-        if (instruction.function7 == 0x01U) {
-            const auto multiplied_or_divided = execute_integer_m(
-                instruction.function3, source1, source2, true);
-            if (!multiplied_or_divided.has_value()) {
-                return illegal(packet);
-            }
+        case 0x37U:  // LUI
             return write_and_retire(
-                instruction.destination, *multiplied_or_divided, sequential_pc);
-        }
-        if (instruction.function7 == 0U && instruction.function3 == 0x0U) {
-            result = lhs + rhs;
-        } else if (instruction.function7 == 0x20U && instruction.function3 == 0x0U) {
-            result = lhs - rhs;
-        } else if (instruction.function7 == 0U && instruction.function3 == 0x1U) {
-            result = static_cast<std::uint32_t>(lhs << (rhs & 0x1FU));
-        } else if (instruction.function7 == 0U && instruction.function3 == 0x5U) {
-            result = lhs >> (rhs & 0x1FU);
-        } else if (instruction.function7 == 0x20U && instruction.function3 == 0x5U) {
-            result = arithmetic_shift_right32(lhs, static_cast<std::uint8_t>(rhs & 0x1FU));
-        } else {
-            return illegal(packet);
-        }
-        return write_and_retire(instruction.destination, sign_extend_word(result), sequential_pc);
-    }
+                instruction.destination, immediate_u(packet.bits), sequential_pc);
 
-    case 0x2FU: {  // RV64A：LR/SC 与 AMO
-        const auto word_operation = instruction.function3 == 0x2U;
-        if (!word_operation && instruction.function3 != 0x3U) {
-            return illegal(packet);
-        }
+        case 0x17U:  // AUIPC
+            return write_and_retire(instruction.destination,
+                                    packet.program_counter + immediate_u(packet.bits),
+                                    sequential_pc);
 
-        const auto width = word_operation ? bus::AccessWidth::Word : bus::AccessWidth::DoubleWord;
-        const auto width_bytes = bus::width_in_bytes(width);
-        const auto address = source1;
-        const auto function5 = static_cast<std::uint8_t>((packet.bits >> 27U) & 0x1FU);
-        const auto acquire = ((packet.bits >> 26U) & 0x1U) != 0U;
-        const auto release = ((packet.bits >> 25U) & 0x1U) != 0U;
-
-        if (function5 == 0x02U) {  // LR.W / LR.D
-            if (instruction.source2 != 0U) {
-                return illegal(packet);
-            }
-            if ((address & (width_bytes - 1U)) != 0U) {
+        case 0x6FU: {  // JAL
+            const auto target = packet.program_counter + immediate_j(packet.bits);
+            if ((target & 0x1U) != 0U) {
                 return StepResult::failure(
-                    make_trap(packet, ExceptionCause::LoadAddressMisaligned, address),
+                    make_trap(packet, ExceptionCause::InstructionAddressMisaligned, target),
                     packet.length);
             }
+            return write_and_retire(instruction.destination, sequential_pc, target);
+        }
 
-            apply_release_ordering(release);
-            const auto loaded = guest_load_reserved(packet, address, width);
+        case 0x67U: {  // JALR
+            if (instruction.function3 != 0U) {
+                return illegal(packet);
+            }
+            const auto target = (source1 + immediate_i(packet.bits)) & ~1ULL;
+            if ((target & 0x1U) != 0U) {
+                return StepResult::failure(
+                    make_trap(packet, ExceptionCause::InstructionAddressMisaligned, target),
+                    packet.length);
+            }
+            return write_and_retire(instruction.destination, sequential_pc, target);
+        }
+
+        case 0x63U: {  // 条件分支
+            bool taken = false;
+            switch (instruction.function3) {
+                case 0x0U:
+                    taken = source1 == source2;
+                    break;
+                case 0x1U:
+                    taken = source1 != source2;
+                    break;
+                case 0x4U:
+                    taken = signed_less(source1, source2);
+                    break;
+                case 0x5U:
+                    taken = !signed_less(source1, source2);
+                    break;
+                case 0x6U:
+                    taken = source1 < source2;
+                    break;
+                case 0x7U:
+                    taken = source1 >= source2;
+                    break;
+                default:
+                    return illegal(packet);
+            }
+
+            if (!taken) {
+                return retire(sequential_pc);
+            }
+            const auto target = packet.program_counter + immediate_b(packet.bits);
+            if ((target & 0x1U) != 0U) {
+                return StepResult::failure(
+                    make_trap(packet, ExceptionCause::InstructionAddressMisaligned, target),
+                    packet.length);
+            }
+            return retire(target);
+        }
+
+        case 0x03U: {  // 标量加载
+            bus::AccessWidth width = bus::AccessWidth::Byte;
+            bool sign_result = true;
+            std::uint8_t sign_width = 8U;
+            switch (instruction.function3) {
+                case 0x0U:  // LB
+                    break;
+                case 0x1U:  // LH
+                    width = bus::AccessWidth::HalfWord;
+                    sign_width = 16U;
+                    break;
+                case 0x2U:  // LW
+                    width = bus::AccessWidth::Word;
+                    sign_width = 32U;
+                    break;
+                case 0x3U:  // LD
+                    width = bus::AccessWidth::DoubleWord;
+                    sign_width = 64U;
+                    break;
+                case 0x4U:  // LBU
+                    sign_result = false;
+                    break;
+                case 0x5U:  // LHU
+                    width = bus::AccessWidth::HalfWord;
+                    sign_result = false;
+                    break;
+                case 0x6U:  // LWU
+                    width = bus::AccessWidth::Word;
+                    sign_result = false;
+                    break;
+                default:
+                    return illegal(packet);
+            }
+
+            const auto address = source1 + immediate_i(packet.bits);
+            const auto loaded = guest_read(
+                packet, address, width, memory::MmuAccessKind::Load, bus::AccessType::Load);
             if (loaded.trap.has_value()) {
                 return StepResult::failure(*loaded.trap, packet.length);
             }
-            state_.set_reservation_token(loaded.token);
-            apply_acquire_ordering(acquire);
-            const auto value = word_operation ? sign_extend_word(loaded.access.value) :
-                                                loaded.access.value;
+            const auto value =
+                sign_result ? sign_extend(loaded.access.value, sign_width) : loaded.access.value;
             return write_and_retire(instruction.destination, value, sequential_pc);
         }
 
-        if (function5 == 0x03U) {  // SC.W / SC.D
-            if ((address & (width_bytes - 1U)) != 0U) {
+        case 0x23U: {  // 标量存储
+            bus::AccessWidth width = bus::AccessWidth::Byte;
+            switch (instruction.function3) {
+                case 0x0U:
+                    break;
+                case 0x1U:
+                    width = bus::AccessWidth::HalfWord;
+                    break;
+                case 0x2U:
+                    width = bus::AccessWidth::Word;
+                    break;
+                case 0x3U:
+                    width = bus::AccessWidth::DoubleWord;
+                    break;
+                default:
+                    return illegal(packet);
+            }
+
+            const auto address = source1 + immediate_s(packet.bits);
+            const auto stored =
+                guest_write(packet, address, width, source2, bus::AccessType::Store);
+            if (stored.trap.has_value()) {
+                return StepResult::failure(*stored.trap, packet.length);
+            }
+            return retire(sequential_pc);
+        }
+
+        case 0x13U: {  // OP-IMM
+            const auto immediate = immediate_i(packet.bits);
+            std::uint64_t result = 0U;
+            switch (instruction.function3) {
+                case 0x0U:
+                    result = source1 + immediate;
+                    break;
+                case 0x2U:
+                    result = signed_less(source1, immediate) ? 1U : 0U;
+                    break;
+                case 0x3U:
+                    result = source1 < immediate ? 1U : 0U;
+                    break;
+                case 0x4U:
+                    result = source1 ^ immediate;
+                    break;
+                case 0x6U:
+                    result = source1 | immediate;
+                    break;
+                case 0x7U:
+                    result = source1 & immediate;
+                    break;
+                case 0x1U: {
+                    const auto function6 = static_cast<std::uint8_t>((packet.bits >> 26U) & 0x3FU);
+                    if (function6 != 0U) {
+                        return illegal(packet);
+                    }
+                    const auto amount = static_cast<std::uint8_t>((packet.bits >> 20U) & 0x3FU);
+                    result = source1 << amount;
+                    break;
+                }
+                case 0x5U: {
+                    const auto function6 = static_cast<std::uint8_t>((packet.bits >> 26U) & 0x3FU);
+                    const auto amount = static_cast<std::uint8_t>((packet.bits >> 20U) & 0x3FU);
+                    if (function6 == 0U) {
+                        result = source1 >> amount;
+                    } else if (function6 == 0x10U) {
+                        result = arithmetic_shift_right64(source1, amount);
+                    } else {
+                        return illegal(packet);
+                    }
+                    break;
+                }
+                default:
+                    return illegal(packet);
+            }
+            return write_and_retire(instruction.destination, result, sequential_pc);
+        }
+
+        case 0x1BU: {  // OP-IMM-32
+            std::uint32_t result = 0U;
+            const auto source_word = static_cast<std::uint32_t>(source1 & 0xFFFF'FFFFULL);
+            switch (instruction.function3) {
+                case 0x0U:
+                    result = source_word + static_cast<std::uint32_t>(immediate_i(packet.bits));
+                    break;
+                case 0x1U: {
+                    if (instruction.function7 != 0U) {
+                        return illegal(packet);
+                    }
+                    const auto amount = static_cast<std::uint8_t>((packet.bits >> 20U) & 0x1FU);
+                    result = static_cast<std::uint32_t>(source_word << amount);
+                    break;
+                }
+                case 0x5U: {
+                    const auto amount = static_cast<std::uint8_t>((packet.bits >> 20U) & 0x1FU);
+                    if (instruction.function7 == 0U) {
+                        result = source_word >> amount;
+                    } else if (instruction.function7 == 0x20U) {
+                        result = arithmetic_shift_right32(source_word, amount);
+                    } else {
+                        return illegal(packet);
+                    }
+                    break;
+                }
+                default:
+                    return illegal(packet);
+            }
+            return write_and_retire(
+                instruction.destination, sign_extend_word(result), sequential_pc);
+        }
+
+        case 0x33U: {  // OP
+            std::uint64_t result = 0U;
+            if (instruction.function7 == 0x01U) {
+                const auto multiplied_or_divided =
+                    execute_integer_m(instruction.function3, source1, source2, false);
+                if (!multiplied_or_divided.has_value()) {
+                    return illegal(packet);
+                }
+                result = *multiplied_or_divided;
+            } else if (instruction.function7 == 0U) {
+                switch (instruction.function3) {
+                    case 0x0U:
+                        result = source1 + source2;
+                        break;
+                    case 0x1U:
+                        result = source1 << (source2 & 0x3FU);
+                        break;
+                    case 0x2U:
+                        result = signed_less(source1, source2) ? 1U : 0U;
+                        break;
+                    case 0x3U:
+                        result = source1 < source2 ? 1U : 0U;
+                        break;
+                    case 0x4U:
+                        result = source1 ^ source2;
+                        break;
+                    case 0x5U:
+                        result = source1 >> (source2 & 0x3FU);
+                        break;
+                    case 0x6U:
+                        result = source1 | source2;
+                        break;
+                    case 0x7U:
+                        result = source1 & source2;
+                        break;
+                    default:
+                        return illegal(packet);
+                }
+            } else if (instruction.function7 == 0x20U && instruction.function3 == 0x0U) {
+                result = source1 - source2;
+            } else if (instruction.function7 == 0x20U && instruction.function3 == 0x5U) {
+                result =
+                    arithmetic_shift_right64(source1, static_cast<std::uint8_t>(source2 & 0x3FU));
+            } else {
+                return illegal(packet);
+            }
+            return write_and_retire(instruction.destination, result, sequential_pc);
+        }
+
+        case 0x3BU: {  // OP-32
+            const auto lhs = static_cast<std::uint32_t>(source1 & 0xFFFF'FFFFULL);
+            const auto rhs = static_cast<std::uint32_t>(source2 & 0xFFFF'FFFFULL);
+            std::uint32_t result = 0U;
+            if (instruction.function7 == 0x01U) {
+                const auto multiplied_or_divided =
+                    execute_integer_m(instruction.function3, source1, source2, true);
+                if (!multiplied_or_divided.has_value()) {
+                    return illegal(packet);
+                }
+                return write_and_retire(
+                    instruction.destination, *multiplied_or_divided, sequential_pc);
+            }
+            if (instruction.function7 == 0U && instruction.function3 == 0x0U) {
+                result = lhs + rhs;
+            } else if (instruction.function7 == 0x20U && instruction.function3 == 0x0U) {
+                result = lhs - rhs;
+            } else if (instruction.function7 == 0U && instruction.function3 == 0x1U) {
+                result = static_cast<std::uint32_t>(lhs << (rhs & 0x1FU));
+            } else if (instruction.function7 == 0U && instruction.function3 == 0x5U) {
+                result = lhs >> (rhs & 0x1FU);
+            } else if (instruction.function7 == 0x20U && instruction.function3 == 0x5U) {
+                result = arithmetic_shift_right32(lhs, static_cast<std::uint8_t>(rhs & 0x1FU));
+            } else {
+                return illegal(packet);
+            }
+            return write_and_retire(
+                instruction.destination, sign_extend_word(result), sequential_pc);
+        }
+
+        case 0x2FU: {  // RV64A：LR/SC 与 AMO
+            const auto word_operation = instruction.function3 == 0x2U;
+            if (!word_operation && instruction.function3 != 0x3U) {
+                return illegal(packet);
+            }
+
+            const auto width =
+                word_operation ? bus::AccessWidth::Word : bus::AccessWidth::DoubleWord;
+            const auto width_bytes = bus::width_in_bytes(width);
+            const auto address = source1;
+            const auto function5 = static_cast<std::uint8_t>((packet.bits >> 27U) & 0x1FU);
+            const auto acquire = ((packet.bits >> 26U) & 0x1U) != 0U;
+            const auto release = ((packet.bits >> 25U) & 0x1U) != 0U;
+
+            if (function5 == 0x02U) {  // LR.W / LR.D
+                if (instruction.source2 != 0U) {
+                    return illegal(packet);
+                }
+                if ((address & (width_bytes - 1U)) != 0U) {
+                    return StepResult::failure(
+                        make_trap(packet, ExceptionCause::LoadAddressMisaligned, address),
+                        packet.length);
+                }
+
+                apply_release_ordering(release);
+                const auto loaded = guest_load_reserved(packet, address, width);
+                if (loaded.trap.has_value()) {
+                    return StepResult::failure(*loaded.trap, packet.length);
+                }
+                state_.set_reservation_token(loaded.token);
+                apply_acquire_ordering(acquire);
+                const auto value =
+                    word_operation ? sign_extend_word(loaded.access.value) : loaded.access.value;
+                return write_and_retire(instruction.destination, value, sequential_pc);
+            }
+
+            if (function5 == 0x03U) {  // SC.W / SC.D
+                if ((address & (width_bytes - 1U)) != 0U) {
+                    state_.clear_reservation_token();
+                    return StepResult::failure(
+                        make_trap(packet, ExceptionCause::StoreAddressMisaligned, address),
+                        packet.length);
+                }
+
+                apply_release_ordering(release);
+                const auto token = state_.reservation_token();
                 state_.clear_reservation_token();
+                const auto stored = guest_store_conditional(packet, token, address, width, source2);
+                if (stored.trap.has_value()) {
+                    return StepResult::failure(*stored.trap, packet.length);
+                }
+                apply_acquire_ordering(acquire);
+                return write_and_retire(
+                    instruction.destination, stored.access.exchanged ? 0U : 1U, sequential_pc);
+            }
+
+            const auto operation = decode_atomic_operation(function5);
+            if (!operation.has_value()) {
+                return illegal(packet);
+            }
+            if ((address & (width_bytes - 1U)) != 0U) {
                 return StepResult::failure(
                     make_trap(packet, ExceptionCause::StoreAddressMisaligned, address),
                     packet.length);
             }
 
             apply_release_ordering(release);
-            const auto token = state_.reservation_token();
-            state_.clear_reservation_token();
-            const auto stored = guest_store_conditional(
-                packet, token, address, width, source2);
-            if (stored.trap.has_value()) {
-                return StepResult::failure(*stored.trap, packet.length);
+            auto observed = guest_read(
+                packet, address, width, memory::MmuAccessKind::Atomic, bus::AccessType::Atomic);
+            if (observed.trap.has_value()) {
+                return StepResult::failure(*observed.trap, packet.length);
             }
+
+            // CAS 失败说明另一个总线主设备已更新内存；使用它返回的新观察值重算，直至
+            // 某次比较与写入在 RAM 锁内原子提交，期间不会把过期结果写回。
+            std::uint64_t original = observed.access.value;
+            for (;;) {
+                const auto desired =
+                    execute_atomic_operation(*operation, original, source2, word_operation);
+                const auto exchanged =
+                    guest_compare_exchange(packet, address, width, original, desired);
+                if (exchanged.trap.has_value()) {
+                    return StepResult::failure(*exchanged.trap, packet.length);
+                }
+                if (exchanged.access.exchanged) {
+                    break;
+                }
+                original = exchanged.access.value;
+            }
+
             apply_acquire_ordering(acquire);
-            return write_and_retire(
-                instruction.destination, stored.access.exchanged ? 0U : 1U, sequential_pc);
+            const auto result = word_operation ? sign_extend_word(original) : original;
+            return write_and_retire(instruction.destination, result, sequential_pc);
         }
 
-        const auto operation = decode_atomic_operation(function5);
-        if (!operation.has_value()) {
+        case 0x07U:    // LOAD-FP
+        case 0x27U: {  // STORE-FP
+            const auto vector_memory =
+                vector::decode_vector_memory_operation(packet.bits, instruction.opcode == 0x07U);
+            if (vector_memory.has_value()) {
+                return execute_vector_memory(packet, *vector_memory, sequential_pc);
+            }
+            return execute_floating(packet, instruction, sequential_pc);
+        }
+
+        case 0x43U:  // FMADD
+        case 0x47U:  // FMSUB
+        case 0x4BU:  // FNMSUB
+        case 0x4FU:  // FNMADD
+        case 0x53U:  // OP-FP
+            return execute_floating(packet, instruction, sequential_pc);
+
+        case 0x0FU:  // FENCE / FENCE.I
+            if (instruction.function3 == 0U) {
+                // 单 Hart、无缓存模型中，所有先前总线事务已同步提交，因此 FENCE、FENCE.TSO、
+                // 保留字段和 hint fence 都没有额外状态；接受完整编码空间可避免把规范 hint
+                // 或未来细粒度 fence 字段误判成非法指令。
+                return retire(sequential_pc);
+            }
+            if (instruction.function3 == 1U) {
+                // Zifencei 把 rd/rs1/imm 保留给未来更细粒度的同步形式；基础实现必须按完整
+                // instruction-stream 同步处理这些字段，不能因测试使用非零保留字段而陷入非法指令。
+                return retire(sequential_pc);
+            }
             return illegal(packet);
-        }
-        if ((address & (width_bytes - 1U)) != 0U) {
-            return StepResult::failure(
-                make_trap(packet, ExceptionCause::StoreAddressMisaligned, address),
-                packet.length);
-        }
 
-        apply_release_ordering(release);
-        auto observed = guest_read(
-            packet, address, width, memory::MmuAccessKind::Atomic, bus::AccessType::Atomic);
-        if (observed.trap.has_value()) {
-            return StepResult::failure(*observed.trap, packet.length);
-        }
+        case 0x73U:
+            return execute_system(packet, instruction, source1, sequential_pc);
 
-        // CAS 失败说明另一个总线主设备已更新内存；使用它返回的新观察值重算，直至
-        // 某次比较与写入在 RAM 锁内原子提交，期间不会把过期结果写回。
-        std::uint64_t original = observed.access.value;
-        for (;;) {
-            const auto desired = execute_atomic_operation(
-                *operation, original, source2, word_operation);
-            const auto exchanged = guest_compare_exchange(
-                packet, address, width, original, desired);
-            if (exchanged.trap.has_value()) {
-                return StepResult::failure(*exchanged.trap, packet.length);
-            }
-            if (exchanged.access.exchanged) {
-                break;
-            }
-            original = exchanged.access.value;
-        }
-
-        apply_acquire_ordering(acquire);
-        const auto result = word_operation ? sign_extend_word(original) : original;
-        return write_and_retire(instruction.destination, result, sequential_pc);
-    }
-
-    case 0x07U:  // LOAD-FP
-    case 0x27U: {  // STORE-FP
-        const auto vector_memory = vector::decode_vector_memory_operation(
-            packet.bits, instruction.opcode == 0x07U);
-        if (vector_memory.has_value()) {
-            return execute_vector_memory(packet, *vector_memory, sequential_pc);
-        }
-        return execute_floating(packet, instruction, sequential_pc);
-    }
-
-    case 0x43U:  // FMADD
-    case 0x47U:  // FMSUB
-    case 0x4BU:  // FNMSUB
-    case 0x4FU:  // FNMADD
-    case 0x53U:  // OP-FP
-        return execute_floating(packet, instruction, sequential_pc);
-
-    case 0x0FU:  // FENCE / FENCE.I
-        if (instruction.function3 == 0U) {
-            // 单 Hart、无缓存模型中，所有先前总线事务已同步提交，因此 FENCE、FENCE.TSO、
-            // 保留字段和 hint fence 都没有额外状态；接受完整编码空间可避免把规范 hint
-            // 或未来细粒度 fence 字段误判成非法指令。
-            return retire(sequential_pc);
-        }
-        if (instruction.function3 == 1U) {
-            // Zifencei 把 rd/rs1/imm 保留给未来更细粒度的同步形式；基础实现必须按完整
-            // instruction-stream 同步处理这些字段，不能因测试使用非零保留字段而陷入非法指令。
-            return retire(sequential_pc);
-        }
-        return illegal(packet);
-
-    case 0x73U:
-        return execute_system(packet, instruction, source1, sequential_pc);
-
-    default:
-        return illegal(packet);
+        default:
+            return illegal(packet);
     }
 }
 
-StepResult Cpu::execute_system(
-    const InstructionPacket& packet,
-    const DecodedInstruction& instruction,
-    std::uint64_t source1,
-    std::uint64_t sequential_pc) {
+StepResult Cpu::execute_system(const InstructionPacket& packet,
+                               const DecodedInstruction& instruction,
+                               std::uint64_t source1,
+                               std::uint64_t sequential_pc) {
     // funct3=0 使用完整机器码区分特权指令；其余 funct3 才解释为 Zicsr 操作。
     if (instruction.function3 == 0U) {
         if ((packet.bits & 0xFE00'707FU) == 0x1200'0073U) {  // SFENCE.VMA
             const auto privilege = state_.privilege();
             const auto tvm = (state_.csrs().peek(CsrAddress::Mstatus) & (1ULL << 20U)) != 0U;
-            if (privilege == PrivilegeMode::User ||
-                (privilege == PrivilegeMode::Supervisor && tvm)) {
+            if (privilege == PrivilegeMode::User
+                || (privilege == PrivilegeMode::Supervisor && tvm)) {
                 return illegal(packet);
             }
-            const auto virtual_address = instruction.source1 == 0U ?
-                                             std::optional<std::uint64_t>{} :
-                                             std::optional<std::uint64_t>{source1};
-            const auto asid = instruction.source2 == 0U ?
-                                  std::optional<std::uint16_t>{} :
-                                  std::optional<std::uint16_t>{
-                                      static_cast<std::uint16_t>(
-                                          state_.integer(instruction.source2) & 0xFFFFU)};
+            const auto virtual_address = instruction.source1 == 0U
+                                             ? std::optional<std::uint64_t>{}
+                                             : std::optional<std::uint64_t>{source1};
+            const auto asid = instruction.source2 == 0U
+                                  ? std::optional<std::uint16_t>{}
+                                  : std::optional<std::uint16_t>{static_cast<std::uint16_t>(
+                                        state_.integer(instruction.source2) & 0xFFFFU)};
             mmu_.sfence_vma(virtual_address, asid);
             state_.set_program_counter(sequential_pc);
             return StepResult::success(packet.length);
         }
         if (packet.bits == 0x0000'0073U) {  // ECALL
             return StepResult::failure(
-                make_trap(packet, environment_call_cause(state_.privilege()), 0U),
-                packet.length);
+                make_trap(packet, environment_call_cause(state_.privilege()), 0U), packet.length);
         }
         if (packet.bits == 0x0010'0073U) {  // EBREAK
-            return StepResult::failure(
-                make_trap(packet, ExceptionCause::Breakpoint, 0U),
-                packet.length);
+            return StepResult::failure(make_trap(packet, ExceptionCause::Breakpoint, 0U),
+                                       packet.length);
         }
         if (packet.bits == 0x3020'0073U) {  // MRET
             if (state_.privilege() != PrivilegeMode::Machine) {
@@ -941,27 +940,27 @@ StepResult Cpu::execute_system(
     CsrModifyOperation operation = CsrModifyOperation::Replace;
     bool immediate = false;
     switch (instruction.function3) {
-    case 0x1U:  // CSRRW
-        break;
-    case 0x2U:  // CSRRS
-        operation = CsrModifyOperation::SetBits;
-        break;
-    case 0x3U:  // CSRRC
-        operation = CsrModifyOperation::ClearBits;
-        break;
-    case 0x5U:  // CSRRWI
-        immediate = true;
-        break;
-    case 0x6U:  // CSRRSI
-        immediate = true;
-        operation = CsrModifyOperation::SetBits;
-        break;
-    case 0x7U:  // CSRRCI
-        immediate = true;
-        operation = CsrModifyOperation::ClearBits;
-        break;
-    default:
-        return illegal(packet);
+        case 0x1U:  // CSRRW
+            break;
+        case 0x2U:  // CSRRS
+            operation = CsrModifyOperation::SetBits;
+            break;
+        case 0x3U:  // CSRRC
+            operation = CsrModifyOperation::ClearBits;
+            break;
+        case 0x5U:  // CSRRWI
+            immediate = true;
+            break;
+        case 0x6U:  // CSRRSI
+            immediate = true;
+            operation = CsrModifyOperation::SetBits;
+            break;
+        case 0x7U:  // CSRRCI
+            immediate = true;
+            operation = CsrModifyOperation::ClearBits;
+            break;
+        default:
+            return illegal(packet);
     }
 
     // CSRRS/CSRRC 是否产生写访问由 rs1 字段是否为 x0 决定，而不是寄存器运行值是否为零。
@@ -996,10 +995,9 @@ StepResult Cpu::execute_system(
     return StepResult::success(packet.length);
 }
 
-StepResult Cpu::execute_vector_configuration(
-    const InstructionPacket& packet,
-    const DecodedInstruction& instruction,
-    std::uint64_t sequential_pc) {
+StepResult Cpu::execute_vector_configuration(const InstructionPacket& packet,
+                                             const DecodedInstruction& instruction,
+                                             std::uint64_t sequential_pc) {
     // OP-V 的 funct3=111 专用于三种向量配置指令；其余编码属于后续元素运算，当前不能猜测执行。
     if (instruction.function3 != 0x7U || !state_.csrs().vector_state_enabled()) {
         return illegal(packet);
@@ -1021,14 +1019,16 @@ StepResult Cpu::execute_vector_configuration(
             // rs1=x0 且 rd 非零时的 AVL 是全一 XLEN 值，而非 x0 中保存的零。
             application_vector_length = instruction.source1 == 0U ? ~0ULL : source1;
         }
-    } else if ((packet.bits & (1U << 31U)) == 0U) {  // vsetvli：bit31 固定为零，vtypei 占 bit30:20。
+    } else if ((packet.bits & (1U << 31U))
+               == 0U) {  // vsetvli：bit31 固定为零，vtypei 占 bit30:20。
         requested_vtype = static_cast<std::uint64_t>((packet.bits >> 20U) & 0x7FFU);
         if (instruction.source1 == 0U && instruction.destination == 0U) {
             preserve_vector_length = true;
         } else {
             application_vector_length = instruction.source1 == 0U ? ~0ULL : source1;
         }
-    } else if ((packet.bits & (0x3U << 30U)) == (0x3U << 30U)) {  // vsetivli：uimm AVL 位于 rs1 字段。
+    } else if ((packet.bits & (0x3U << 30U))
+               == (0x3U << 30U)) {  // vsetivli：uimm AVL 位于 rs1 字段。
         requested_vtype = static_cast<std::uint64_t>((packet.bits >> 20U) & 0x3FFU);
         application_vector_length = instruction.source1;
     } else {
@@ -1038,14 +1038,15 @@ StepResult Cpu::execute_vector_configuration(
     const auto configuration = vector::decode_vector_configuration(requested_vtype);
     if (preserve_vector_length) {
         // 该紧凑形式只允许保持同一 VLMAX；旧 vill、非法新值或容量变化均是保留指令形式。
-        if (!vector::can_preserve_vector_length(
-                state_.csrs().peek(CsrAddress::Vtype), requested_vtype)) {
+        if (!vector::can_preserve_vector_length(state_.csrs().peek(CsrAddress::Vtype),
+                                                requested_vtype)) {
             return illegal(packet);
         }
-        state_.csrs().commit_vector_configuration(configuration.vtype, state_.csrs().peek(CsrAddress::Vl));
+        state_.csrs().commit_vector_configuration(configuration.vtype,
+                                                  state_.csrs().peek(CsrAddress::Vl));
     } else if (configuration.valid) {
-        const auto vector_length = vector::select_vector_length(
-            application_vector_length, configuration.vlmax);
+        const auto vector_length =
+            vector::select_vector_length(application_vector_length, configuration.vlmax);
         state_.csrs().commit_vector_configuration(configuration.vtype, vector_length);
         state_.set_integer(instruction.destination, vector_length);
     } else {
@@ -1058,24 +1059,22 @@ StepResult Cpu::execute_vector_configuration(
     return StepResult::success(packet.length);
 }
 
-StepResult Cpu::execute_vector_memory(
-    const InstructionPacket& packet,
-    const vector::VectorMemoryOperation& operation,
-    std::uint64_t sequential_pc) {
+StepResult Cpu::execute_vector_memory(const InstructionPacket& packet,
+                                      const vector::VectorMemoryOperation& operation,
+                                      std::uint64_t sequential_pc) {
     if (!state_.csrs().vector_state_enabled()) {
         return illegal(packet);
     }
-    const auto current = vector::decode_vector_configuration(
-        state_.csrs().peek(CsrAddress::Vtype));
-    const auto memory_configuration = vector::derive_memory_configuration(
-        current, operation.element_width_bits);
+    const auto current = vector::decode_vector_configuration(state_.csrs().peek(CsrAddress::Vtype));
+    const auto memory_configuration =
+        vector::derive_memory_configuration(current, operation.element_width_bits);
     if (!memory_configuration.has_value()) {
         return illegal(packet);
     }
-    const auto group = vector::VectorRegisterGroup::create(
-        *memory_configuration, operation.vector_register);
-    if (!group.has_value() || state_.csrs().peek(CsrAddress::Vl) > current.vlmax ||
-        (operation.load && operation.masked && operation.vector_register == 0U)) {
+    const auto group =
+        vector::VectorRegisterGroup::create(*memory_configuration, operation.vector_register);
+    if (!group.has_value() || state_.csrs().peek(CsrAddress::Vl) > current.vlmax
+        || (operation.load && operation.masked && operation.vector_register == 0U)) {
         // 掩码加载目的组不得覆盖 v0，否则从非零 vstart 重启时会破坏尚未使用的控制位。
         return illegal(packet);
     }
@@ -1083,12 +1082,11 @@ StepResult Cpu::execute_vector_memory(
     const auto vector_length = state_.csrs().peek(CsrAddress::Vl);
     const auto start = state_.csrs().vector_start();
     const auto base = state_.integer(operation.base_register);
-    const auto stride = operation.addressing_mode == vector::VectorMemoryAddressingMode::Strided ?
-                            state_.integer(operation.stride_register) :
-                            static_cast<std::uint64_t>(operation.element_width_bits / 8U);
-    const auto agnostic_value = operation.element_width_bits == 64U ?
-                                    ~0ULL :
-                                    (1ULL << operation.element_width_bits) - 1ULL;
+    const auto stride = operation.addressing_mode == vector::VectorMemoryAddressingMode::Strided
+                            ? state_.integer(operation.stride_register)
+                            : static_cast<std::uint64_t>(operation.element_width_bits / 8U);
+    const auto agnostic_value =
+        operation.element_width_bits == 64U ? ~0ULL : (1ULL << operation.element_width_bits) - 1ULL;
     const auto vtype = state_.csrs().peek(CsrAddress::Vtype);
     const auto mask_agnostic = (vtype & (1ULL << 7U)) != 0U;
     const auto tail_agnostic = (vtype & (1ULL << 6U)) != 0U;
@@ -1101,10 +1099,11 @@ StepResult Cpu::execute_vector_memory(
 
     if (start < vector_length) {
         for (auto element = start; element < vector_length; ++element) {
-            const auto active = !operation.masked || state_.vector_mask_bit(element).value_or(false);
+            const auto active =
+                !operation.masked || state_.vector_mask_bit(element).value_or(false);
             if (!active) {
-                if (operation.load && mask_agnostic &&
-                    !state_.set_vector_element(*group, element, agnostic_value)) {
+                if (operation.load && mask_agnostic
+                    && !state_.set_vector_element(*group, element, agnostic_value)) {
                     return illegal(packet);
                 }
                 continue;
@@ -1114,12 +1113,11 @@ StepResult Cpu::execute_vector_memory(
             if (operation.load) {
                 std::uint64_t value = 0U;
                 for (std::uint64_t byte = 0U; byte < transfer_bytes; ++byte) {
-                    const auto loaded = guest_read(
-                        packet,
-                        address + byte,
-                        bus::AccessWidth::Byte,
-                        memory::MmuAccessKind::Load,
-                        bus::AccessType::Load);
+                    const auto loaded = guest_read(packet,
+                                                   address + byte,
+                                                   bus::AccessWidth::Byte,
+                                                   memory::MmuAccessKind::Load,
+                                                   bus::AccessType::Load);
                     if (loaded.trap.has_value()) {
                         state_.csrs().set_vector_start_for_trap(element);
                         return StepResult::failure(*loaded.trap, packet.length);
@@ -1135,12 +1133,11 @@ StepResult Cpu::execute_vector_memory(
                     return illegal(packet);
                 }
                 for (std::uint64_t byte = 0U; byte < transfer_bytes; ++byte) {
-                    const auto stored = guest_write(
-                        packet,
-                        address + byte,
-                        bus::AccessWidth::Byte,
-                        *value >> (byte * 8U),
-                        bus::AccessType::Store);
+                    const auto stored = guest_write(packet,
+                                                    address + byte,
+                                                    bus::AccessWidth::Byte,
+                                                    *value >> (byte * 8U),
+                                                    bus::AccessType::Store);
                     if (stored.trap.has_value()) {
                         state_.csrs().set_vector_start_for_trap(element);
                         return StepResult::failure(*stored.trap, packet.length);
@@ -1164,41 +1161,133 @@ StepResult Cpu::execute_vector_memory(
     return StepResult::success(packet.length);
 }
 
-StepResult Cpu::execute_vector_integer(
-    const InstructionPacket& packet,
-    const vector::VectorIntegerInstruction& instruction,
-    std::uint64_t sequential_pc) {
-    if (!state_.csrs().vector_state_enabled()) return illegal(packet);
-    const auto configuration = vector::decode_vector_configuration(state_.csrs().peek(CsrAddress::Vtype));
-    const auto destination = vector::VectorRegisterGroup::create(configuration, instruction.destination);
+StepResult Cpu::execute_vector_integer(const InstructionPacket& packet,
+                                       const vector::VectorIntegerInstruction& instruction,
+                                       std::uint64_t sequential_pc) {
+    if (!state_.csrs().vector_state_enabled())
+        return illegal(packet);
+    const auto configuration =
+        vector::decode_vector_configuration(state_.csrs().peek(CsrAddress::Vtype));
+    const auto destination =
+        vector::VectorRegisterGroup::create(configuration, instruction.destination);
     const auto source2 = vector::VectorRegisterGroup::create(configuration, instruction.source2);
-    const auto source1 = instruction.form == vector::VectorIntegerOperandForm::VectorVector ?
-                             vector::VectorRegisterGroup::create(configuration, instruction.source1) : std::nullopt;
-    if (!destination.has_value() || !source2.has_value() ||
-        (instruction.form == vector::VectorIntegerOperandForm::VectorVector && !source1.has_value()) ||
-        (instruction.masked && instruction.destination == 0U) ||
-        state_.csrs().peek(CsrAddress::Vl) > configuration.vlmax) return illegal(packet);
-    const auto vl = state_.csrs().peek(CsrAddress::Vl); const auto start = state_.csrs().vector_start();
+    const auto source1 =
+        instruction.form == vector::VectorIntegerOperandForm::VectorVector
+            ? vector::VectorRegisterGroup::create(configuration, instruction.source1)
+            : std::nullopt;
+    if (!destination.has_value() || !source2.has_value()
+        || (instruction.form == vector::VectorIntegerOperandForm::VectorVector
+            && !source1.has_value())
+        || (instruction.masked && instruction.destination == 0U)
+        || state_.csrs().peek(CsrAddress::Vl) > configuration.vlmax)
+        return illegal(packet);
+    const auto vl = state_.csrs().peek(CsrAddress::Vl);
+    const auto start = state_.csrs().vector_start();
     const auto vtype = state_.csrs().peek(CsrAddress::Vtype);
-    const auto agnostic = configuration.sew_bits == 64U ? ~0ULL : (1ULL << configuration.sew_bits) - 1ULL;
+    const auto agnostic =
+        configuration.sew_bits == 64U ? ~0ULL : (1ULL << configuration.sew_bits) - 1ULL;
     if (start < vl) {
         for (auto element = start; element < vl; ++element) {
             if (instruction.masked && !state_.vector_mask_bit(element).value_or(false)) {
-                if ((vtype & (1ULL << 7U)) != 0U && !state_.set_vector_element(*destination, element, agnostic)) return illegal(packet);
+                if ((vtype & (1ULL << 7U)) != 0U
+                    && !state_.set_vector_element(*destination, element, agnostic))
+                    return illegal(packet);
                 continue;
             }
             const auto lhs = state_.vector_element(*source2, element);
             std::optional<std::uint64_t> rhs{};
-            if (instruction.form == vector::VectorIntegerOperandForm::VectorVector) rhs = state_.vector_element(*source1, element);
-            else if (instruction.form == vector::VectorIntegerOperandForm::VectorScalar) rhs = state_.integer(instruction.source1);
-            else rhs = vector::sign_extend_vector_immediate(instruction.source1, static_cast<std::uint8_t>(configuration.sew_bits));
-            if (!lhs.has_value() || !rhs.has_value() || !state_.set_vector_element(*destination, element,
-                    vector::execute_vector_integer_operation(instruction.operation, *lhs, *rhs, static_cast<std::uint8_t>(configuration.sew_bits)))) return illegal(packet);
+            if (instruction.form == vector::VectorIntegerOperandForm::VectorVector)
+                rhs = state_.vector_element(*source1, element);
+            else if (instruction.form == vector::VectorIntegerOperandForm::VectorScalar)
+                rhs = state_.integer(instruction.source1);
+            else
+                rhs = vector::sign_extend_vector_immediate(
+                    instruction.source1, static_cast<std::uint8_t>(configuration.sew_bits));
+            if (!lhs.has_value() || !rhs.has_value()
+                || !state_.set_vector_element(
+                    *destination,
+                    element,
+                    vector::execute_vector_integer_operation(
+                        instruction.operation,
+                        *lhs,
+                        *rhs,
+                        static_cast<std::uint8_t>(configuration.sew_bits))))
+                return illegal(packet);
         }
-        if ((vtype & (1ULL << 6U)) != 0U) for (auto element = vl; element < configuration.vlmax; ++element)
-            if (!state_.set_vector_element(*destination, element, agnostic)) return illegal(packet);
+        if ((vtype & (1ULL << 6U)) != 0U)
+            for (auto element = vl; element < configuration.vlmax; ++element)
+                if (!state_.set_vector_element(*destination, element, agnostic))
+                    return illegal(packet);
     }
-    state_.csrs().clear_vector_start_after_instruction(); state_.set_program_counter(sequential_pc);
+    state_.csrs().clear_vector_start_after_instruction();
+    state_.set_program_counter(sequential_pc);
+    return StepResult::success(packet.length);
+}
+
+StepResult Cpu::execute_vector_floating(const InstructionPacket& packet,
+                                        const vector::VectorFloatingInstruction& instruction,
+                                        std::uint64_t sequential_pc) {
+    // 向量浮点既消耗 VS，也读取 frm/写入 fflags；任一扩展上下文为 Off 时必须在提交前非法。
+    if (!state_.csrs().vector_state_enabled() || !state_.csrs().floating_state_enabled())
+        return illegal(packet);
+    const auto configuration =
+        vector::decode_vector_configuration(state_.csrs().peek(CsrAddress::Vtype));
+    if (!configuration.valid || (configuration.sew_bits != 32U && configuration.sew_bits != 64U))
+        return illegal(packet);
+    const auto destination =
+        vector::VectorRegisterGroup::create(configuration, instruction.destination);
+    const auto source2 = vector::VectorRegisterGroup::create(configuration, instruction.source2);
+    const auto source1 =
+        instruction.form == vector::VectorFloatingOperandForm::VectorVector
+            ? vector::VectorRegisterGroup::create(configuration, instruction.source1)
+            : std::nullopt;
+    const auto rounding =
+        resolve_floating_rounding_mode(0x7U, state_.csrs().floating_rounding_mode());
+    const auto vector_length = state_.csrs().peek(CsrAddress::Vl);
+    if (!destination.has_value() || !source2.has_value()
+        || (instruction.form == vector::VectorFloatingOperandForm::VectorVector
+            && !source1.has_value())
+        || (instruction.masked && instruction.destination == 0U)
+        || vector_length > configuration.vlmax || !rounding.has_value())
+        return illegal(packet);
+    const auto start = state_.csrs().vector_start();
+    const auto vtype = state_.csrs().peek(CsrAddress::Vtype);
+    const auto mask_agnostic = (vtype & (1ULL << 7U)) != 0U;
+    const auto tail_agnostic = (vtype & (1ULL << 6U)) != 0U;
+    const auto agnostic = configuration.sew_bits == 64U ? ~0ULL : 0xFFFF'FFFFULL;
+    const auto format =
+        configuration.sew_bits == 32U ? FloatingFormat::Single : FloatingFormat::Double;
+    std::uint8_t accumulated_flags = 0U;
+    if (start < vector_length) {
+        for (auto element = start; element < vector_length; ++element) {
+            // 非活动元素不得进入软件浮点核心，否则会错误产生 fflags；agnostic 仅改变目的位模式。
+            if (instruction.masked && !state_.vector_mask_bit(element).value_or(false)) {
+                if (mask_agnostic && !state_.set_vector_element(*destination, element, agnostic))
+                    return illegal(packet);
+                continue;
+            }
+            const auto lhs = state_.vector_element(*source2, element);
+            const auto rhs =
+                instruction.form == vector::VectorFloatingOperandForm::VectorVector
+                    ? state_.vector_element(*source1, element)
+                    : std::optional<std::uint64_t>{state_.floating(instruction.source1)};
+            if (!lhs.has_value() || !rhs.has_value())
+                return illegal(packet);
+            const auto result = vector::execute_vector_floating_operation(
+                instruction.operation, format, *lhs, *rhs, *rounding);
+            if (!state_.set_vector_element(*destination, element, result.bits))
+                return illegal(packet);
+            accumulated_flags = static_cast<std::uint8_t>(accumulated_flags | result.flags);
+        }
+        if (tail_agnostic)
+            for (auto element = vector_length; element < configuration.vlmax; ++element)
+                if (!state_.set_vector_element(*destination, element, agnostic))
+                    return illegal(packet);
+    }
+    // 仅在所有活动元素成功写回后合并 fflags 并清零 vstart，保持可重启指令的精确提交边界。
+    state_.csrs().accrue_floating_exception_flags(accumulated_flags);
+    state_.csrs().clear_vector_start_after_instruction();
+    state_.set_program_counter(sequential_pc);
     return StepResult::success(packet.length);
 }
 
