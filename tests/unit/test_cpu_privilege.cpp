@@ -26,6 +26,12 @@ constexpr std::uint64_t bit(std::uint8_t index) noexcept {
     return 1ULL << index;
 }
 
+// Trap cause 的类型是 XLEN 宽编码；测试构造掩码时保留完整类型并显式拒绝无效移位。
+// 它只用于准备 CSR 输入，不复制生产端的委托、优先级或状态转换规则。
+constexpr std::uint64_t cause_bit(std::uint64_t cause) noexcept {
+    return cause < 64U ? (1ULL << cause) : 0U;
+}
+
 class TestContext final {
 public:
     // 累计断言失败以便一次展示同一状态转换的全部偏差，不吞掉异常或伪造成功。
@@ -454,6 +460,210 @@ void test_delegated_trap_and_sret(TestContext& context) {
     context.expect(machine_delivery.target == rvemu::core::PrivilegeMode::Machine, "M-mode Trap 不得向下委托");
 }
 
+// 穷举项目声明的同步异常集合（含不可委托的 M-mode ECALL 边界），确保目标选择
+// 只依赖来源特权级与 medeleg，并逐项验证目标层 Trap CSR 更新不会污染另一层。
+// 这直接覆盖 Linux/OpenSBI 依赖的委托基石，而非用另一套测试路由推断生产行为。
+void test_complete_synchronous_exception_delegation(TestContext& context) {
+    constexpr std::array<rvemu::core::ExceptionCause, 14U> implemented_causes{
+        rvemu::core::ExceptionCause::InstructionAddressMisaligned,
+        rvemu::core::ExceptionCause::InstructionAccessFault,
+        rvemu::core::ExceptionCause::IllegalInstruction,
+        rvemu::core::ExceptionCause::Breakpoint,
+        rvemu::core::ExceptionCause::LoadAddressMisaligned,
+        rvemu::core::ExceptionCause::LoadAccessFault,
+        rvemu::core::ExceptionCause::StoreAddressMisaligned,
+        rvemu::core::ExceptionCause::StoreAccessFault,
+        rvemu::core::ExceptionCause::EnvironmentCallFromUser,
+        rvemu::core::ExceptionCause::EnvironmentCallFromSupervisor,
+        rvemu::core::ExceptionCause::InstructionPageFault,
+        rvemu::core::ExceptionCause::LoadPageFault,
+        rvemu::core::ExceptionCause::StorePageFault,
+        rvemu::core::ExceptionCause::EnvironmentCallFromMachine,
+    };
+    constexpr std::array<rvemu::core::PrivilegeMode, 2U> lower_sources{
+        rvemu::core::PrivilegeMode::User,
+        rvemu::core::PrivilegeMode::Supervisor,
+    };
+
+    for (const auto cause : implemented_causes) {
+        const auto cause_code = static_cast<std::uint64_t>(cause);
+        const auto is_delegatable = cause != rvemu::core::ExceptionCause::EnvironmentCallFromMachine;
+        for (const auto source : lower_sources) {
+            CpuFixture fixture;
+            auto& state = fixture.cpu().state();
+            write_csr(state.csrs(), rvemu::core::CsrAddress::Medeleg, cause_bit(cause_code));
+            write_csr(state.csrs(), rvemu::core::CsrAddress::Mtvec, kSecondTrapBase);
+            write_csr(state.csrs(), rvemu::core::CsrAddress::Stvec, kTrapBase);
+            write_csr(state.csrs(), rvemu::core::CsrAddress::Mepc, 0x1111'0000U);
+            write_csr(state.csrs(), rvemu::core::CsrAddress::Mcause, 0x1111'0001U);
+            write_csr(state.csrs(), rvemu::core::CsrAddress::Mtval, 0x1111'0002U);
+            write_csr(state.csrs(), rvemu::core::CsrAddress::Sepc, 0x2222'0000U);
+            write_csr(state.csrs(), rvemu::core::CsrAddress::Scause, 0x2222'0001U);
+            write_csr(state.csrs(), rvemu::core::CsrAddress::Stval, 0x2222'0002U);
+            state.set_privilege(source);
+
+            const auto fault_pc = kRamBase + 0x100U + cause_code * 4U;
+            const auto fault_value = 0xDEAD'0000U + cause_code;
+            const auto delivery = fixture.cpu().take_trap(
+                rvemu::core::Trap{cause, fault_value, fault_pc, 0U});
+            const auto expected_target = is_delegatable ?
+                rvemu::core::PrivilegeMode::Supervisor : rvemu::core::PrivilegeMode::Machine;
+            context.expect(
+                delivery.target == expected_target,
+                "每种同步异常必须按 medeleg 和来源特权级选择规范目标");
+            context.expect(
+                state.program_counter() ==
+                    (expected_target == rvemu::core::PrivilegeMode::Supervisor ? kTrapBase : kSecondTrapBase),
+                "同步异常必须跳转到目标层 Direct tvec 基址");
+
+            if (expected_target == rvemu::core::PrivilegeMode::Supervisor) {
+                context.expect(state.csrs().peek(rvemu::core::CsrAddress::Sepc) == fault_pc, "委托异常必须写 sepc");
+                context.expect(state.csrs().peek(rvemu::core::CsrAddress::Scause) == cause_code, "委托异常必须写 scause");
+                context.expect(state.csrs().peek(rvemu::core::CsrAddress::Stval) == fault_value, "委托异常必须写 stval");
+                context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mepc) == 0x1111'0000U, "S Trap 不得修改 mepc");
+                context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mcause) == 0x1111'0001U, "S Trap 不得修改 mcause");
+                context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mtval) == 0x1111'0002U, "S Trap 不得修改 mtval");
+            } else {
+                context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mepc) == fault_pc, "未委托异常必须写 mepc");
+                context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mcause) == cause_code, "未委托异常必须写 mcause");
+                context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mtval) == fault_value, "未委托异常必须写 mtval");
+                context.expect(state.csrs().peek(rvemu::core::CsrAddress::Sepc) == 0x2222'0000U, "M Trap 不得修改 sepc");
+                context.expect(state.csrs().peek(rvemu::core::CsrAddress::Scause) == 0x2222'0001U, "M Trap 不得修改 scause");
+                context.expect(state.csrs().peek(rvemu::core::CsrAddress::Stval) == 0x2222'0002U, "M Trap 不得修改 stval");
+            }
+        }
+    }
+
+    // 即使 medeleg 中存在相应位，M-mode 产生的异常仍必须由 M-mode 接收。
+    CpuFixture machine_fixture;
+    auto& machine_state = machine_fixture.cpu().state();
+    write_csr(machine_state.csrs(), rvemu::core::CsrAddress::Medeleg, bit(12U));
+    write_csr(machine_state.csrs(), rvemu::core::CsrAddress::Mtvec, kSecondTrapBase);
+    machine_state.set_privilege(rvemu::core::PrivilegeMode::Machine);
+    const auto machine_delivery = machine_fixture.cpu().take_trap(rvemu::core::Trap{
+        rvemu::core::ExceptionCause::InstructionPageFault,
+        0xCAFEU,
+        kRamBase + 0x300U,
+        0U,
+    });
+    context.expect(machine_delivery.target == rvemu::core::PrivilegeMode::Machine, "M-mode 同步异常不得向 S-mode 委托");
+}
+
+// 覆盖六种已实现中断在 M/S/U 三种来源下的委托、全局使能与抢占规则。
+// 测试直接调用正式 CSR 选择器，避免为矩阵判断复制另一套中断优先级实现。
+void test_complete_interrupt_delegation_and_global_enable(TestContext& context) {
+    constexpr std::array<rvemu::core::InterruptCause, 6U> causes{
+        rvemu::core::InterruptCause::MachineExternal,
+        rvemu::core::InterruptCause::MachineSoftware,
+        rvemu::core::InterruptCause::MachineTimer,
+        rvemu::core::InterruptCause::SupervisorExternal,
+        rvemu::core::InterruptCause::SupervisorSoftware,
+        rvemu::core::InterruptCause::SupervisorTimer,
+    };
+
+    for (const auto cause : causes) {
+        const auto cause_code = static_cast<std::uint64_t>(cause);
+        const auto supervisor_cause = cause_code == 1U || cause_code == 5U || cause_code == 9U;
+        for (const auto delegated : {false, true}) {
+            if (delegated && !supervisor_cause) {
+                continue;
+            }
+            for (const auto source : {rvemu::core::PrivilegeMode::Machine,
+                                      rvemu::core::PrivilegeMode::Supervisor,
+                                      rvemu::core::PrivilegeMode::User}) {
+                for (const auto global_enabled : {false, true}) {
+                    rvemu::core::CsrFile csrs;
+                    write_csr(csrs, rvemu::core::CsrAddress::Mie, cause_bit(cause_code));
+                    if (delegated) {
+                        write_csr(csrs, rvemu::core::CsrAddress::Mideleg, cause_bit(cause_code));
+                    }
+                    const auto global_bit = delegated ? bit(1U) : bit(3U);
+                    write_csr(csrs, rvemu::core::CsrAddress::Mstatus, global_enabled ? global_bit : 0U);
+                    csrs.set_interrupt_pending(cause, true);
+
+                    const auto selected = csrs.select_pending_interrupt(source);
+                    const auto target = delegated ? rvemu::core::PrivilegeMode::Supervisor :
+                                                    rvemu::core::PrivilegeMode::Machine;
+                    const auto target_is_higher =
+                        static_cast<std::uint8_t>(source) < static_cast<std::uint8_t>(target);
+                    const auto target_is_current = source == target;
+                    // 已委托的 S 中断在 M-mode 被规范屏蔽；其余情况仅在目标层级
+                    // 高于当前模式，或同级且目标全局 xIE 置位时才可接收。
+                    const auto blocked_by_machine_mode =
+                        delegated && source == rvemu::core::PrivilegeMode::Machine;
+                    const auto should_accept = !blocked_by_machine_mode &&
+                        (target_is_higher || (target_is_current && global_enabled));
+
+                    context.expect(
+                        selected.has_value() == should_accept,
+                        "中断可接收性必须同时遵循委托目标、当前特权级和目标 xIE");
+                    if (selected.has_value()) {
+                        context.expect(selected->cause == cause, "中断选择不得改变 pending cause");
+                        context.expect(selected->target == target, "中断必须进入唯一的委托目标层");
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 在正式 CPU 注入入口验证三类 S 中断和三类 M 中断都写入唯一目标层的完整 Trap 状态。
+void test_interrupt_trap_state_isolation(TestContext& context) {
+    constexpr std::array<rvemu::core::InterruptCause, 6U> causes{
+        rvemu::core::InterruptCause::MachineSoftware,
+        rvemu::core::InterruptCause::MachineTimer,
+        rvemu::core::InterruptCause::MachineExternal,
+        rvemu::core::InterruptCause::SupervisorSoftware,
+        rvemu::core::InterruptCause::SupervisorTimer,
+        rvemu::core::InterruptCause::SupervisorExternal,
+    };
+
+    for (const auto cause : causes) {
+        CpuFixture fixture;
+        auto& state = fixture.cpu().state();
+        const auto cause_code = static_cast<std::uint64_t>(cause);
+        const auto supervisor_cause = cause_code == 1U || cause_code == 5U || cause_code == 9U;
+        const auto expected_target = supervisor_cause ? rvemu::core::PrivilegeMode::Supervisor :
+                                                       rvemu::core::PrivilegeMode::Machine;
+        const auto interrupted_pc = kRamBase + 0x600U + cause_code * 4U;
+        write_csr(state.csrs(), rvemu::core::CsrAddress::Mideleg, supervisor_cause ? cause_bit(cause_code) : 0U);
+        write_csr(state.csrs(), rvemu::core::CsrAddress::Mie, cause_bit(cause_code));
+        write_csr(state.csrs(), rvemu::core::CsrAddress::Mstatus, 0U);
+        write_csr(state.csrs(), rvemu::core::CsrAddress::Mepc, 0x3333'0000U);
+        write_csr(state.csrs(), rvemu::core::CsrAddress::Mcause, 0x3333'0001U);
+        write_csr(state.csrs(), rvemu::core::CsrAddress::Mtval, 0x3333'0002U);
+        write_csr(state.csrs(), rvemu::core::CsrAddress::Sepc, 0x4444'0000U);
+        write_csr(state.csrs(), rvemu::core::CsrAddress::Scause, 0x4444'0001U);
+        write_csr(state.csrs(), rvemu::core::CsrAddress::Stval, 0x4444'0002U);
+        state.set_privilege(rvemu::core::PrivilegeMode::User);
+        state.set_program_counter(interrupted_pc);
+        state.csrs().set_interrupt_pending(cause, true);
+
+        const auto delivery = fixture.cpu().take_pending_interrupt();
+        context.expect(delivery.has_value(), "来自 U-mode 的已使能中断必须可接收");
+        if (!delivery.has_value()) {
+            continue;
+        }
+        context.expect(delivery->target == expected_target, "中断 Trap 目标必须与委托规则一致");
+        const auto encoded_cause = kInterruptFlag | cause_code;
+        if (expected_target == rvemu::core::PrivilegeMode::Supervisor) {
+            context.expect(state.csrs().peek(rvemu::core::CsrAddress::Sepc) == interrupted_pc, "S 中断必须写 sepc");
+            context.expect(state.csrs().peek(rvemu::core::CsrAddress::Scause) == encoded_cause, "S 中断必须写 scause");
+            context.expect(state.csrs().peek(rvemu::core::CsrAddress::Stval) == 0U, "中断 stval 必须为零");
+            context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mepc) == 0x3333'0000U, "S 中断不得修改 mepc");
+            context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mcause) == 0x3333'0001U, "S 中断不得修改 mcause");
+            context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mtval) == 0x3333'0002U, "S 中断不得修改 mtval");
+        } else {
+            context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mepc) == interrupted_pc, "M 中断必须写 mepc");
+            context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mcause) == encoded_cause, "M 中断必须写 mcause");
+            context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mtval) == 0U, "中断 mtval 必须为零");
+            context.expect(state.csrs().peek(rvemu::core::CsrAddress::Sepc) == 0x4444'0000U, "M 中断不得修改 sepc");
+            context.expect(state.csrs().peek(rvemu::core::CsrAddress::Scause) == 0x4444'0001U, "M 中断不得修改 scause");
+            context.expect(state.csrs().peek(rvemu::core::CsrAddress::Stval) == 0x4444'0002U, "M 中断不得修改 stval");
+        }
+    }
+}
+
 // 同时挂起六种标准中断验证固定优先级，并检查 M/S Vectored 入口与 cause 最高位。
 void test_interrupt_priority_and_vectors(TestContext& context) {
     rvemu::core::CsrFile priority_csrs;
@@ -558,6 +768,9 @@ int main() {
         test_counters_and_access_control(context);
         test_machine_trap_and_mret(context);
         test_delegated_trap_and_sret(context);
+        test_complete_synchronous_exception_delegation(context);
+        test_complete_interrupt_delegation_and_global_enable(context);
+        test_interrupt_trap_state_isolation(context);
         test_interrupt_priority_and_vectors(context);
         test_privileged_legality_and_wfi(context);
     } catch (const std::exception& error) {

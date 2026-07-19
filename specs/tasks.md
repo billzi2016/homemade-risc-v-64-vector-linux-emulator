@@ -92,11 +92,17 @@
     - 验证结果：全一写入后只读回可委托同步异常位和 SSIP/STIP/SEIP 位；M-mode ECALL 等不可委托位保持零。
   - [x] **PRV-004B** 验证 `mie/mip` 与 `sie/sip` 委托受限视图不会形成两套状态。
     - 验证结果：`sie/sip` 读取受 `mideleg` 限制，写入直接修改共享 `mie/mip` 的允许位，无独立 S 状态副本。
-  - [ ] **PRV-004C** 实现每一种可委托同步异常的目标特权级选择。
-  - [ ] **PRV-004D** 实现软件、定时器和外部中断的委托目标选择。
-  - [ ] **PRV-004E** 实现不同当前特权级下的全局中断使能与抢占规则。
-  - [ ] **PRV-004F** 验证委托前后 `epc/cause/tval/status` 只写入正确目标 CSR。
+  - [x] **PRV-004C** 实现每一种可委托同步异常的目标特权级选择。
+    - 验证结果：真实 CPU Trap 入口穷举 13 种可委托同步异常及不可委托 M-mode ECALL 边界，并覆盖 U/S/M 来源与 M/S 目标选择。
+  - [x] **PRV-004D** 实现软件、定时器和外部中断的委托目标选择。
+    - 验证结果：真实 CSR 中断选择器和 CPU 注入入口覆盖 MSIP/MTIP/MEIP、SSIP/STIP/SEIP 的 pending、enable、委托目标与 Trap 提交。
+  - [x] **PRV-004E** 实现不同当前特权级下的全局中断使能与抢占规则。
+    - 验证结果：覆盖 M/S/U 当前模式；验证 MIE/SIE 关闭时同级中断被屏蔽、较高目标级抢占，以及已委托 S 中断在 M-mode 被屏蔽。
+  - [x] **PRV-004F** 验证委托前后 `epc/cause/tval/status` 只写入正确目标 CSR。
+    - 验证结果：同步异常与六种中断均验证 M/S Trap CSR 隔离、来源 PC、cause、tval=0（中断）及目标层状态栈更新。
   - [ ] **PRV-004G** 使用真实 OpenSBI 验证向 S-mode Linux 的委托链路。
+  - 验证命令：`cmake --build build --parallel`；`./build/tests/rvemu_cpu_privilege_tests`；`ctest --test-dir build --output-on-failure`；`cmake --build build/sanitize --parallel`；`ctest --test-dir build/sanitize --output-on-failure`
+  - 验证结果：严格构建通过；特权专项测试通过；常规与 ASan/UBSan CTest 均为 11/11 通过。
   - 完成条件：以上子任务全部完成，真实 OpenSBI/Linux 不在中断初始化阶段卡死，且有 Trap 状态证据。
 - [x] **PRV-005** 实现 `ECALL`、`EBREAK`、`MRET`、`SRET`、`WFI` 与陷阱入口。
   - 实现文件：`src/core/cpu.cpp`、`src/core/csr.cpp`
