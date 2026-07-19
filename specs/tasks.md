@@ -232,7 +232,14 @@
   - 验证结果：CLINT 专项测试通过；clang-format 严格检查通过；严格构建和完整 CTest 为
     19/19 通过；`build/sanitize` 的 AddressSanitizer/UndefinedBehaviorSanitizer 构建与完整
     CTest 为 19/19 通过；`git diff --check` 无输出。
-- [ ] **DEV-002** 实现 PLIC 优先级、pending、enable、threshold、claim/complete。
+- [x] **DEV-002** 实现 PLIC 优先级、pending、enable、threshold、claim/complete。
+  - 证据：`include/rvemu/devices/plic.hpp`、`src/devices/plic.cpp` 与
+    `tests/unit/test_plic.cpp`；提供 31 个非零 source、M/S 两个 context、稳定的
+    priority/pending/enable/threshold/claim/complete MMIO 布局，并通过唯一 CSR pending
+    投影入口驱动 MEIP/SEIP。
+  - 验证结果：PLIC 专项测试通过；clang-format 严格检查通过；严格构建和完整 CTest 为
+    20/20 通过；`build/sanitize` 的 AddressSanitizer/UndefinedBehaviorSanitizer 构建与完整
+    CTest 为 20/20 通过；`git diff --check` 无输出。
 - [ ] **DEV-003** 实现 UART THR/RBR/LSR 及必要的 16550A 寄存器行为。
 - [ ] **DEV-004** 实现宿主终端 Raw 模式、非阻塞输入和异常退出恢复。
 - [ ] **DEV-005** 验证定时器、外部中断和 UART 控制台持续交互。

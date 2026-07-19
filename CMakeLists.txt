@@ -61,6 +61,7 @@ rvemu_enable_strict_warnings(rvemu_core)
 
 add_library(rvemu_devices STATIC
     src/devices/clint.cpp
+    src/devices/plic.cpp
 )
 
 target_include_directories(rvemu_devices

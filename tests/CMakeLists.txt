@@ -109,6 +109,12 @@ rvemu_enable_strict_warnings(rvemu_clint_tests)
 
 add_test(NAME rvemu.clint COMMAND rvemu_clint_tests)
 
+add_executable(rvemu_plic_tests unit/test_plic.cpp)
+target_link_libraries(rvemu_plic_tests PRIVATE rvemu_devices)
+target_compile_features(rvemu_plic_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_plic_tests)
+add_test(NAME rvemu.plic COMMAND rvemu_plic_tests)
+
 add_executable(rvemu_cpu_m_tests
     unit/test_cpu_m.cpp
 )
