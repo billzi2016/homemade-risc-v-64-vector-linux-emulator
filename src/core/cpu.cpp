@@ -424,6 +424,9 @@ StepResult Cpu::execute_standard(const InstructionPacket& packet) {
 
     switch (instruction.opcode) {
     case 0x57U:  // OP-V：当前阶段只开放 vsetvli/vsetivli/vsetvl，其余向量指令不能被宽松接受。
+        if (const auto integer = vector::decode_vector_integer_instruction(packet.bits); integer.has_value()) {
+            return execute_vector_integer(packet, *integer, sequential_pc);
+        }
         return execute_vector_configuration(packet, instruction, sequential_pc);
 
     case 0x37U:  // LUI
@@ -1158,6 +1161,44 @@ StepResult Cpu::execute_vector_memory(
 
     state_.csrs().clear_vector_start_after_instruction();
     state_.set_program_counter(sequential_pc);
+    return StepResult::success(packet.length);
+}
+
+StepResult Cpu::execute_vector_integer(
+    const InstructionPacket& packet,
+    const vector::VectorIntegerInstruction& instruction,
+    std::uint64_t sequential_pc) {
+    if (!state_.csrs().vector_state_enabled()) return illegal(packet);
+    const auto configuration = vector::decode_vector_configuration(state_.csrs().peek(CsrAddress::Vtype));
+    const auto destination = vector::VectorRegisterGroup::create(configuration, instruction.destination);
+    const auto source2 = vector::VectorRegisterGroup::create(configuration, instruction.source2);
+    const auto source1 = instruction.form == vector::VectorIntegerOperandForm::VectorVector ?
+                             vector::VectorRegisterGroup::create(configuration, instruction.source1) : std::nullopt;
+    if (!destination.has_value() || !source2.has_value() ||
+        (instruction.form == vector::VectorIntegerOperandForm::VectorVector && !source1.has_value()) ||
+        (instruction.masked && instruction.destination == 0U) ||
+        state_.csrs().peek(CsrAddress::Vl) > configuration.vlmax) return illegal(packet);
+    const auto vl = state_.csrs().peek(CsrAddress::Vl); const auto start = state_.csrs().vector_start();
+    const auto vtype = state_.csrs().peek(CsrAddress::Vtype);
+    const auto agnostic = configuration.sew_bits == 64U ? ~0ULL : (1ULL << configuration.sew_bits) - 1ULL;
+    if (start < vl) {
+        for (auto element = start; element < vl; ++element) {
+            if (instruction.masked && !state_.vector_mask_bit(element).value_or(false)) {
+                if ((vtype & (1ULL << 7U)) != 0U && !state_.set_vector_element(*destination, element, agnostic)) return illegal(packet);
+                continue;
+            }
+            const auto lhs = state_.vector_element(*source2, element);
+            std::optional<std::uint64_t> rhs{};
+            if (instruction.form == vector::VectorIntegerOperandForm::VectorVector) rhs = state_.vector_element(*source1, element);
+            else if (instruction.form == vector::VectorIntegerOperandForm::VectorScalar) rhs = state_.integer(instruction.source1);
+            else rhs = vector::sign_extend_vector_immediate(instruction.source1, static_cast<std::uint8_t>(configuration.sew_bits));
+            if (!lhs.has_value() || !rhs.has_value() || !state_.set_vector_element(*destination, element,
+                    vector::execute_vector_integer_operation(instruction.operation, *lhs, *rhs, static_cast<std::uint8_t>(configuration.sew_bits)))) return illegal(packet);
+        }
+        if ((vtype & (1ULL << 6U)) != 0U) for (auto element = vl; element < configuration.vlmax; ++element)
+            if (!state_.set_vector_element(*destination, element, agnostic)) return illegal(packet);
+    }
+    state_.csrs().clear_vector_start_after_instruction(); state_.set_program_counter(sequential_pc);
     return StepResult::success(packet.length);
 }
 

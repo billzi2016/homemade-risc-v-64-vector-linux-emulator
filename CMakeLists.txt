@@ -44,6 +44,7 @@ add_library(rvemu_core STATIC
     src/memory/mmu.cpp
     src/vector/vector_configuration.cpp
     src/vector/vector_memory.cpp
+    src/vector/vector_integer.cpp
     src/vector/vector_register_group.cpp
     src/vector/vector_state.cpp
 )

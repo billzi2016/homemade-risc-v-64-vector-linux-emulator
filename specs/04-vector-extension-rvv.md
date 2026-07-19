@@ -141,6 +141,10 @@ undisturbed 元素保持旧值。成功完成后清零 `vstart`。
 - 掩码逻辑、产生掩码的比较及 carry/borrow 类操作中 `v0` 的特殊角色。
 - 除零、最小负数除以 `-1` 等与标量对应宽度一致的定义结果。
 
+首版实现 `vadd/vsub/vmul/vdiv[u]/vrem[u]` 的 `vv/vx` 形式，以及 `vadd.vi`。所有结果按
+SEW 截断；除零和 signed 最小值除以 `-1` 与标量 M 扩展一致。masked-off 元素不执行，
+依 `vma` 保持或写全一；tail 依 `vta` 保持或写全一；成功后清零 `vstart`。
+
 ## 8. 向量浮点
 
 - 支持 PRD 要求的向量浮点加、减、乘、除，覆盖 SEW=32/64。

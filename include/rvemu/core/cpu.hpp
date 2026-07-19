@@ -9,6 +9,7 @@
 #include "rvemu/core/trap.hpp"
 #include "rvemu/memory/mmu.hpp"
 #include "rvemu/vector/vector_memory.hpp"
+#include "rvemu/vector/vector_integer.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -121,6 +122,11 @@ private:
     [[nodiscard]] StepResult execute_vector_memory(
         const InstructionPacket& packet,
         const vector::VectorMemoryOperation& operation,
+        std::uint64_t sequential_pc);
+    // 执行已声明的 OP-V 单宽度整数运算；寄存器组、掩码、tail 和 vstart 只通过统一状态接口处理。
+    [[nodiscard]] StepResult execute_vector_integer(
+        const InstructionPacket& packet,
+        const vector::VectorIntegerInstruction& instruction,
         std::uint64_t sequential_pc);
     // 集中处理 LOAD/STORE-FP、OP-FP 与 R4 FMA，校验完成后才提交浮点副作用。
     [[nodiscard]] StepResult execute_floating(

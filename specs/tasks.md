@@ -210,7 +210,9 @@
   - 实现文件：`include/rvemu/vector/vector_memory.hpp`、`src/vector/vector_memory.cpp`、`include/rvemu/vector/vector_configuration.hpp`、`src/vector/vector_configuration.cpp`、`include/rvemu/core/cpu.hpp`、`src/core/cpu.cpp`、`tests/unit/test_cpu_vector_memory.cpp`
   - 验证命令：`cmake --build build --parallel`；`./build/tests/rvemu_cpu_vector_memory_tests`；`ctest --test-dir build --output-on-failure`；`cmake --build build/sanitize --parallel`；`ctest --test-dir build/sanitize --output-on-failure`；`git diff --check`
   - 验证结果：严格构建和专项测试通过；常规与 ASan/UBSan CTest 均为 15/15 通过；补丁格式检查无输出。
-- [ ] **RVV-005** 实现规定范围的整数算术、乘除和掩码语义。
+- [x] **RVV-005** 实现规定范围的整数算术、乘除和掩码语义。
+  - 实现范围：`vadd/vsub/vmul/vdiv[u]/vrem[u]` 的声明 `vv/vx/vi` 形式，含 SEW 回绕、除零、signed overflow、mask/tail/prestart 与 `vstart` 完成语义。
+  - 验证结果：严格构建、专项测试通过；常规与 ASan/UBSan CTest 均为 16/16 通过；补丁格式检查无输出。
 - [ ] **RVV-006** 实现规定范围的向量浮点四则运算和浮点状态更新。
 - [ ] **RVV-007** 通过 RVV 边界、tail/mask、重叠和异常重启测试。
 
