@@ -216,7 +216,12 @@
 - [x] **RVV-006** 实现规定范围的向量浮点四则运算和浮点状态更新。
   - 证据：`include/rvemu/vector/vector_floating.hpp`、`src/vector/vector_floating.cpp`、`tests/unit/test_cpu_vector_floating.cpp`。
   - 验证结果：RVV 专项测试通过；严格构建和完整 CTest 为 17/17 通过；补丁格式检查无输出。
-- [ ] **RVV-007** 通过 RVV 边界、tail/mask、重叠和异常重启测试。
+- [x] **RVV-007** 通过 RVV 边界、tail/mask、重叠和异常重启测试。
+  - 证据：`tests/unit/test_cpu_vector_rvv_boundaries.cpp` 覆盖 `vl=0`、`vstart` prestart 保持、
+    destructive alias、tail/mask undisturbed、掩码目的 `v0` 非法指令，以及 unit-strided 加载异常后的重启。
+  - 验证结果：`clang-format --dry-run --Werror tests/unit/test_cpu_vector_rvv_boundaries.cpp` 通过；
+    严格构建与完整 CTest 为 18/18 通过；`build/sanitize` 的 AddressSanitizer/UndefinedBehaviorSanitizer
+    构建与完整 CTest 为 18/18 通过；`git diff --check` 无输出。
 
 ## 10. 阶段 8：CLINT、PLIC 与 UART
 
