@@ -191,7 +191,7 @@
 
 - [x] **RVV-001** 实现 32×VLEN=256 位向量状态及 `vlenb=32`。
   - 完成条件：32 个 32 字节寄存器、`vstart/vxrm/vxsat/vcsr/vl/vtype/vlenb` 的唯一 CSR 状态源、VS=Off 门控、合法写入后的 VS Dirty、只读 `vlenb=32`、复位值和 CSR 权限/别名测试均通过。
-  - 冻结边界：仅接受 `m1/m2/m4/m8` 与 SEW=8/16/32/64；分数 LMUL 或保留 `vtype` 必须由后续 `vset*` 依据 `RVV-REQ-006` 设置 `vill=1, vl=0`，不得静默降级。
+  - 冻结边界：支持 `m1/m2/m4/m8` 与标准要求的 `mf2/mf4/mf8`；分数 LMUL 仅接受满足 `SEW ≤ LMUL × ELEN` 的组合。保留或不支持的完整 `vtype` 必须由后续 `vset*` 依据 `RVV-REQ-006` 设置 `vill=1, vl=0`，不得静默降级。
   - 实现文件：`include/rvemu/vector/vector_state.hpp`、`src/vector/vector_state.cpp`、`include/rvemu/core/cpu_state.hpp`、`src/core/cpu_state.cpp`、`include/rvemu/core/csr.hpp`、`src/core/csr.cpp`
   - 验证命令：`cmake --build build --parallel`；`./build/tests/rvemu_vector_state_tests`；`ctest --test-dir build --output-on-failure`；`cmake --build build/sanitize --parallel`；`ctest --test-dir build/sanitize --output-on-failure`
   - 验证结果：严格构建和专项 RVV 状态测试通过；常规与 ASan/UBSan CTest 均为 12/12 通过。

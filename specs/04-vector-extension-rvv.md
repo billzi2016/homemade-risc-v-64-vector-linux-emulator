@@ -10,14 +10,16 @@
 
 ### 1.1 首版 `vtype` 能力冻结
 
-首版仅接受整数 LMUL 编码 `m1=0b000`、`m2=0b001`、`m4=0b010`、`m8=0b011`，以及
-`SEW=8/16/32/64` 对应的 `vsew=0b000..0b011`。`ELEN` 固定为 64，因此更大的 SEW
-编码不受支持。
+固定 `ELEN=64`、最小 SEW=8 的 RVV 1.0 实现必须支持整数 LMUL `m1=0b000`、
+`m2=0b001`、`m4=0b010`、`m8=0b011`，以及分数 LMUL `mf8=0b101`、`mf4=0b110`、
+`mf2=0b111`。支持的 SEW 编码为 `e8/e16/e32/e64` 对应 `vsew=0b000..0b011`，但
+分数 LMUL 的合法 SEW 受 `SEW ≤ LMUL × ELEN` 约束：`mf8` 仅支持 `e8`，`mf4`
+支持 `e8/e16`，`mf2` 支持 `e8/e16/e32`；整数 LMUL 支持全部四种 SEW。
 
-分数 LMUL `mf8/mf4/mf2` 和全部保留 `vlmul/vsew` 编码在首版均不支持。它们不是可被
-静默降级的配置：`vsetvli`、`vsetivli` 或 `vsetvl` 请求此类 `vtype` 时，必须写入
-`vtype.vill=1`、将其余可见 `vtype` 位清零，并将 `vl=0`。后续向量指令遇到当前
-`vill=1` 必须触发非法指令异常。
+全部保留 `vlmul/vsew` 编码、超出上述分数 LMUL 宽度上限的组合以及任何非零保留高位都
+不是可被静默降级的配置：`vsetvli`、`vsetivli` 或 `vsetvl` 请求此类完整 `vtype` 值时，
+必须写入 `vtype.vill=1`、将其余可见 `vtype` 位清零，并将 `vl=0`。后续依赖 `vtype`
+的向量指令遇到当前 `vill=1` 必须触发非法指令异常。
 
 合法 `vtype` 的低位布局冻结为 `vlmul[2:0]`、`vsew[5:3]`、`vta[6]`、`vma[7]`；除
 `XLEN-1` 的 `vill` 外，任何置位的保留高位都会使 `vtype` 非法。这样可避免不同模块
