@@ -12,7 +12,9 @@ struct InstructionPacket final {
     std::uint32_t bits{0U};
     std::uint8_t length{0U};
 
-    [[nodiscard]] bool compressed() const noexcept { return length == 2U; }
+    [[nodiscard]] bool compressed() const noexcept {
+        return length == 2U;
+    }
 };
 
 struct DecodedInstruction final {

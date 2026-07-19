@@ -10,41 +10,40 @@ constexpr std::uint64_t kVtypeImplementedMask = 0xFFU;
 constexpr std::uint64_t kMaximumElementLengthBits = 64U;
 
 // 只从标准 vlmul 编码导出有理 LMUL。0b100 为保留值，不能被误当作 m1 或分数配置。
-[[nodiscard]] bool decode_lmul(
-    std::uint8_t encoding,
-    std::uint64_t& numerator,
-    std::uint64_t& denominator) noexcept {
+[[nodiscard]] bool decode_lmul(std::uint8_t encoding,
+                               std::uint64_t& numerator,
+                               std::uint64_t& denominator) noexcept {
     switch (encoding) {
-    case 0U:
-        numerator = 1U;
-        denominator = 1U;
-        return true;
-    case 1U:
-        numerator = 2U;
-        denominator = 1U;
-        return true;
-    case 2U:
-        numerator = 4U;
-        denominator = 1U;
-        return true;
-    case 3U:
-        numerator = 8U;
-        denominator = 1U;
-        return true;
-    case 5U:
-        numerator = 1U;
-        denominator = 8U;
-        return true;
-    case 6U:
-        numerator = 1U;
-        denominator = 4U;
-        return true;
-    case 7U:
-        numerator = 1U;
-        denominator = 2U;
-        return true;
-    default:
-        return false;
+        case 0U:
+            numerator = 1U;
+            denominator = 1U;
+            return true;
+        case 1U:
+            numerator = 2U;
+            denominator = 1U;
+            return true;
+        case 2U:
+            numerator = 4U;
+            denominator = 1U;
+            return true;
+        case 3U:
+            numerator = 8U;
+            denominator = 1U;
+            return true;
+        case 5U:
+            numerator = 1U;
+            denominator = 8U;
+            return true;
+        case 6U:
+            numerator = 1U;
+            denominator = 4U;
+            return true;
+        case 7U:
+            numerator = 1U;
+            denominator = 2U;
+            return true;
+        default:
+            return false;
     }
 }
 
@@ -86,28 +85,25 @@ VectorConfiguration decode_vector_configuration(std::uint64_t vtype) noexcept {
     return VectorConfiguration{true, vtype, sew_bits, numerator, denominator, vlmax};
 }
 
-std::uint64_t select_vector_length(
-    std::uint64_t application_vector_length,
-    std::uint64_t vlmax) noexcept {
+std::uint64_t select_vector_length(std::uint64_t application_vector_length,
+                                   std::uint64_t vlmax) noexcept {
     if (vlmax == 0U) {
         return 0U;
     }
     return application_vector_length < vlmax ? application_vector_length : vlmax;
 }
 
-bool can_preserve_vector_length(
-    std::uint64_t previous_vtype,
-    std::uint64_t requested_vtype) noexcept {
+bool can_preserve_vector_length(std::uint64_t previous_vtype,
+                                std::uint64_t requested_vtype) noexcept {
     const auto previous = decode_vector_configuration(previous_vtype);
     const auto requested = decode_vector_configuration(requested_vtype);
     return previous.valid && requested.valid && previous.vlmax == requested.vlmax;
 }
 
 std::optional<VectorConfiguration> derive_memory_configuration(
-    const VectorConfiguration& current,
-    std::uint64_t element_width_bits) noexcept {
-    if (!current.valid || element_width_bits < 8U || element_width_bits > 64U ||
-        (element_width_bits & (element_width_bits - 1U)) != 0U) {
+    const VectorConfiguration& current, std::uint64_t element_width_bits) noexcept {
+    if (!current.valid || element_width_bits < 8U || element_width_bits > 64U
+        || (element_width_bits & (element_width_bits - 1U)) != 0U) {
         return std::nullopt;
     }
     // EMUL=(EEW/SEW)*LMUL；所有量都很小，但先约分可避免把合法 mf* 组合错误拒绝。
@@ -121,8 +117,8 @@ std::optional<VectorConfiguration> derive_memory_configuration(
     std::uint64_t ignored_denominator = 1U;
     bool supported = false;
     for (std::uint8_t encoding = 0U; encoding < 8U; ++encoding) {
-        if (decode_lmul(encoding, ignored_numerator, ignored_denominator) &&
-            ignored_numerator == numerator && ignored_denominator == denominator) {
+        if (decode_lmul(encoding, ignored_numerator, ignored_denominator)
+            && ignored_numerator == numerator && ignored_denominator == denominator) {
             supported = true;
             break;
         }

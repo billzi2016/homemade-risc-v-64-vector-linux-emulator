@@ -12,47 +12,48 @@ namespace rvemu::core::soft_float_detail {
 namespace {
 
 constexpr Format kSingleFormat{
-    8U, 23U, 127, -126, 127,
-    0x8000'0000ULL, 0x7F80'0000ULL, 0x007F'FFFFULL,
-    kCanonicalSingleNan};
-constexpr Format kDoubleFormat{
-    11U, 52U, 1023, -1022, 1023,
-    0x8000'0000'0000'0000ULL, 0x7FF0'0000'0000'0000ULL,
-    0x000F'FFFF'FFFF'FFFFULL, kCanonicalDoubleNan};
+    8U, 23U, 127, -126, 127, 0x8000'0000ULL, 0x7F80'0000ULL, 0x007F'FFFFULL, kCanonicalSingleNan};
+constexpr Format kDoubleFormat{11U,
+                               52U,
+                               1023,
+                               -1022,
+                               1023,
+                               0x8000'0000'0000'0000ULL,
+                               0x7FF0'0000'0000'0000ULL,
+                               0x000F'FFFF'FFFF'FFFFULL,
+                               kCanonicalDoubleNan};
 
 [[nodiscard]] std::uint64_t exponent_all_ones(const Format& format) noexcept {
     return (1ULL << format.exponent_bits) - 1U;
 }
 
-[[nodiscard]] bool should_increment(
-    FloatingRoundingMode rounding,
-    bool sign,
-    bool halfway_bit,
-    bool lower_bits,
-    bool retained_odd) noexcept {
+[[nodiscard]] bool should_increment(FloatingRoundingMode rounding,
+                                    bool sign,
+                                    bool halfway_bit,
+                                    bool lower_bits,
+                                    bool retained_odd) noexcept {
     const auto discarded = halfway_bit || lower_bits;
     switch (rounding) {
-    case FloatingRoundingMode::NearestTiesToEven:
-        return halfway_bit && (lower_bits || retained_odd);
-    case FloatingRoundingMode::TowardZero:
-        return false;
-    case FloatingRoundingMode::Down:
-        return sign && discarded;
-    case FloatingRoundingMode::Up:
-        return !sign && discarded;
-    case FloatingRoundingMode::NearestTiesToMaximumMagnitude:
-        return halfway_bit;
+        case FloatingRoundingMode::NearestTiesToEven:
+            return halfway_bit && (lower_bits || retained_odd);
+        case FloatingRoundingMode::TowardZero:
+            return false;
+        case FloatingRoundingMode::Down:
+            return sign && discarded;
+        case FloatingRoundingMode::Up:
+            return !sign && discarded;
+        case FloatingRoundingMode::NearestTiesToMaximumMagnitude:
+            return halfway_bit;
     }
     return false;
 }
 
 // 丢弃低位前先提取 half/sticky；加一发生在截断后，因此不会把被丢弃区域的进位重复计算。
-[[nodiscard]] WideUnsigned rounded_right_shift(
-    WideUnsigned value,
-    std::size_t shift,
-    bool sign,
-    FloatingRoundingMode rounding,
-    bool& inexact) noexcept {
+[[nodiscard]] WideUnsigned rounded_right_shift(WideUnsigned value,
+                                               std::size_t shift,
+                                               bool sign,
+                                               FloatingRoundingMode rounding,
+                                               bool& inexact) noexcept {
     if (shift == 0U) {
         return value;
     }
@@ -66,25 +67,22 @@ constexpr Format kDoubleFormat{
     return value;
 }
 
-[[nodiscard]] bool overflow_to_infinity(
-    FloatingRoundingMode rounding,
-    bool sign) noexcept {
-    return rounding == FloatingRoundingMode::NearestTiesToEven ||
-           rounding == FloatingRoundingMode::NearestTiesToMaximumMagnitude ||
-           (rounding == FloatingRoundingMode::Up && !sign) ||
-           (rounding == FloatingRoundingMode::Down && sign);
+[[nodiscard]] bool overflow_to_infinity(FloatingRoundingMode rounding, bool sign) noexcept {
+    return rounding == FloatingRoundingMode::NearestTiesToEven
+           || rounding == FloatingRoundingMode::NearestTiesToMaximumMagnitude
+           || (rounding == FloatingRoundingMode::Up && !sign)
+           || (rounding == FloatingRoundingMode::Down && sign);
 }
 
 // RISC-V 采用 IEEE 754 的“舍入后检测微小性”，但这里的“舍入后”不是看最终编码
 // 是否仍为次正规数。规范要求先假设指数范围无界，仅按目标格式的有效数精度进行一次
 // 舍入，再检查该无界舍入结果的指数是否小于最小正规指数。这样可以区分两个非常相近
 // 的边界：有些结果最终编码为最小正规数但仍应报告 UF，有些则不应报告 UF。
-[[nodiscard]] bool tiny_after_unbounded_rounding(
-    const Format& format,
-    bool sign,
-    WideUnsigned magnitude,
-    std::int32_t exponent,
-    FloatingRoundingMode rounding) noexcept {
+[[nodiscard]] bool tiny_after_unbounded_rounding(const Format& format,
+                                                 bool sign,
+                                                 WideUnsigned magnitude,
+                                                 std::int32_t exponent,
+                                                 FloatingRoundingMode rounding) noexcept {
     if (magnitude.zero()) {
         return false;
     }
@@ -95,8 +93,8 @@ constexpr Format kDoubleFormat{
 
     bool ignored_inexact = false;
     if (bit_length > precision) {
-        magnitude = rounded_right_shift(
-            magnitude, bit_length - precision, sign, rounding, ignored_inexact);
+        magnitude =
+            rounded_right_shift(magnitude, bit_length - precision, sign, rounding, ignored_inexact);
     } else if (bit_length < precision) {
         magnitude.shift_left(precision - bit_length);
     }
@@ -113,10 +111,9 @@ constexpr Format kDoubleFormat{
     return FloatingResult{format.canonical_nan, invalid_flag()};
 }
 
-[[nodiscard]] bool numeric_less(
-    const Format& format,
-    std::uint64_t lhs_bits,
-    std::uint64_t rhs_bits) noexcept {
+[[nodiscard]] bool numeric_less(const Format& format,
+                                std::uint64_t lhs_bits,
+                                std::uint64_t rhs_bits) noexcept {
     const auto lhs_magnitude = lhs_bits & ~format.sign_mask;
     const auto rhs_magnitude = rhs_bits & ~format.sign_mask;
     if (lhs_magnitude == 0U && rhs_magnitude == 0U) {
@@ -130,36 +127,35 @@ constexpr Format kDoubleFormat{
     return lhs_sign ? lhs_magnitude > rhs_magnitude : lhs_magnitude < rhs_magnitude;
 }
 
-[[nodiscard]] FloatingResult add_unpacked(
-    const Format& format,
-    Unpacked lhs,
-    Unpacked rhs,
-    FloatingRoundingMode rounding) noexcept {
+[[nodiscard]] FloatingResult add_unpacked(const Format& format,
+                                          Unpacked lhs,
+                                          Unpacked rhs,
+                                          FloatingRoundingMode rounding) noexcept {
     if (is_nan(lhs.category) || is_nan(rhs.category)) {
-        const auto signaling = lhs.category == Category::SignalingNan ||
-                               rhs.category == Category::SignalingNan;
-        return FloatingResult{
-            format.canonical_nan,
-            static_cast<std::uint8_t>(signaling ? invalid_flag() : 0U)};
+        const auto signaling =
+            lhs.category == Category::SignalingNan || rhs.category == Category::SignalingNan;
+        return FloatingResult{format.canonical_nan,
+                              static_cast<std::uint8_t>(signaling ? invalid_flag() : 0U)};
     }
     if (lhs.category == Category::Infinity || rhs.category == Category::Infinity) {
-        if (lhs.category == Category::Infinity && rhs.category == Category::Infinity &&
-            lhs.sign != rhs.sign) {
+        if (lhs.category == Category::Infinity && rhs.category == Category::Infinity
+            && lhs.sign != rhs.sign) {
             return invalid_result(format);
         }
         const auto& infinite = lhs.category == Category::Infinity ? lhs : rhs;
         return FloatingResult{infinity(format, infinite.sign), 0U};
     }
     if (lhs.category == Category::Zero && rhs.category == Category::Zero) {
-        const auto sign = lhs.sign == rhs.sign ? lhs.sign :
-                          rounding == FloatingRoundingMode::Down;
+        const auto sign = lhs.sign == rhs.sign ? lhs.sign : rounding == FloatingRoundingMode::Down;
         return FloatingResult{signed_zero(format, sign), 0U};
     }
     if (lhs.category == Category::Zero) {
-        return round_and_pack(format, rhs.sign, WideUnsigned{rhs.significand}, rhs.exponent, rounding);
+        return round_and_pack(
+            format, rhs.sign, WideUnsigned{rhs.significand}, rhs.exponent, rounding);
     }
     if (rhs.category == Category::Zero) {
-        return round_and_pack(format, lhs.sign, WideUnsigned{lhs.significand}, lhs.exponent, rounding);
+        return round_and_pack(
+            format, lhs.sign, WideUnsigned{lhs.significand}, lhs.exponent, rounding);
     }
 
     const auto common_exponent = std::min(lhs.exponent, rhs.exponent);
@@ -174,8 +170,7 @@ constexpr Format kDoubleFormat{
     } else {
         const auto ordering = left.compare(right);
         if (ordering == 0) {
-            return FloatingResult{
-                signed_zero(format, rounding == FloatingRoundingMode::Down), 0U};
+            return FloatingResult{signed_zero(format, rounding == FloatingRoundingMode::Down), 0U};
         }
         if (ordering > 0) {
             left.subtract(right);
@@ -217,8 +212,7 @@ std::size_t WideUnsigned::bit_length() const noexcept {
 }
 
 bool WideUnsigned::bit(std::size_t index) const noexcept {
-    return index < kWideLimbs * 64U &&
-           ((limbs_[index / 64U] >> (index % 64U)) & 1U) != 0U;
+    return index < kWideLimbs * 64U && ((limbs_[index / 64U] >> (index % 64U)) & 1U) != 0U;
 }
 
 void WideUnsigned::set_bit(std::size_t index) noexcept {
@@ -334,27 +328,24 @@ Unpacked unpack(FloatingFormat floating_format, std::uint64_t bits) noexcept {
             return Unpacked{sign, Category::Infinity, 0U, 0};
         }
         const auto quiet_bit = 1ULL << (format.fraction_bits - 1U);
-        return Unpacked{
-            sign,
-            (fraction & quiet_bit) != 0U ? Category::QuietNan : Category::SignalingNan,
-            0U,
-            0};
+        return Unpacked{sign,
+                        (fraction & quiet_bit) != 0U ? Category::QuietNan : Category::SignalingNan,
+                        0U,
+                        0};
     }
     if (exponent_field == 0U) {
         if (fraction == 0U) {
             return Unpacked{sign, Category::Zero, 0U, 0};
         }
-        return Unpacked{
-            sign,
-            Category::Finite,
-            fraction,
-            static_cast<std::int32_t>(format.minimum_exponent) - format.fraction_bits};
+        return Unpacked{sign,
+                        Category::Finite,
+                        fraction,
+                        static_cast<std::int32_t>(format.minimum_exponent) - format.fraction_bits};
     }
-    return Unpacked{
-        sign,
-        Category::Finite,
-        (1ULL << format.fraction_bits) | fraction,
-        static_cast<std::int32_t>(exponent_field) - format.bias - format.fraction_bits};
+    return Unpacked{sign,
+                    Category::Finite,
+                    (1ULL << format.fraction_bits) | fraction,
+                    static_cast<std::int32_t>(exponent_field) - format.bias - format.fraction_bits};
 }
 
 bool is_nan(Category category) noexcept {
@@ -373,12 +364,11 @@ std::uint64_t infinity(const Format& format, bool sign) noexcept {
     return (sign ? format.sign_mask : 0U) | format.exponent_mask;
 }
 
-FloatingResult round_and_pack(
-    const Format& format,
-    bool sign,
-    WideUnsigned magnitude,
-    std::int32_t exponent,
-    FloatingRoundingMode rounding) noexcept {
+FloatingResult round_and_pack(const Format& format,
+                              bool sign,
+                              WideUnsigned magnitude,
+                              std::int32_t exponent,
+                              FloatingRoundingMode rounding) noexcept {
     if (magnitude.zero()) {
         return FloatingResult{signed_zero(format, sign), 0U};
     }
@@ -386,14 +376,14 @@ FloatingResult round_and_pack(
     const auto precision = static_cast<std::size_t>(format.fraction_bits) + 1U;
     auto bit_length = magnitude.bit_length();
     auto result_exponent = exponent + static_cast<std::int32_t>(bit_length) - 1;
-    const auto tiny_after_rounding = tiny_after_unbounded_rounding(
-        format, sign, magnitude, exponent, rounding);
+    const auto tiny_after_rounding =
+        tiny_after_unbounded_rounding(format, sign, magnitude, exponent, rounding);
     bool inexact = false;
 
     if (result_exponent >= format.minimum_exponent) {
         if (bit_length > precision) {
-            magnitude = rounded_right_shift(
-                magnitude, bit_length - precision, sign, rounding, inexact);
+            magnitude =
+                rounded_right_shift(magnitude, bit_length - precision, sign, rounding, inexact);
         } else if (bit_length < precision) {
             magnitude.shift_left(precision - bit_length);
         }
@@ -403,39 +393,33 @@ FloatingResult round_and_pack(
         }
         if (result_exponent > format.maximum_exponent) {
             const auto flags = static_cast<std::uint8_t>(
-                static_cast<std::uint8_t>(FloatingExceptionFlag::Overflow) |
-                static_cast<std::uint8_t>(FloatingExceptionFlag::Inexact));
+                static_cast<std::uint8_t>(FloatingExceptionFlag::Overflow)
+                | static_cast<std::uint8_t>(FloatingExceptionFlag::Inexact));
             if (overflow_to_infinity(rounding, sign)) {
                 return FloatingResult{infinity(format, sign), flags};
             }
             const auto maximum_finite =
-                ((exponent_all_ones(format) - 1U) << format.fraction_bits) |
-                format.fraction_mask;
+                ((exponent_all_ones(format) - 1U) << format.fraction_bits) | format.fraction_mask;
             return FloatingResult{(sign ? format.sign_mask : 0U) | maximum_finite, flags};
         }
         const auto exponent_field = static_cast<std::uint64_t>(result_exponent + format.bias);
         const auto fraction = magnitude.low64() & format.fraction_mask;
-        auto flags = static_cast<std::uint8_t>(inexact ?
-            static_cast<std::uint8_t>(FloatingExceptionFlag::Inexact) : 0U);
+        auto flags = static_cast<std::uint8_t>(
+            inexact ? static_cast<std::uint8_t>(FloatingExceptionFlag::Inexact) : 0U);
         if (inexact && tiny_after_rounding) {
             flags |= static_cast<std::uint8_t>(FloatingExceptionFlag::Underflow);
         }
         return FloatingResult{
-            (sign ? format.sign_mask : 0U) |
-                (exponent_field << format.fraction_bits) | fraction,
+            (sign ? format.sign_mask : 0U) | (exponent_field << format.fraction_bits) | fraction,
             flags};
     }
 
     // 次正规数的量化单位固定为 2^(emin-fractionBits)；舍入后跨过边界即成为最小正规数。
-    const auto unit_exponent = static_cast<std::int32_t>(format.minimum_exponent) -
-                               format.fraction_bits;
+    const auto unit_exponent =
+        static_cast<std::int32_t>(format.minimum_exponent) - format.fraction_bits;
     if (exponent < unit_exponent) {
         magnitude = rounded_right_shift(
-            magnitude,
-            static_cast<std::size_t>(unit_exponent - exponent),
-            sign,
-            rounding,
-            inexact);
+            magnitude, static_cast<std::size_t>(unit_exponent - exponent), sign, rounding, inexact);
     } else if (exponent > unit_exponent) {
         magnitude.shift_left(static_cast<std::size_t>(exponent - unit_exponent));
     }
@@ -457,12 +441,11 @@ FloatingResult round_and_pack(
     return FloatingResult{bits, flags};
 }
 
-WideUnsigned round_to_integer_magnitude(
-    WideUnsigned magnitude,
-    std::int32_t exponent,
-    bool sign,
-    FloatingRoundingMode rounding,
-    bool& inexact) noexcept {
+WideUnsigned round_to_integer_magnitude(WideUnsigned magnitude,
+                                        std::int32_t exponent,
+                                        bool sign,
+                                        FloatingRoundingMode rounding,
+                                        bool& inexact) noexcept {
     inexact = false;
     if (exponent >= 0) {
         magnitude.shift_left(static_cast<std::size_t>(exponent));
@@ -485,11 +468,10 @@ WideUnsigned multiply_significands(std::uint64_t lhs, std::uint64_t rhs) noexcep
     return result;
 }
 
-WideUnsigned divide_significands(
-    std::uint64_t numerator,
-    std::uint64_t denominator,
-    std::size_t precision,
-    bool& inexact) noexcept {
+WideUnsigned divide_significands(std::uint64_t numerator,
+                                 std::uint64_t denominator,
+                                 std::size_t precision,
+                                 bool& inexact) noexcept {
     WideUnsigned dividend{numerator};
     dividend.shift_left(precision);
     WideUnsigned quotient{};
@@ -505,10 +487,9 @@ WideUnsigned divide_significands(
     return quotient;
 }
 
-WideUnsigned square_root_significand(
-    std::uint64_t significand,
-    std::size_t shift_pairs,
-    bool& inexact) noexcept {
+WideUnsigned square_root_significand(std::uint64_t significand,
+                                     std::size_t shift_pairs,
+                                     bool& inexact) noexcept {
     WideUnsigned radicand{significand};
     radicand.shift_left(shift_pairs * 2U);
     WideUnsigned root{};
@@ -544,21 +525,19 @@ namespace {
 using soft_float_detail::Category;
 using soft_float_detail::WideUnsigned;
 
-[[nodiscard]] FloatingResult multiply_impl(
-    FloatingFormat format_name,
-    std::uint64_t lhs_bits,
-    std::uint64_t rhs_bits,
-    FloatingRoundingMode rounding) noexcept {
+[[nodiscard]] FloatingResult multiply_impl(FloatingFormat format_name,
+                                           std::uint64_t lhs_bits,
+                                           std::uint64_t rhs_bits,
+                                           FloatingRoundingMode rounding) noexcept {
     const auto& format = soft_float_detail::format_of(format_name);
     const auto lhs = soft_float_detail::unpack(format_name, lhs_bits);
     const auto rhs = soft_float_detail::unpack(format_name, rhs_bits);
     if (soft_float_detail::is_nan(lhs.category) || soft_float_detail::is_nan(rhs.category)) {
-        const auto signaling = lhs.category == Category::SignalingNan ||
-                               rhs.category == Category::SignalingNan;
+        const auto signaling =
+            lhs.category == Category::SignalingNan || rhs.category == Category::SignalingNan;
         return FloatingResult{
             format.canonical_nan,
-            static_cast<std::uint8_t>(
-                signaling ? soft_float_detail::invalid_flag() : 0U)};
+            static_cast<std::uint8_t>(signaling ? soft_float_detail::invalid_flag() : 0U)};
     }
     const auto sign = lhs.sign != rhs.sign;
     const auto zero = lhs.category == Category::Zero || rhs.category == Category::Zero;
@@ -582,54 +561,48 @@ using soft_float_detail::WideUnsigned;
 
 }  // namespace
 
-FloatingResult floating_add(
-    FloatingFormat format,
-    std::uint64_t lhs,
-    std::uint64_t rhs,
-    FloatingRoundingMode rounding) noexcept {
-    return soft_float_detail::add_unpacked(
-        soft_float_detail::format_of(format),
-        soft_float_detail::unpack(format, lhs),
-        soft_float_detail::unpack(format, rhs),
-        rounding);
+FloatingResult floating_add(FloatingFormat format,
+                            std::uint64_t lhs,
+                            std::uint64_t rhs,
+                            FloatingRoundingMode rounding) noexcept {
+    return soft_float_detail::add_unpacked(soft_float_detail::format_of(format),
+                                           soft_float_detail::unpack(format, lhs),
+                                           soft_float_detail::unpack(format, rhs),
+                                           rounding);
 }
 
-FloatingResult floating_subtract(
-    FloatingFormat format,
-    std::uint64_t lhs,
-    std::uint64_t rhs,
-    FloatingRoundingMode rounding) noexcept {
+FloatingResult floating_subtract(FloatingFormat format,
+                                 std::uint64_t lhs,
+                                 std::uint64_t rhs,
+                                 FloatingRoundingMode rounding) noexcept {
     const auto sign_mask = soft_float_detail::format_of(format).sign_mask;
     return floating_add(format, lhs, rhs ^ sign_mask, rounding);
 }
 
-FloatingResult floating_multiply(
-    FloatingFormat format,
-    std::uint64_t lhs,
-    std::uint64_t rhs,
-    FloatingRoundingMode rounding) noexcept {
+FloatingResult floating_multiply(FloatingFormat format,
+                                 std::uint64_t lhs,
+                                 std::uint64_t rhs,
+                                 FloatingRoundingMode rounding) noexcept {
     return multiply_impl(format, lhs, rhs, rounding);
 }
 
-FloatingResult floating_divide(
-    FloatingFormat format_name,
-    std::uint64_t lhs_bits,
-    std::uint64_t rhs_bits,
-    FloatingRoundingMode rounding) noexcept {
+FloatingResult floating_divide(FloatingFormat format_name,
+                               std::uint64_t lhs_bits,
+                               std::uint64_t rhs_bits,
+                               FloatingRoundingMode rounding) noexcept {
     const auto& format = soft_float_detail::format_of(format_name);
     const auto lhs = soft_float_detail::unpack(format_name, lhs_bits);
     const auto rhs = soft_float_detail::unpack(format_name, rhs_bits);
     if (soft_float_detail::is_nan(lhs.category) || soft_float_detail::is_nan(rhs.category)) {
-        const auto signaling = lhs.category == Category::SignalingNan ||
-                               rhs.category == Category::SignalingNan;
+        const auto signaling =
+            lhs.category == Category::SignalingNan || rhs.category == Category::SignalingNan;
         return FloatingResult{
             format.canonical_nan,
-            static_cast<std::uint8_t>(
-                signaling ? soft_float_detail::invalid_flag() : 0U)};
+            static_cast<std::uint8_t>(signaling ? soft_float_detail::invalid_flag() : 0U)};
     }
     const auto sign = lhs.sign != rhs.sign;
-    if ((lhs.category == Category::Zero && rhs.category == Category::Zero) ||
-        (lhs.category == Category::Infinity && rhs.category == Category::Infinity)) {
+    if ((lhs.category == Category::Zero && rhs.category == Category::Zero)
+        || (lhs.category == Category::Infinity && rhs.category == Category::Infinity)) {
         return FloatingResult{format.canonical_nan, soft_float_detail::invalid_flag()};
     }
     if (lhs.category == Category::Infinity) {
@@ -639,9 +612,8 @@ FloatingResult floating_divide(
         return FloatingResult{soft_float_detail::signed_zero(format, sign), 0U};
     }
     if (rhs.category == Category::Zero) {
-        return FloatingResult{
-            soft_float_detail::infinity(format, sign),
-            static_cast<std::uint8_t>(FloatingExceptionFlag::DivideByZero)};
+        return FloatingResult{soft_float_detail::infinity(format, sign),
+                              static_cast<std::uint8_t>(FloatingExceptionFlag::DivideByZero)};
     }
     if (lhs.category == Category::Zero) {
         return FloatingResult{soft_float_detail::signed_zero(format, sign), 0U};
@@ -667,18 +639,16 @@ FloatingResult floating_divide(
         rounding);
 }
 
-FloatingResult floating_square_root(
-    FloatingFormat format_name,
-    std::uint64_t operand_bits,
-    FloatingRoundingMode rounding) noexcept {
+FloatingResult floating_square_root(FloatingFormat format_name,
+                                    std::uint64_t operand_bits,
+                                    FloatingRoundingMode rounding) noexcept {
     const auto& format = soft_float_detail::format_of(format_name);
     auto operand = soft_float_detail::unpack(format_name, operand_bits);
     if (soft_float_detail::is_nan(operand.category)) {
-        return FloatingResult{
-            format.canonical_nan,
-            static_cast<std::uint8_t>(
-                operand.category == Category::SignalingNan ?
-                    soft_float_detail::invalid_flag() : 0U)};
+        return FloatingResult{format.canonical_nan,
+                              static_cast<std::uint8_t>(operand.category == Category::SignalingNan
+                                                            ? soft_float_detail::invalid_flag()
+                                                            : 0U)};
     }
     if (operand.category == Category::Zero) {
         return FloatingResult{soft_float_detail::signed_zero(format, operand.sign), 0U};
@@ -698,8 +668,8 @@ FloatingResult floating_square_root(
     const auto source_root_bits = (source_bits + 1U) / 2U;
     const auto shift_pairs = precision > source_root_bits ? precision - source_root_bits : 0U;
     bool remainder = false;
-    auto root = soft_float_detail::square_root_significand(
-        operand.significand, shift_pairs, remainder);
+    auto root =
+        soft_float_detail::square_root_significand(operand.significand, shift_pairs, remainder);
     root.shift_left(1U);
     if (remainder) {
         root.set_bit(0U);
@@ -712,39 +682,37 @@ FloatingResult floating_square_root(
         rounding);
 }
 
-FloatingResult floating_fused_multiply_add(
-    FloatingFormat format_name,
-    std::uint64_t multiplicand_bits,
-    std::uint64_t multiplier_bits,
-    std::uint64_t addend_bits,
-    bool negate_product,
-    bool negate_addend,
-    FloatingRoundingMode rounding) noexcept {
+FloatingResult floating_fused_multiply_add(FloatingFormat format_name,
+                                           std::uint64_t multiplicand_bits,
+                                           std::uint64_t multiplier_bits,
+                                           std::uint64_t addend_bits,
+                                           bool negate_product,
+                                           bool negate_addend,
+                                           FloatingRoundingMode rounding) noexcept {
     const auto& format = soft_float_detail::format_of(format_name);
     auto lhs = soft_float_detail::unpack(format_name, multiplicand_bits);
     auto rhs = soft_float_detail::unpack(format_name, multiplier_bits);
     auto addend = soft_float_detail::unpack(format_name, addend_bits);
     const auto invalid_product =
-        (lhs.category == Category::Infinity && rhs.category == Category::Zero) ||
-        (rhs.category == Category::Infinity && lhs.category == Category::Zero);
+        (lhs.category == Category::Infinity && rhs.category == Category::Zero)
+        || (rhs.category == Category::Infinity && lhs.category == Category::Zero);
     if (invalid_product) {
         return FloatingResult{format.canonical_nan, soft_float_detail::invalid_flag()};
     }
-    if (soft_float_detail::is_nan(lhs.category) || soft_float_detail::is_nan(rhs.category) ||
-        soft_float_detail::is_nan(addend.category)) {
-        const auto signaling = lhs.category == Category::SignalingNan ||
-                               rhs.category == Category::SignalingNan ||
-                               addend.category == Category::SignalingNan;
+    if (soft_float_detail::is_nan(lhs.category) || soft_float_detail::is_nan(rhs.category)
+        || soft_float_detail::is_nan(addend.category)) {
+        const auto signaling = lhs.category == Category::SignalingNan
+                               || rhs.category == Category::SignalingNan
+                               || addend.category == Category::SignalingNan;
         return FloatingResult{
             format.canonical_nan,
-            static_cast<std::uint8_t>(
-                signaling ? soft_float_detail::invalid_flag() : 0U)};
+            static_cast<std::uint8_t>(signaling ? soft_float_detail::invalid_flag() : 0U)};
     }
 
     auto product_sign = (lhs.sign != rhs.sign) != negate_product;
     addend.sign = addend.sign != negate_addend;
-    const auto product_infinite = lhs.category == Category::Infinity ||
-                                  rhs.category == Category::Infinity;
+    const auto product_infinite =
+        lhs.category == Category::Infinity || rhs.category == Category::Infinity;
     if (product_infinite) {
         if (addend.category == Category::Infinity && product_sign != addend.sign) {
             return FloatingResult{format.canonical_nan, soft_float_detail::invalid_flag()};
@@ -757,8 +725,8 @@ FloatingResult floating_fused_multiply_add(
 
     const auto product_zero = lhs.category == Category::Zero || rhs.category == Category::Zero;
     if (product_zero && addend.category == Category::Zero) {
-        const auto sign = product_sign == addend.sign ? product_sign :
-                          rounding == FloatingRoundingMode::Down;
+        const auto sign =
+            product_sign == addend.sign ? product_sign : rounding == FloatingRoundingMode::Down;
         return FloatingResult{soft_float_detail::signed_zero(format, sign), 0U};
     }
     if (product_zero) {
@@ -782,9 +750,7 @@ FloatingResult floating_fused_multiply_add(
         const auto ordering = product.compare(addend_magnitude);
         if (ordering == 0) {
             return FloatingResult{
-                soft_float_detail::signed_zero(
-                    format, rounding == FloatingRoundingMode::Down),
-                0U};
+                soft_float_detail::signed_zero(format, rounding == FloatingRoundingMode::Down), 0U};
         }
         if (ordering > 0) {
             product.subtract(addend_magnitude);
@@ -798,11 +764,10 @@ FloatingResult floating_fused_multiply_add(
         format, result_sign, product, common_exponent, rounding);
 }
 
-std::uint64_t floating_sign_inject(
-    FloatingFormat format_name,
-    std::uint64_t magnitude,
-    std::uint64_t sign_source,
-    std::uint8_t operation) noexcept {
+std::uint64_t floating_sign_inject(FloatingFormat format_name,
+                                   std::uint64_t magnitude,
+                                   std::uint64_t sign_source,
+                                   std::uint8_t operation) noexcept {
     const auto sign_mask = soft_float_detail::format_of(format_name).sign_mask;
     const auto first_sign = magnitude & sign_mask;
     const auto second_sign = sign_source & sign_mask;
@@ -815,20 +780,19 @@ std::uint64_t floating_sign_inject(
     return (magnitude & ~sign_mask) | result_sign;
 }
 
-FloatingResult floating_minimum_maximum(
-    FloatingFormat format_name,
-    std::uint64_t lhs_bits,
-    std::uint64_t rhs_bits,
-    bool maximum) noexcept {
+FloatingResult floating_minimum_maximum(FloatingFormat format_name,
+                                        std::uint64_t lhs_bits,
+                                        std::uint64_t rhs_bits,
+                                        bool maximum) noexcept {
     const auto& format = soft_float_detail::format_of(format_name);
     const auto lhs = soft_float_detail::unpack(format_name, lhs_bits);
     const auto rhs = soft_float_detail::unpack(format_name, rhs_bits);
-    const auto signaling = lhs.category == Category::SignalingNan ||
-                           rhs.category == Category::SignalingNan;
+    const auto signaling =
+        lhs.category == Category::SignalingNan || rhs.category == Category::SignalingNan;
     const auto lhs_nan = soft_float_detail::is_nan(lhs.category);
     const auto rhs_nan = soft_float_detail::is_nan(rhs.category);
-    const auto flags = static_cast<std::uint8_t>(
-        signaling ? soft_float_detail::invalid_flag() : 0U);
+    const auto flags =
+        static_cast<std::uint8_t>(signaling ? soft_float_detail::invalid_flag() : 0U);
     if (lhs_nan && rhs_nan) {
         return FloatingResult{format.canonical_nan, flags};
     }
@@ -839,41 +803,35 @@ FloatingResult floating_minimum_maximum(
         return FloatingResult{lhs_bits, flags};
     }
     const auto less = soft_float_detail::numeric_less(format, lhs_bits, rhs_bits);
-    const auto equal = !less &&
-                       !soft_float_detail::numeric_less(format, rhs_bits, lhs_bits);
+    const auto equal = !less && !soft_float_detail::numeric_less(format, rhs_bits, lhs_bits);
     if (equal) {
-        if ((lhs_bits & ~format.sign_mask) == 0U &&
-            (rhs_bits & ~format.sign_mask) == 0U) {
-            return FloatingResult{
-                maximum ? (lhs_bits & rhs_bits) : (lhs_bits | rhs_bits), 0U};
+        if ((lhs_bits & ~format.sign_mask) == 0U && (rhs_bits & ~format.sign_mask) == 0U) {
+            return FloatingResult{maximum ? (lhs_bits & rhs_bits) : (lhs_bits | rhs_bits), 0U};
         }
         return FloatingResult{lhs_bits, 0U};
     }
-    return FloatingResult{maximum ? (less ? rhs_bits : lhs_bits) :
-                                    (less ? lhs_bits : rhs_bits), 0U};
+    return FloatingResult{maximum ? (less ? rhs_bits : lhs_bits) : (less ? lhs_bits : rhs_bits),
+                          0U};
 }
 
-FloatingComparisonResult floating_compare(
-    FloatingFormat format_name,
-    std::uint64_t lhs_bits,
-    std::uint64_t rhs_bits,
-    FloatingComparison comparison) noexcept {
+FloatingComparisonResult floating_compare(FloatingFormat format_name,
+                                          std::uint64_t lhs_bits,
+                                          std::uint64_t rhs_bits,
+                                          FloatingComparison comparison) noexcept {
     const auto& format = soft_float_detail::format_of(format_name);
     const auto lhs = soft_float_detail::unpack(format_name, lhs_bits);
     const auto rhs = soft_float_detail::unpack(format_name, rhs_bits);
     if (soft_float_detail::is_nan(lhs.category) || soft_float_detail::is_nan(rhs.category)) {
         const auto signaling_comparison = comparison != FloatingComparison::Equal;
-        const auto signaling_nan = lhs.category == Category::SignalingNan ||
-                                   rhs.category == Category::SignalingNan;
+        const auto signaling_nan =
+            lhs.category == Category::SignalingNan || rhs.category == Category::SignalingNan;
         return FloatingComparisonResult{
             false,
             static_cast<std::uint8_t>(
-                (signaling_comparison || signaling_nan) ?
-                    soft_float_detail::invalid_flag() : 0U)};
+                (signaling_comparison || signaling_nan) ? soft_float_detail::invalid_flag() : 0U)};
     }
     const auto less = soft_float_detail::numeric_less(format, lhs_bits, rhs_bits);
-    const auto equal = !less &&
-                       !soft_float_detail::numeric_less(format, rhs_bits, lhs_bits);
+    const auto equal = !less && !soft_float_detail::numeric_less(format, rhs_bits, lhs_bits);
     if (comparison == FloatingComparison::Equal) {
         return FloatingComparisonResult{equal, 0U};
     }
@@ -883,9 +841,7 @@ FloatingComparisonResult floating_compare(
     return FloatingComparisonResult{less || equal, 0U};
 }
 
-std::uint16_t floating_classify(
-    FloatingFormat format_name,
-    std::uint64_t operand_bits) noexcept {
+std::uint16_t floating_classify(FloatingFormat format_name, std::uint64_t operand_bits) noexcept {
     const auto operand = soft_float_detail::unpack(format_name, operand_bits);
     if (operand.category == Category::Infinity) {
         return static_cast<std::uint16_t>(1U << (operand.sign ? 0U : 7U));

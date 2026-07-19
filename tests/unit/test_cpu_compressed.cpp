@@ -19,7 +19,7 @@ namespace {
 constexpr std::uint64_t kRamBase = 0x8000'0000ULL;
 
 class TestContext final {
-public:
+   public:
     void expect(bool condition, const std::string& message) {
         if (!condition) {
             ++failures_;
@@ -27,14 +27,16 @@ public:
         }
     }
 
-    [[nodiscard]] int failures() const noexcept { return failures_; }
+    [[nodiscard]] int failures() const noexcept {
+        return failures_;
+    }
 
-private:
+   private:
     int failures_{0};
 };
 
 class CpuFixture final {
-public:
+   public:
     CpuFixture()
         : ram_(std::make_shared<rvemu::memory::PhysicalMemory>(
               rvemu::bus::PhysicalAddress{kRamBase}, 0x2000U, "compressed-test-ram")),
@@ -46,7 +48,9 @@ public:
         cpu_.state().reset(kRamBase);
     }
 
-    [[nodiscard]] rvemu::core::Cpu& cpu() noexcept { return cpu_; }
+    [[nodiscard]] rvemu::core::Cpu& cpu() noexcept {
+        return cpu_;
+    }
 
     void enable_floating_state() {
         const auto current = cpu_.state().csrs().peek(rvemu::core::CsrAddress::Mstatus);
@@ -63,25 +67,19 @@ public:
         }
     }
 
-    void write(
-        std::uint64_t address,
-        rvemu::bus::AccessWidth width,
-        std::uint64_t value) {
-        const auto result = bus_.write(
-            rvemu::bus::PhysicalAddress{address},
-            width,
-            value,
-            rvemu::bus::AccessType::Initialization);
+    void write(std::uint64_t address, rvemu::bus::AccessWidth width, std::uint64_t value) {
+        const auto result = bus_.write(rvemu::bus::PhysicalAddress{address},
+                                       width,
+                                       value,
+                                       rvemu::bus::AccessType::Initialization);
         if (!result.ok()) {
             throw std::runtime_error("RV64C 测试内存写入失败");
         }
     }
 
-    [[nodiscard]] std::uint64_t read(
-        std::uint64_t address,
-        rvemu::bus::AccessWidth width) {
-        const auto result = bus_.read(
-            rvemu::bus::PhysicalAddress{address}, width, rvemu::bus::AccessType::Load);
+    [[nodiscard]] std::uint64_t read(std::uint64_t address, rvemu::bus::AccessWidth width) {
+        const auto result =
+            bus_.read(rvemu::bus::PhysicalAddress{address}, width, rvemu::bus::AccessType::Load);
         if (!result.ok()) {
             throw std::runtime_error("RV64C 测试内存读取失败");
         }
@@ -94,16 +92,15 @@ public:
         return cpu_.step();
     }
 
-private:
+   private:
     rvemu::bus::Bus bus_{};
     std::shared_ptr<rvemu::memory::PhysicalMemory> ram_;
     rvemu::core::Cpu cpu_;
 };
 
-void expect_retired(
-    TestContext& context,
-    const rvemu::core::StepResult& result,
-    const std::string& name) {
+void expect_retired(TestContext& context,
+                    const rvemu::core::StepResult& result,
+                    const std::string& name) {
     context.expect(result.retired && !result.stalled && !result.trap.has_value(),
                    name + " 必须正常退休");
     context.expect(result.instruction_length == 2U, name + " 必须报告 2 字节长度");
@@ -135,8 +132,7 @@ void test_immediate_and_register_arithmetic(TestContext& context) {
 
     result = fixture.execute(0x6185U);  // C.LUI x3, 1
     expect_retired(context, result, "C.LUI");
-    context.expect(fixture.cpu().state().integer(3U) == 0x1000U,
-                   "C.LUI 必须把立即数放入位 17:12");
+    context.expect(fixture.cpu().state().integer(3U) == 0x1000U, "C.LUI 必须把立即数放入位 17:12");
 
     fixture.cpu().state().set_integer(2U, 0x1000U);
     result = fixture.execute(0x6141U);  // C.ADDI16SP x2, 16
@@ -225,8 +221,7 @@ void test_integer_loads_and_stores(TestContext& context) {
     context.expect(fixture.cpu().state().integer(9U) == 0xFFFF'FFFF'8000'0001ULL,
                    "C.LW 必须符号扩展 32 位结果");
 
-    fixture.write(data + 8U, rvemu::bus::AccessWidth::DoubleWord,
-                  0x0123'4567'89AB'CDEFULL);
+    fixture.write(data + 8U, rvemu::bus::AccessWidth::DoubleWord, 0x0123'4567'89AB'CDEFULL);
     result = fixture.execute(0x6408U);  // C.LD x10, 8(x8)
     expect_retired(context, result, "C.LD");
     context.expect(fixture.cpu().state().integer(10U) == 0x0123'4567'89AB'CDEFULL,
@@ -238,16 +233,15 @@ void test_integer_loads_and_stores(TestContext& context) {
                    "C.SW 必须写入低 32 位");
     result = fixture.execute(0xE408U);  // C.SD x10, 8(x8)
     expect_retired(context, result, "C.SD");
-    context.expect(fixture.read(data + 8U, rvemu::bus::AccessWidth::DoubleWord) ==
-                       0x0123'4567'89AB'CDEFULL,
-                   "C.SD 必须写入完整双字");
+    context.expect(
+        fixture.read(data + 8U, rvemu::bus::AccessWidth::DoubleWord) == 0x0123'4567'89AB'CDEFULL,
+        "C.SD 必须写入完整双字");
 
     fixture.cpu().state().set_integer(2U, data);
     fixture.write(data + 4U, rvemu::bus::AccessWidth::Word, 0x7FFF'FFFEU);
     result = fixture.execute(0x4192U);  // C.LWSP x3, 4(x2)
     expect_retired(context, result, "C.LWSP");
-    context.expect(fixture.cpu().state().integer(3U) == 0x7FFF'FFFEU,
-                   "C.LWSP 必须使用栈指针偏移");
+    context.expect(fixture.cpu().state().integer(3U) == 0x7FFF'FFFEU, "C.LWSP 必须使用栈指针偏移");
     fixture.write(data + 8U, rvemu::bus::AccessWidth::DoubleWord, 0xFEDC'BA98'7654'3210ULL);
     result = fixture.execute(0x61A2U);  // C.LDSP x3, 8(x2)
     expect_retired(context, result, "C.LDSP");
@@ -259,9 +253,9 @@ void test_integer_loads_and_stores(TestContext& context) {
                    "C.SWSP 必须存储寄存器低字");
     result = fixture.execute(0xE40EU);  // C.SDSP x3, 8(x2)
     expect_retired(context, result, "C.SDSP");
-    context.expect(fixture.read(data + 8U, rvemu::bus::AccessWidth::DoubleWord) ==
-                       0xFEDC'BA98'7654'3210ULL,
-                   "C.SDSP 必须存储完整双字");
+    context.expect(
+        fixture.read(data + 8U, rvemu::bus::AccessWidth::DoubleWord) == 0xFEDC'BA98'7654'3210ULL,
+        "C.SDSP 必须存储完整双字");
 }
 
 void test_control_flow(TestContext& context) {
@@ -312,9 +306,9 @@ void test_compressed_double_memory(TestContext& context) {
     const auto data = kRamBase + 0x500U;
     fixture.cpu().state().set_integer(8U, data);
     const auto denied = fixture.execute(0x2000U);  // C.FLD f8, 0(x8)
-    context.expect(!denied.retired && denied.trap.has_value() &&
-                       denied.trap->cause == rvemu::core::ExceptionCause::IllegalInstruction &&
-                       denied.trap->value == 0x2000U && denied.trap->instruction == 0x2000U,
+    context.expect(!denied.retired && denied.trap.has_value()
+                       && denied.trap->cause == rvemu::core::ExceptionCause::IllegalInstruction
+                       && denied.trap->value == 0x2000U && denied.trap->instruction == 0x2000U,
                    "FS=Off 的 C.FLD 必须报告原始 16 位非法指令");
 
     fixture.enable_floating_state();
@@ -326,13 +320,12 @@ void test_compressed_double_memory(TestContext& context) {
     fixture.cpu().state().set_floating(9U, 0xC010'0000'0000'0000ULL);
     result = fixture.execute(0xA004U);  // C.FSD f9, 0(x8)
     expect_retired(context, result, "C.FSD");
-    context.expect(fixture.read(data, rvemu::bus::AccessWidth::DoubleWord) ==
-                       0xC010'0000'0000'0000ULL,
-                   "C.FSD 必须复用双精度存储路径");
+    context.expect(
+        fixture.read(data, rvemu::bus::AccessWidth::DoubleWord) == 0xC010'0000'0000'0000ULL,
+        "C.FSD 必须复用双精度存储路径");
 
     fixture.cpu().state().set_integer(2U, data);
-    fixture.write(data + 8U, rvemu::bus::AccessWidth::DoubleWord,
-                  0x3FF8'0000'0000'0000ULL);
+    fixture.write(data + 8U, rvemu::bus::AccessWidth::DoubleWord, 0x3FF8'0000'0000'0000ULL);
     result = fixture.execute(0x21A2U);  // C.FLDSP f3, 8(x2)
     expect_retired(context, result, "C.FLDSP");
     context.expect(fixture.cpu().state().floating(3U) == 0x3FF8'0000'0000'0000ULL,
@@ -340,9 +333,9 @@ void test_compressed_double_memory(TestContext& context) {
     fixture.cpu().state().set_floating(3U, 0xBFF8'0000'0000'0000ULL);
     result = fixture.execute(0xA40EU);  // C.FSDSP f3, 8(x2)
     expect_retired(context, result, "C.FSDSP");
-    context.expect(fixture.read(data + 8U, rvemu::bus::AccessWidth::DoubleWord) ==
-                       0xBFF8'0000'0000'0000ULL,
-                   "C.FSDSP 必须存储完整双精度位模式");
+    context.expect(
+        fixture.read(data + 8U, rvemu::bus::AccessWidth::DoubleWord) == 0xBFF8'0000'0000'0000ULL,
+        "C.FSDSP 必须存储完整双精度位模式");
 }
 
 void test_hints_illegal_and_mixed_fetch(TestContext& context) {
@@ -370,11 +363,11 @@ void test_hints_illegal_and_mixed_fetch(TestContext& context) {
     };
     for (const auto bits : illegal) {
         const auto result = fixture.execute(bits);
-        context.expect(!result.retired && result.trap.has_value() &&
-                           result.trap->cause == rvemu::core::ExceptionCause::IllegalInstruction,
+        context.expect(!result.retired && result.trap.has_value()
+                           && result.trap->cause == rvemu::core::ExceptionCause::IllegalInstruction,
                        "保留压缩编码必须触发非法指令");
-        context.expect(result.trap.has_value() && result.trap->value == bits &&
-                           result.trap->instruction == bits,
+        context.expect(result.trap.has_value() && result.trap->value == bits
+                           && result.trap->instruction == bits,
                        "压缩非法指令 Trap 必须保存原始 16 位编码");
     }
 
@@ -388,13 +381,13 @@ void test_hints_illegal_and_mixed_fetch(TestContext& context) {
     result = fixture.cpu().step();
     context.expect(result.retired && result.instruction_length == 4U,
                    "半字边界上的 32 位指令必须正常退休并报告四字节");
-    context.expect(fixture.cpu().state().integer(3U) == 10U &&
-                       fixture.cpu().state().program_counter() == kRamBase + 6U,
+    context.expect(fixture.cpu().state().integer(3U) == 10U
+                       && fixture.cpu().state().program_counter() == kRamBase + 6U,
                    "16/32 位混合取指必须保持正确 PC 和执行结果");
 
     result = fixture.execute(0x9002U);  // C.EBREAK
-    context.expect(!result.retired && result.trap.has_value() &&
-                       result.trap->cause == rvemu::core::ExceptionCause::Breakpoint,
+    context.expect(!result.retired && result.trap.has_value()
+                       && result.trap->cause == rvemu::core::ExceptionCause::Breakpoint,
                    "C.EBREAK 必须复用正式 breakpoint Trap");
     context.expect(result.trap.has_value() && result.trap->instruction == 0x9002U,
                    "C.EBREAK 诊断必须保存原始压缩编码");

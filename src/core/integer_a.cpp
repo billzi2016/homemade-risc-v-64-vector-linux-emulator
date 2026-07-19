@@ -16,29 +16,28 @@ template <typename UInt>
 }
 
 template <typename UInt>
-[[nodiscard]] constexpr UInt calculate(
-    AtomicOperation operation,
-    UInt observed,
-    UInt operand) noexcept {
+[[nodiscard]] constexpr UInt calculate(AtomicOperation operation,
+                                       UInt observed,
+                                       UInt operand) noexcept {
     switch (operation) {
-    case AtomicOperation::Swap:
-        return operand;
-    case AtomicOperation::Add:
-        return static_cast<UInt>(observed + operand);
-    case AtomicOperation::Xor:
-        return static_cast<UInt>(observed ^ operand);
-    case AtomicOperation::And:
-        return static_cast<UInt>(observed & operand);
-    case AtomicOperation::Or:
-        return static_cast<UInt>(observed | operand);
-    case AtomicOperation::MinimumSigned:
-        return signed_less(observed, operand) ? observed : operand;
-    case AtomicOperation::MaximumSigned:
-        return signed_less(observed, operand) ? operand : observed;
-    case AtomicOperation::MinimumUnsigned:
-        return observed < operand ? observed : operand;
-    case AtomicOperation::MaximumUnsigned:
-        return observed < operand ? operand : observed;
+        case AtomicOperation::Swap:
+            return operand;
+        case AtomicOperation::Add:
+            return static_cast<UInt>(observed + operand);
+        case AtomicOperation::Xor:
+            return static_cast<UInt>(observed ^ operand);
+        case AtomicOperation::And:
+            return static_cast<UInt>(observed & operand);
+        case AtomicOperation::Or:
+            return static_cast<UInt>(observed | operand);
+        case AtomicOperation::MinimumSigned:
+            return signed_less(observed, operand) ? observed : operand;
+        case AtomicOperation::MaximumSigned:
+            return signed_less(observed, operand) ? operand : observed;
+        case AtomicOperation::MinimumUnsigned:
+            return observed < operand ? observed : operand;
+        case AtomicOperation::MaximumUnsigned:
+            return observed < operand ? operand : observed;
     }
     return observed;
 }
@@ -47,39 +46,36 @@ template <typename UInt>
 
 std::optional<AtomicOperation> decode_atomic_operation(std::uint8_t function5) noexcept {
     switch (function5) {
-    case 0x01U:
-        return AtomicOperation::Swap;
-    case 0x00U:
-        return AtomicOperation::Add;
-    case 0x04U:
-        return AtomicOperation::Xor;
-    case 0x0CU:
-        return AtomicOperation::And;
-    case 0x08U:
-        return AtomicOperation::Or;
-    case 0x10U:
-        return AtomicOperation::MinimumSigned;
-    case 0x14U:
-        return AtomicOperation::MaximumSigned;
-    case 0x18U:
-        return AtomicOperation::MinimumUnsigned;
-    case 0x1CU:
-        return AtomicOperation::MaximumUnsigned;
-    default:
-        return std::nullopt;
+        case 0x01U:
+            return AtomicOperation::Swap;
+        case 0x00U:
+            return AtomicOperation::Add;
+        case 0x04U:
+            return AtomicOperation::Xor;
+        case 0x0CU:
+            return AtomicOperation::And;
+        case 0x08U:
+            return AtomicOperation::Or;
+        case 0x10U:
+            return AtomicOperation::MinimumSigned;
+        case 0x14U:
+            return AtomicOperation::MaximumSigned;
+        case 0x18U:
+            return AtomicOperation::MinimumUnsigned;
+        case 0x1CU:
+            return AtomicOperation::MaximumUnsigned;
+        default:
+            return std::nullopt;
     }
 }
 
-std::uint64_t execute_atomic_operation(
-    AtomicOperation operation,
-    std::uint64_t observed,
-    std::uint64_t operand,
-    bool word_operation) noexcept {
+std::uint64_t execute_atomic_operation(AtomicOperation operation,
+                                       std::uint64_t observed,
+                                       std::uint64_t operand,
+                                       bool word_operation) noexcept {
     if (word_operation) {
         return calculate(
-            operation,
-            static_cast<std::uint32_t>(observed),
-            static_cast<std::uint32_t>(operand));
+            operation, static_cast<std::uint32_t>(observed), static_cast<std::uint32_t>(operand));
     }
     return calculate(operation, observed, operand);
 }

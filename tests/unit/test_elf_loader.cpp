@@ -22,7 +22,7 @@ constexpr std::uint64_t kRamBase = 0x8000'0000ULL;
 constexpr std::size_t kRamSize = 0x1000U;
 
 class TestContext final {
-public:
+   public:
     void expect(bool condition, const std::string& message) {
         if (!condition) {
             ++failures_;
@@ -30,9 +30,11 @@ public:
         }
     }
 
-    [[nodiscard]] int failures() const noexcept { return failures_; }
+    [[nodiscard]] int failures() const noexcept {
+        return failures_;
+    }
 
-private:
+   private:
     int failures_{0};
 };
 
@@ -85,17 +87,16 @@ void put_little_endian(std::vector<std::uint8_t>& bytes, std::size_t offset, Int
     put_little_endian<std::uint32_t>(bytes, 0x200U + 128U + 4U, 3U);
     put_little_endian<std::uint64_t>(bytes, 0x200U + 128U + 24U, 0x1C0U);
     put_little_endian<std::uint64_t>(bytes, 0x200U + 128U + 32U, 8U);
-    const std::string symbol_name = include_tohost ? std::string{"\0tohost\0", 8U}
-                                                   : std::string{"\0absent", 7U};
+    const std::string symbol_name =
+        include_tohost ? std::string{"\0tohost\0", 8U} : std::string{"\0absent", 7U};
     for (std::size_t index = 0U; index < symbol_name.size(); ++index) {
         bytes[0x1C0U + index] = static_cast<std::uint8_t>(symbol_name[index]);
     }
     return bytes;
 }
 
-[[nodiscard]] bool write_file(
-    const std::filesystem::path& path,
-    const std::vector<std::uint8_t>& bytes) {
+[[nodiscard]] bool write_file(const std::filesystem::path& path,
+                              const std::vector<std::uint8_t>& bytes) {
     std::ofstream stream{path, std::ios::binary | std::ios::trunc};
     stream.write(reinterpret_cast<const char*>(bytes.data()),
                  static_cast<std::streamsize>(bytes.size()));
@@ -108,22 +109,20 @@ void test_valid_load(TestContext& context, const std::filesystem::path& path) {
     auto ram = std::make_shared<rvemu::memory::PhysicalMemory>(
         rvemu::bus::PhysicalAddress{kRamBase}, kRamSize);
     context.expect(bus.register_region(ram).ok(), "测试 RAM 应注册成功");
-    const auto range = rvemu::bus::AddressRange::create(
-        rvemu::bus::PhysicalAddress{kRamBase}, kRamSize);
+    const auto range =
+        rvemu::bus::AddressRange::create(rvemu::bus::PhysicalAddress{kRamBase}, kRamSize);
     context.expect(range.has_value(), "测试 RAM 范围应合法");
     if (!range.has_value()) {
         return;
     }
 
     // 预置非零值，证明 p_memsz 尾部由生产装载器显式清零，而不是依赖 RAM 初态。
-    context.expect(
-        bus.write(
-               rvemu::bus::PhysicalAddress{kRamBase + 8U},
-               rvemu::bus::AccessWidth::DoubleWord,
-               0xFFFF'FFFF'FFFF'FFFFULL,
-               rvemu::bus::AccessType::Store)
-            .ok(),
-        "BSS 预置值应写入成功");
+    context.expect(bus.write(rvemu::bus::PhysicalAddress{kRamBase + 8U},
+                             rvemu::bus::AccessWidth::DoubleWord,
+                             0xFFFF'FFFF'FFFF'FFFFULL,
+                             rvemu::bus::AccessType::Store)
+                       .ok(),
+                   "BSS 预置值应写入成功");
     const auto result = rvemu::conformance::load_elf64_riscv(path, bus, *range);
     context.expect(result.ok(), "合法 RV64 ELF 应装载成功");
     if (!result.ok()) {
@@ -131,14 +130,12 @@ void test_valid_load(TestContext& context, const std::filesystem::path& path) {
     }
     context.expect(result.image->entry_point == kRamBase, "应保存 ELF 入口地址");
     context.expect(result.image->tohost_address == kRamBase + 8U, "应解析 tohost 符号");
-    const auto instruction = bus.read(
-        rvemu::bus::PhysicalAddress{kRamBase},
-        rvemu::bus::AccessWidth::Word,
-        rvemu::bus::AccessType::InstructionFetch);
-    const auto bss = bus.read(
-        rvemu::bus::PhysicalAddress{kRamBase + 8U},
-        rvemu::bus::AccessWidth::DoubleWord,
-        rvemu::bus::AccessType::Load);
+    const auto instruction = bus.read(rvemu::bus::PhysicalAddress{kRamBase},
+                                      rvemu::bus::AccessWidth::Word,
+                                      rvemu::bus::AccessType::InstructionFetch);
+    const auto bss = bus.read(rvemu::bus::PhysicalAddress{kRamBase + 8U},
+                              rvemu::bus::AccessWidth::DoubleWord,
+                              rvemu::bus::AccessType::Load);
     context.expect(instruction.ok() && instruction.value == 0x13U, "文件段应按小端序进入 RAM");
     context.expect(bss.ok() && bss.value == 0U, "PT_LOAD 的 BSS 尾部必须清零");
 }
@@ -148,21 +145,19 @@ void test_rejections(TestContext& context, const std::filesystem::path& path) {
     auto ram = std::make_shared<rvemu::memory::PhysicalMemory>(
         rvemu::bus::PhysicalAddress{kRamBase}, kRamSize);
     context.expect(bus.register_region(ram).ok(), "拒绝测试 RAM 应注册成功");
-    const auto range = rvemu::bus::AddressRange::create(
-        rvemu::bus::PhysicalAddress{kRamBase}, kRamSize);
+    const auto range =
+        rvemu::bus::AddressRange::create(rvemu::bus::PhysicalAddress{kRamBase}, kRamSize);
     if (!range.has_value()) {
         context.expect(false, "拒绝测试 RAM 范围应合法");
         return;
     }
 
     context.expect(write_file(path, make_elf(62U, true)), "应写入错误架构 ELF");
-    context.expect(
-        !rvemu::conformance::load_elf64_riscv(path, bus, *range).ok(),
-        "x86-64 ELF 必须被拒绝");
+    context.expect(!rvemu::conformance::load_elf64_riscv(path, bus, *range).ok(),
+                   "x86-64 ELF 必须被拒绝");
     context.expect(write_file(path, make_elf(243U, false)), "应写入缺少 tohost 的 ELF");
-    context.expect(
-        !rvemu::conformance::load_elf64_riscv(path, bus, *range).ok(),
-        "缺少 tohost 的 ELF 必须被拒绝");
+    context.expect(!rvemu::conformance::load_elf64_riscv(path, bus, *range).ok(),
+                   "缺少 tohost 的 ELF 必须被拒绝");
 }
 
 }  // namespace

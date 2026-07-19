@@ -22,19 +22,16 @@ namespace {
     return std::nullopt;
 }
 
-[[nodiscard]] std::uint64_t read_computational_operand(
-    const CpuState& state,
-    FloatingFormat format,
-    std::uint8_t index) {
-    return format == FloatingFormat::Single ? state.floating_single(index) :
-                                              state.floating(index);
+[[nodiscard]] std::uint64_t read_computational_operand(const CpuState& state,
+                                                       FloatingFormat format,
+                                                       std::uint8_t index) {
+    return format == FloatingFormat::Single ? state.floating_single(index) : state.floating(index);
 }
 
-void write_floating_result(
-    CpuState& state,
-    FloatingFormat format,
-    std::uint8_t destination,
-    const FloatingResult& result) {
+void write_floating_result(CpuState& state,
+                           FloatingFormat format,
+                           std::uint8_t destination,
+                           const FloatingResult& result) {
     if (format == FloatingFormat::Single) {
         state.set_floating_single(destination, static_cast<std::uint32_t>(result.bits));
     } else {
@@ -45,10 +42,9 @@ void write_floating_result(
 
 }  // namespace
 
-StepResult Cpu::execute_floating(
-    const InstructionPacket& packet,
-    const DecodedInstruction& instruction,
-    std::uint64_t sequential_pc) {
+StepResult Cpu::execute_floating(const InstructionPacket& packet,
+                                 const DecodedInstruction& instruction,
+                                 std::uint64_t sequential_pc) {
     // FS 门控必须先于地址计算和总线访问，确保 Off 状态不留下访存或状态副作用。
     if (!state_.csrs().floating_state_enabled()) {
         return illegal(packet);
@@ -59,8 +55,8 @@ StepResult Cpu::execute_floating(
         return StepResult::success(packet.length);
     };
     const auto resolve_rounding = [this, &instruction]() {
-        return resolve_floating_rounding_mode(
-            instruction.function3, state_.csrs().floating_rounding_mode());
+        return resolve_floating_rounding_mode(instruction.function3,
+                                              state_.csrs().floating_rounding_mode());
     };
 
     if (instruction.opcode == 0x07U) {  // FLW / FLD
@@ -76,18 +72,14 @@ StepResult Cpu::execute_floating(
             return illegal(packet);
         }
         const auto address = state_.integer(instruction.source1) + immediate_i(packet.bits);
-        const auto loaded = guest_read(
-            packet,
-            address,
-            width,
-            memory::MmuAccessKind::Load,
-            bus::AccessType::Load);
+        const auto loaded =
+            guest_read(packet, address, width, memory::MmuAccessKind::Load, bus::AccessType::Load);
         if (loaded.trap.has_value()) {
             return StepResult::failure(*loaded.trap, packet.length);
         }
         if (format == FloatingFormat::Single) {
-            state_.set_floating_single(
-                instruction.destination, static_cast<std::uint32_t>(loaded.access.value));
+            state_.set_floating_single(instruction.destination,
+                                       static_cast<std::uint32_t>(loaded.access.value));
         } else {
             state_.set_floating(instruction.destination, loaded.access.value);
         }
@@ -106,19 +98,15 @@ StepResult Cpu::execute_floating(
         const auto address = state_.integer(instruction.source1) + immediate_s(packet.bits);
         // FSW 是位模式传输，不执行 NaN-box 合法性检查；这与计算型单精度源不同。
         const auto stored = guest_write(
-            packet,
-            address,
-            width,
-            state_.floating(instruction.source2),
-            bus::AccessType::Store);
+            packet, address, width, state_.floating(instruction.source2), bus::AccessType::Store);
         if (stored.trap.has_value()) {
             return StepResult::failure(*stored.trap, packet.length);
         }
         return retire();
     }
 
-    if (instruction.opcode == 0x43U || instruction.opcode == 0x47U ||
-        instruction.opcode == 0x4BU || instruction.opcode == 0x4FU) {
+    if (instruction.opcode == 0x43U || instruction.opcode == 0x47U || instruction.opcode == 0x4BU
+        || instruction.opcode == 0x4FU) {
         const auto format = decode_format(static_cast<std::uint8_t>((packet.bits >> 25U) & 0x3U));
         const auto rounding = resolve_rounding();
         if (!format.has_value() || !rounding.has_value()) {
@@ -174,9 +162,7 @@ StepResult Cpu::execute_floating(
             return illegal(packet);
         }
         const auto result = floating_square_root(
-            *format,
-            read_computational_operand(state_, *format, instruction.source1),
-            *rounding);
+            *format, read_computational_operand(state_, *format, instruction.source1), *rounding);
         write_floating_result(state_, *format, instruction.destination, result);
         return retire();
     }
@@ -185,11 +171,11 @@ StepResult Cpu::execute_floating(
         if (instruction.function3 > 2U) {
             return illegal(packet);
         }
-        const auto result = floating_sign_inject(
-            *format,
-            read_computational_operand(state_, *format, instruction.source1),
-            read_computational_operand(state_, *format, instruction.source2),
-            instruction.function3);
+        const auto result =
+            floating_sign_inject(*format,
+                                 read_computational_operand(state_, *format, instruction.source1),
+                                 read_computational_operand(state_, *format, instruction.source2),
+                                 instruction.function3);
         write_floating_result(state_, *format, instruction.destination, FloatingResult{result, 0U});
         return retire();
     }
@@ -218,11 +204,11 @@ StepResult Cpu::execute_floating(
         } else {
             return illegal(packet);
         }
-        const auto result = floating_compare(
-            *format,
-            read_computational_operand(state_, *format, instruction.source1),
-            read_computational_operand(state_, *format, instruction.source2),
-            comparison);
+        const auto result =
+            floating_compare(*format,
+                             read_computational_operand(state_, *format, instruction.source1),
+                             read_computational_operand(state_, *format, instruction.source2),
+                             comparison);
         state_.set_integer(instruction.destination, result.value ? 1U : 0U);
         state_.csrs().accrue_floating_exception_flags(result.flags);
         return retire();
@@ -233,15 +219,14 @@ StepResult Cpu::execute_floating(
         if (instruction.source2 > 3U || !rounding.has_value()) {
             return illegal(packet);
         }
-        const auto integer_width = static_cast<std::uint8_t>(
-            instruction.source2 < 2U ? 32U : 64U);
+        const auto integer_width = static_cast<std::uint8_t>(instruction.source2 < 2U ? 32U : 64U);
         const auto unsigned_integer = (instruction.source2 & 1U) != 0U;
-        auto result = floating_to_integer(
-            *format,
-            read_computational_operand(state_, *format, instruction.source1),
-            unsigned_integer,
-            integer_width,
-            *rounding);
+        auto result =
+            floating_to_integer(*format,
+                                read_computational_operand(state_, *format, instruction.source1),
+                                unsigned_integer,
+                                integer_width,
+                                *rounding);
         if (integer_width == 32U) {
             result.value = sign_extend(result.value & 0xFFFF'FFFFULL, 32U);
         }
@@ -255,12 +240,11 @@ StepResult Cpu::execute_floating(
         if (instruction.source2 > 3U || !rounding.has_value()) {
             return illegal(packet);
         }
-        const auto result = floating_from_integer(
-            *format,
-            state_.integer(instruction.source1),
-            (instruction.source2 & 1U) != 0U,
-            instruction.source2 < 2U ? 32U : 64U,
-            *rounding);
+        const auto result = floating_from_integer(*format,
+                                                  state_.integer(instruction.source1),
+                                                  (instruction.source2 & 1U) != 0U,
+                                                  instruction.source2 < 2U ? 32U : 64U,
+                                                  *rounding);
         write_floating_result(state_, *format, instruction.destination, result);
         return retire();
     }
@@ -270,22 +254,21 @@ StepResult Cpu::execute_floating(
             state_.set_integer(
                 instruction.destination,
                 floating_classify(
-                    *format,
-                    read_computational_operand(state_, *format, instruction.source1)));
+                    *format, read_computational_operand(state_, *format, instruction.source1)));
             return retire();
         }
         if (instruction.function3 == 0U) {  // FMV.X.W / FMV.X.D
             const auto raw = state_.floating(instruction.source1);
-            const auto value = *format == FloatingFormat::Single ?
-                sign_extend(raw & 0xFFFF'FFFFULL, 32U) : raw;
+            const auto value =
+                *format == FloatingFormat::Single ? sign_extend(raw & 0xFFFF'FFFFULL, 32U) : raw;
             state_.set_integer(instruction.destination, value);
             return retire();
         }
         return illegal(packet);
     }
 
-    if (format.has_value() && function5 == 0x1EU && instruction.source2 == 0U &&
-        instruction.function3 == 0U) {  // FMV.W.X / FMV.D.X
+    if (format.has_value() && function5 == 0x1EU && instruction.source2 == 0U
+        && instruction.function3 == 0U) {  // FMV.W.X / FMV.D.X
         if (*format == FloatingFormat::Single) {
             state_.set_floating_single(
                 instruction.destination,
@@ -297,21 +280,21 @@ StepResult Cpu::execute_floating(
     }
 
     // FCVT.S.D 与 FCVT.D.S 的 funct7 不按普通 fmt 解释，rs2 固定指定源格式。
-    if ((instruction.function7 == 0x20U && instruction.source2 == 1U) ||
-        (instruction.function7 == 0x21U && instruction.source2 == 0U)) {
+    if ((instruction.function7 == 0x20U && instruction.source2 == 1U)
+        || (instruction.function7 == 0x21U && instruction.source2 == 0U)) {
         const auto rounding = resolve_rounding();
         if (!rounding.has_value()) {
             return illegal(packet);
         }
-        const auto destination = instruction.function7 == 0x20U ?
-            FloatingFormat::Single : FloatingFormat::Double;
-        const auto source = destination == FloatingFormat::Single ?
-            FloatingFormat::Double : FloatingFormat::Single;
-        const auto result = floating_convert_format(
-            destination,
-            source,
-            read_computational_operand(state_, source, instruction.source1),
-            *rounding);
+        const auto destination =
+            instruction.function7 == 0x20U ? FloatingFormat::Single : FloatingFormat::Double;
+        const auto source =
+            destination == FloatingFormat::Single ? FloatingFormat::Double : FloatingFormat::Single;
+        const auto result =
+            floating_convert_format(destination,
+                                    source,
+                                    read_computational_operand(state_, source, instruction.source1),
+                                    *rounding);
         write_floating_result(state_, destination, instruction.destination, result);
         return retire();
     }

@@ -25,10 +25,9 @@ enum class AtomicOperation : std::uint8_t {
     std::uint8_t function5) noexcept;
 
 // 依据 .W/.D 宽度计算待提交的新内存位模式；返回值只在指定宽度内有意义。
-[[nodiscard]] std::uint64_t execute_atomic_operation(
-    AtomicOperation operation,
-    std::uint64_t observed,
-    std::uint64_t operand,
-    bool word_operation) noexcept;
+[[nodiscard]] std::uint64_t execute_atomic_operation(AtomicOperation operation,
+                                                     std::uint64_t observed,
+                                                     std::uint64_t operand,
+                                                     bool word_operation) noexcept;
 
 }  // namespace rvemu::core

@@ -46,10 +46,9 @@ std::uint8_t VectorState::byte_value(std::size_t register_index, std::size_t byt
     return registers_[register_index][byte_index];
 }
 
-void VectorState::set_byte_value(
-    std::size_t register_index,
-    std::size_t byte_index,
-    std::uint8_t value) {
+void VectorState::set_byte_value(std::size_t register_index,
+                                 std::size_t byte_index,
+                                 std::uint8_t value) {
     require_register_index(register_index);
     require_byte_index(byte_index);
     registers_[register_index][byte_index] = value;

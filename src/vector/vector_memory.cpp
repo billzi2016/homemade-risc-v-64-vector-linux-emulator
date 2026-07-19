@@ -8,24 +8,23 @@ namespace {
 
 [[nodiscard]] std::optional<std::uint8_t> decode_element_width(std::uint8_t encoding) noexcept {
     switch (encoding) {
-    case 0U:
-        return 8U;
-    case 5U:
-        return 16U;
-    case 6U:
-        return 32U;
-    case 7U:
-        return 64U;
-    default:
-        return std::nullopt;
+        case 0U:
+            return 8U;
+        case 5U:
+            return 16U;
+        case 6U:
+            return 32U;
+        case 7U:
+            return 64U;
+        default:
+            return std::nullopt;
     }
 }
 
 }  // namespace
 
-std::optional<VectorMemoryOperation> decode_vector_memory_operation(
-    std::uint32_t instruction,
-    bool load) noexcept {
+std::optional<VectorMemoryOperation> decode_vector_memory_operation(std::uint32_t instruction,
+                                                                    bool load) noexcept {
     const auto nf = static_cast<std::uint8_t>((instruction >> 29U) & 0x7U);
     const auto mew = (instruction & (1U << 28U)) != 0U;
     const auto mop = static_cast<std::uint8_t>((instruction >> 26U) & 0x3U);

@@ -16,7 +16,7 @@
 namespace {
 
 class TestContext final {
-public:
+   public:
     // 聚合断言确保一个寄存器组场景中的地址、数据和状态偏差均能一次性报告。
     void expect(bool condition, const std::string& message) {
         if (!condition) {
@@ -25,9 +25,11 @@ public:
         }
     }
 
-    [[nodiscard]] int failures() const noexcept { return failures_; }
+    [[nodiscard]] int failures() const noexcept {
+        return failures_;
+    }
 
-private:
+   private:
     int failures_{0};
 };
 
@@ -56,27 +58,25 @@ void test_integer_lmul_group_mapping(TestContext& context) {
     }
 
     rvemu::vector::VectorState state;
-    context.expect(group->write_element(state, 7U, 0x1122'3344U), "m2 组内最后一个 v2 元素必须可写");
+    context.expect(group->write_element(state, 7U, 0x1122'3344U),
+                   "m2 组内最后一个 v2 元素必须可写");
     context.expect(group->write_element(state, 8U, 0x5566'7788U), "m2 组跨至 v3 的首元素必须可写");
     const auto final_location = group->locate(15U);
-    context.expect(
-        final_location.has_value() && final_location->register_index == 3U &&
-            final_location->byte_offset == 28U,
-        "e32,m2 的元素 15 必须位于 v3 的最后四字节");
-    context.expect(
-        group->read_element(state, 7U).value_or(0U) == 0x1122'3344U &&
-            group->read_element(state, 8U).value_or(0U) == 0x5566'7788U,
-        "跨寄存器元素必须按小端完整往返");
+    context.expect(final_location.has_value() && final_location->register_index == 3U
+                       && final_location->byte_offset == 28U,
+                   "e32,m2 的元素 15 必须位于 v3 的最后四字节");
+    context.expect(group->read_element(state, 7U).value_or(0U) == 0x1122'3344U
+                       && group->read_element(state, 8U).value_or(0U) == 0x5566'7788U,
+                   "跨寄存器元素必须按小端完整往返");
     context.expect(state.byte_value(2U, 28U) == 0x44U, "小端元素最低字节必须位于最低地址");
-    context.expect(!group->write_element(state, 16U, 1U), "超过 VLMAX 的元素写入必须失败且无副作用");
+    context.expect(!group->write_element(state, 16U, 1U),
+                   "超过 VLMAX 的元素写入必须失败且无副作用");
 
-    context.expect(
-        !rvemu::vector::VectorRegisterGroup::create(configuration, 3U).has_value(),
-        "m2 的奇数基寄存器必须因组对齐被拒绝");
+    context.expect(!rvemu::vector::VectorRegisterGroup::create(configuration, 3U).has_value(),
+                   "m2 的奇数基寄存器必须因组对齐被拒绝");
     const auto m8 = rvemu::vector::decode_vector_configuration(0x3U);  // e8,m8
-    context.expect(
-        !rvemu::vector::VectorRegisterGroup::create(m8, 28U).has_value(),
-        "跨越 v31 的 m8 寄存器组必须被拒绝");
+    context.expect(!rvemu::vector::VectorRegisterGroup::create(m8, 28U).has_value(),
+                   "跨越 v31 的 m8 寄存器组必须被拒绝");
 }
 
 // 验证分数 LMUL 只使用基寄存器低部容量，剩余字节既不属于 VLMAX 也不能被元素接口访问。
@@ -89,29 +89,26 @@ void test_fractional_lmul_and_mask_layout(TestContext& context) {
     }
 
     rvemu::vector::VectorState state;
-    context.expect(group->write_element(state, 3U, 0xABCDU), "mf4 有效低 8 字节中的元素 3 必须可写");
+    context.expect(group->write_element(state, 3U, 0xABCDU),
+                   "mf4 有效低 8 字节中的元素 3 必须可写");
     context.expect(state.byte_value(31U, 6U) == 0xCDU, "mf4 元素 3 的低字节必须位于字节 6");
     context.expect(state.byte_value(31U, 7U) == 0xABU, "mf4 元素 3 的高字节必须位于字节 7");
-    context.expect(!group->write_element(state, 4U, 0xFFFFU), "mf4 尾部保留空间不得被当作元素 4 写入");
+    context.expect(!group->write_element(state, 4U, 0xFFFFU),
+                   "mf4 尾部保留空间不得被当作元素 4 写入");
     context.expect(state.byte_value(31U, 8U) == 0U, "分数 LMUL 有效范围外字节必须保持未修改");
 
     state.set_byte_value(0U, 0U, 0x81U);
     state.set_byte_value(0U, 1U, 0x02U);
-    context.expect(
-        rvemu::vector::VectorRegisterGroup::mask_bit(state, 0U).value_or(false),
-        "v0.bit0 必须作为元素 0 掩码位读取");
-    context.expect(
-        rvemu::vector::VectorRegisterGroup::mask_bit(state, 7U).value_or(false),
-        "v0.bit7 必须作为元素 7 掩码位读取");
-    context.expect(
-        rvemu::vector::VectorRegisterGroup::mask_bit(state, 9U).value_or(false),
-        "掩码位必须按字节内低位优先连续映射");
-    context.expect(
-        !rvemu::vector::VectorRegisterGroup::mask_bit(state, 8U).value_or(true),
-        "未置位的掩码元素必须返回 false");
-    context.expect(
-        !rvemu::vector::VectorRegisterGroup::mask_bit(state, 256U).has_value(),
-        "超过 v0 的 VLEN 位掩码索引必须被拒绝");
+    context.expect(rvemu::vector::VectorRegisterGroup::mask_bit(state, 0U).value_or(false),
+                   "v0.bit0 必须作为元素 0 掩码位读取");
+    context.expect(rvemu::vector::VectorRegisterGroup::mask_bit(state, 7U).value_or(false),
+                   "v0.bit7 必须作为元素 7 掩码位读取");
+    context.expect(rvemu::vector::VectorRegisterGroup::mask_bit(state, 9U).value_or(false),
+                   "掩码位必须按字节内低位优先连续映射");
+    context.expect(!rvemu::vector::VectorRegisterGroup::mask_bit(state, 8U).value_or(true),
+                   "未置位的掩码元素必须返回 false");
+    context.expect(!rvemu::vector::VectorRegisterGroup::mask_bit(state, 256U).has_value(),
+                   "超过 v0 的 VLEN 位掩码索引必须被拒绝");
 }
 
 // 验证 CpuState 作为元素写入唯一提交入口会更新 VS，并验证执行器专用 CSR 方法的有限状态语义。
@@ -125,13 +122,12 @@ void test_cpu_commit_and_vector_execution_csrs(TestContext& context) {
     if (!group.has_value()) {
         throw std::runtime_error("e64,m1 测试组创建失败");
     }
-    context.expect(state.set_vector_element(*group, 3U, 0x0123'4567'89AB'CDEFULL), "CpuState 元素写入必须成功");
-    context.expect(
-        state.vector_element(*group, 3U).value_or(0U) == 0x0123'4567'89AB'CDEFULL,
-        "CpuState 元素读写必须保持完整 64 位位模式");
-    context.expect(
-        ((state.csrs().peek(rvemu::core::CsrAddress::Mstatus) >> 9U) & 0x3U) == 0x3U,
-        "受控元素写入必须把 VS 标记为 Dirty");
+    context.expect(state.set_vector_element(*group, 3U, 0x0123'4567'89AB'CDEFULL),
+                   "CpuState 元素写入必须成功");
+    context.expect(state.vector_element(*group, 3U).value_or(0U) == 0x0123'4567'89AB'CDEFULL,
+                   "CpuState 元素读写必须保持完整 64 位位模式");
+    context.expect(((state.csrs().peek(rvemu::core::CsrAddress::Mstatus) >> 9U) & 0x3U) == 0x3U,
+                   "受控元素写入必须把 VS 标记为 Dirty");
 
     const auto write_vstart = state.csrs().access(rvemu::core::CsrAccessRequest{
         rvemu::core::CsrAddress::Vstart,

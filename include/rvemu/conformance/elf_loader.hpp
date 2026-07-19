@@ -25,7 +25,9 @@ struct ElfLoadResult final {
     std::optional<LoadedElf> image{};
     std::string error{};
 
-    [[nodiscard]] bool ok() const noexcept { return image.has_value(); }
+    [[nodiscard]] bool ok() const noexcept {
+        return image.has_value();
+    }
 
     [[nodiscard]] static ElfLoadResult success(LoadedElf loaded) {
         return ElfLoadResult{loaded, {}};
@@ -38,9 +40,8 @@ struct ElfLoadResult final {
 
 // 读取真实宿主文件、校验 ELF64/小端/RISC-V 元数据，并经唯一物理总线装载全部 PT_LOAD 段。
 // allowed_memory 是测试平台明确授权的 RAM 范围，任何越界段都会在产生部分写入前被拒绝。
-[[nodiscard]] ElfLoadResult load_elf64_riscv(
-    const std::filesystem::path& path,
-    bus::Bus& bus,
-    const bus::AddressRange& allowed_memory);
+[[nodiscard]] ElfLoadResult load_elf64_riscv(const std::filesystem::path& path,
+                                             bus::Bus& bus,
+                                             const bus::AddressRange& allowed_memory);
 
 }  // namespace rvemu::conformance

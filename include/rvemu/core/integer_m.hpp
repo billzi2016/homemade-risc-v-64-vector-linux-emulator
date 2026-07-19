@@ -10,10 +10,9 @@ namespace rvemu::core {
 
 // 根据 M 扩展 funct3 计算 RV64 或 RV64W 结果。
 // 返回空表示该 funct3 在指定宽度中保留；除零和有符号溢出是合法结果而不是异常。
-[[nodiscard]] std::optional<std::uint64_t> execute_integer_m(
-    std::uint8_t function3,
-    std::uint64_t lhs,
-    std::uint64_t rhs,
-    bool word_operation) noexcept;
+[[nodiscard]] std::optional<std::uint64_t> execute_integer_m(std::uint8_t function3,
+                                                             std::uint64_t lhs,
+                                                             std::uint64_t rhs,
+                                                             bool word_operation) noexcept;
 
 }  // namespace rvemu::core

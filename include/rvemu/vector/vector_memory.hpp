@@ -25,9 +25,9 @@ struct VectorMemoryOperation final {
     std::uint8_t stride_register{0U};
 };
 
-// 仅接受本阶段声明的普通非分段 unit-stride/strided 编码；保留、索引、mask/whole-register 和 fault-only-first 形式返回空。
+// 仅接受本阶段声明的普通非分段 unit-stride/strided 编码；保留、索引、mask/whole-register 和
+// fault-only-first 形式返回空。
 [[nodiscard]] std::optional<VectorMemoryOperation> decode_vector_memory_operation(
-    std::uint32_t instruction,
-    bool load) noexcept;
+    std::uint32_t instruction, bool load) noexcept;
 
 }  // namespace rvemu::vector

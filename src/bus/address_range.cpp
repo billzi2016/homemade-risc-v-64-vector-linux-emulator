@@ -7,9 +7,8 @@
 
 namespace rvemu::bus {
 
-std::optional<AddressRange> AddressRange::create(
-    PhysicalAddress base,
-    std::uint64_t size) noexcept {
+std::optional<AddressRange> AddressRange::create(PhysicalAddress base,
+                                                 std::uint64_t size) noexcept {
     if (size == 0U) {
         return std::nullopt;
     }

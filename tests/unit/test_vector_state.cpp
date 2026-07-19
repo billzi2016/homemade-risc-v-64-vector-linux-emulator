@@ -17,7 +17,7 @@ constexpr std::uint64_t bit(std::uint8_t index) noexcept {
 }
 
 class TestContext final {
-public:
+   public:
     // 累计独立断言失败，保证同一次 RVV 状态转换中的多个偏差不会被首个失败掩盖。
     void expect(bool condition, const std::string& message) {
         if (!condition) {
@@ -26,18 +26,19 @@ public:
         }
     }
 
-    [[nodiscard]] int failures() const noexcept { return failures_; }
+    [[nodiscard]] int failures() const noexcept {
+        return failures_;
+    }
 
-private:
+   private:
     int failures_{0};
 };
 
 // 测试准备同样经过生产 CSR 权限与 WARL 入口，避免私有字段注入制造不存在的状态。
-void write_csr(
-    rvemu::core::CsrFile& csrs,
-    rvemu::core::CsrAddress address,
-    std::uint64_t value,
-    rvemu::core::PrivilegeMode privilege = rvemu::core::PrivilegeMode::Machine) {
+void write_csr(rvemu::core::CsrFile& csrs,
+               rvemu::core::CsrAddress address,
+               std::uint64_t value,
+               rvemu::core::PrivilegeMode privilege = rvemu::core::PrivilegeMode::Machine) {
     const auto result = csrs.access(rvemu::core::CsrAccessRequest{
         address,
         privilege,
@@ -83,14 +84,14 @@ void test_vector_register_file(TestContext& context) {
     expected.back() = 0x5AU;
     state.set_vector(31U, expected);
     context.expect(state.vector(31U) == expected, "v31 必须保存完整 256 位字节模式");
-    context.expect(
-        ((state.csrs().peek(rvemu::core::CsrAddress::Mstatus) >> 9U) & 0x3U) == 0U,
-        "VS=Off 时内部状态准备不得偷偷启用或标记来宾向量上下文");
+    context.expect(((state.csrs().peek(rvemu::core::CsrAddress::Mstatus) >> 9U) & 0x3U) == 0U,
+                   "VS=Off 时内部状态准备不得偷偷启用或标记来宾向量上下文");
 
     write_csr(state.csrs(), rvemu::core::CsrAddress::Mstatus, bit(9U));
     state.set_vector(0U, expected);
     const auto mstatus = state.csrs().peek(rvemu::core::CsrAddress::Mstatus);
-    context.expect(((mstatus >> 9U) & 0x3U) == 0x3U, "已启用向量上下文的寄存器写入必须标记 VS Dirty");
+    context.expect(((mstatus >> 9U) & 0x3U) == 0x3U,
+                   "已启用向量上下文的寄存器写入必须标记 VS Dirty");
     context.expect((mstatus & bit(63U)) != 0U, "VS Dirty 必须派生 mstatus.SD");
 
     bool read_out_of_range = false;
@@ -106,13 +107,16 @@ void test_vector_register_file(TestContext& context) {
 void test_vector_csrs_and_vs_gate(TestContext& context) {
     rvemu::core::CsrFile csrs;
     context.expect(csrs.peek(rvemu::core::CsrAddress::Vl) == 0U, "复位 vl 必须为零");
-    context.expect(csrs.peek(rvemu::core::CsrAddress::Vtype) == bit(63U), "复位 vtype 必须仅置 vill");
+    context.expect(csrs.peek(rvemu::core::CsrAddress::Vtype) == bit(63U),
+                   "复位 vtype 必须仅置 vill");
     context.expect(csrs.peek(rvemu::core::CsrAddress::Vstart) == 0U, "复位 vstart 必须为零");
     context.expect(csrs.peek(rvemu::core::CsrAddress::Vcsr) == 0U, "复位 vcsr 必须为零");
     context.expect(csrs.peek(rvemu::core::CsrAddress::Vlenb) == 32U, "vlenb 必须恒为 32 字节");
 
-    context.expect(!read_csr(csrs, rvemu::core::CsrAddress::Vlenb).success, "VS=Off 时读取 vlenb 必须被拒绝");
-    context.expect(!read_csr(csrs, rvemu::core::CsrAddress::Vstart).success, "VS=Off 时读取 vstart 必须被拒绝");
+    context.expect(!read_csr(csrs, rvemu::core::CsrAddress::Vlenb).success,
+                   "VS=Off 时读取 vlenb 必须被拒绝");
+    context.expect(!read_csr(csrs, rvemu::core::CsrAddress::Vstart).success,
+                   "VS=Off 时读取 vstart 必须被拒绝");
 
     write_csr(csrs, rvemu::core::CsrAddress::Mstatus, bit(9U));
     context.expect(csrs.vector_state_enabled(), "VS=Initial 必须允许向量上下文访问");
@@ -120,16 +124,22 @@ void test_vector_csrs_and_vs_gate(TestContext& context) {
     context.expect(vlenb.success && vlenb.value == 32U, "VS 启用后读取 vlenb 必须返回 32");
 
     write_csr(csrs, rvemu::core::CsrAddress::Vstart, 17U);
-    context.expect(read_csr(csrs, rvemu::core::CsrAddress::Vstart).value == 17U, "vstart 必须保存重启元素索引");
-    context.expect(((csrs.peek(rvemu::core::CsrAddress::Mstatus) >> 9U) & 0x3U) == 0x3U, "写 vstart 必须标记 VS Dirty");
+    context.expect(read_csr(csrs, rvemu::core::CsrAddress::Vstart).value == 17U,
+                   "vstart 必须保存重启元素索引");
+    context.expect(((csrs.peek(rvemu::core::CsrAddress::Mstatus) >> 9U) & 0x3U) == 0x3U,
+                   "写 vstart 必须标记 VS Dirty");
 
     write_csr(csrs, rvemu::core::CsrAddress::Vcsr, 0x5U);
-    context.expect(read_csr(csrs, rvemu::core::CsrAddress::Vxsat).value == 1U, "vcsr.bit0 必须别名到 vxsat");
-    context.expect(read_csr(csrs, rvemu::core::CsrAddress::Vxrm).value == 2U, "vcsr.bit2:1 必须别名到 vxrm");
+    context.expect(read_csr(csrs, rvemu::core::CsrAddress::Vxsat).value == 1U,
+                   "vcsr.bit0 必须别名到 vxsat");
+    context.expect(read_csr(csrs, rvemu::core::CsrAddress::Vxrm).value == 2U,
+                   "vcsr.bit2:1 必须别名到 vxrm");
     write_csr(csrs, rvemu::core::CsrAddress::Vxrm, 3U);
-    context.expect(read_csr(csrs, rvemu::core::CsrAddress::Vcsr).value == 0x7U, "写 vxrm 必须更新 vcsr 别名视图");
+    context.expect(read_csr(csrs, rvemu::core::CsrAddress::Vcsr).value == 0x7U,
+                   "写 vxrm 必须更新 vcsr 别名视图");
     write_csr(csrs, rvemu::core::CsrAddress::Vxsat, 0U);
-    context.expect(read_csr(csrs, rvemu::core::CsrAddress::Vcsr).value == 0x6U, "写 vxsat 必须更新 vcsr 别名视图");
+    context.expect(read_csr(csrs, rvemu::core::CsrAddress::Vcsr).value == 0x6U,
+                   "写 vxsat 必须更新 vcsr 别名视图");
 
     for (const auto address : {rvemu::core::CsrAddress::Vl,
                                rvemu::core::CsrAddress::Vtype,

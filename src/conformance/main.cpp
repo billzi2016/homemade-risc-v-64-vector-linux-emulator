@@ -57,8 +57,7 @@ struct Options final {
 }
 
 void print_usage(const char* executable) {
-    std::cerr << "用法：" << executable
-              << " <test.elf> [--max-instructions <正整数>]\n";
+    std::cerr << "用法：" << executable << " <test.elf> [--max-instructions <正整数>]\n";
 }
 
 }  // namespace
@@ -78,15 +77,14 @@ int main(int argc, char** argv) {
         std::cerr << "无法注册 ACT4 RAM：" << registration.error.detail << '\n';
         return 2;
     }
-    const auto ram_range = rvemu::bus::AddressRange::create(
-        rvemu::bus::PhysicalAddress{kRamBase}, kRamSize);
+    const auto ram_range =
+        rvemu::bus::AddressRange::create(rvemu::bus::PhysicalAddress{kRamBase}, kRamSize);
     if (!ram_range.has_value()) {
         std::cerr << "内部错误：ACT4 RAM 范围无效\n";
         return 2;
     }
 
-    const auto loaded = rvemu::conformance::load_elf64_riscv(
-        options.elf, bus, *ram_range);
+    const auto loaded = rvemu::conformance::load_elf64_riscv(options.elf, bus, *ram_range);
     if (!loaded.ok()) {
         std::cerr << "ELF 装载失败：" << loaded.error << '\n';
         return 2;
@@ -103,23 +101,20 @@ int main(int argc, char** argv) {
             ++delivered_traps;
         }
 
-        const auto status = bus.read(
-            rvemu::bus::PhysicalAddress{loaded.image->tohost_address},
-            rvemu::bus::AccessWidth::DoubleWord,
-            rvemu::bus::AccessType::Load);
+        const auto status = bus.read(rvemu::bus::PhysicalAddress{loaded.image->tohost_address},
+                                     rvemu::bus::AccessWidth::DoubleWord,
+                                     rvemu::bus::AccessType::Load);
         if (!status.ok()) {
             std::cerr << "读取 tohost 失败：" << status.error.detail << '\n';
             return 2;
         }
         if (status.value == 1U) {
-            std::cout << "RVCP-SUMMARY: TEST PASSED - ELF \""
-                      << options.elf.string() << "\"\n";
+            std::cout << "RVCP-SUMMARY: TEST PASSED - ELF \"" << options.elf.string() << "\"\n";
             return 0;
         }
         if (status.value == 3U) {
-            std::cerr << "RVCP-SUMMARY: TEST FAILED - ELF \""
-                      << options.elf.string() << "\"，PC=0x" << std::hex
-                      << cpu.state().program_counter() << std::dec
+            std::cerr << "RVCP-SUMMARY: TEST FAILED - ELF \"" << options.elf.string() << "\"，PC=0x"
+                      << std::hex << cpu.state().program_counter() << std::dec
                       << "，已送达 Trap=" << delivered_traps << '\n';
             return 1;
         }
@@ -129,11 +124,11 @@ int main(int argc, char** argv) {
         if ((status.value >> 32U) == kHtifConsoleCommand) {
             std::cout.put(static_cast<char>(status.value & 0xFFU));
             std::cout.flush();
-            const auto cleared = bus.write(
-                rvemu::bus::PhysicalAddress{loaded.image->tohost_address},
-                rvemu::bus::AccessWidth::DoubleWord,
-                0U,
-                rvemu::bus::AccessType::Initialization);
+            const auto cleared =
+                bus.write(rvemu::bus::PhysicalAddress{loaded.image->tohost_address},
+                          rvemu::bus::AccessWidth::DoubleWord,
+                          0U,
+                          rvemu::bus::AccessType::Initialization);
             if (!cleared.ok()) {
                 std::cerr << "清除 HTIF 控制字失败：" << cleared.error.detail << '\n';
                 return 2;
@@ -143,7 +138,7 @@ int main(int argc, char** argv) {
 
     std::cerr << "RVCP-SUMMARY: TEST TIMEOUT - ELF \"" << options.elf.string()
               << "\"，指令上限=" << options.instruction_limit << "，PC=0x" << std::hex
-              << cpu.state().program_counter() << std::dec
-              << "，已送达 Trap=" << delivered_traps << '\n';
+              << cpu.state().program_counter() << std::dec << "，已送达 Trap=" << delivered_traps
+              << '\n';
     return 2;
 }

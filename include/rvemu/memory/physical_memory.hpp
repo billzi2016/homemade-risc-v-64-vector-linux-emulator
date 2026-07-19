@@ -14,34 +14,26 @@
 namespace rvemu::memory {
 
 class PhysicalMemory final : public bus::AddressRegion {
-public:
-    PhysicalMemory(
-        bus::PhysicalAddress base,
-        std::size_t size,
-        std::string name = "ram");
+   public:
+    PhysicalMemory(bus::PhysicalAddress base, std::size_t size, std::string name = "ram");
 
-    [[nodiscard]] bus::AccessResult read(
-        std::uint64_t offset,
-        bus::AccessWidth width,
-        bus::AccessType type) override;
+    [[nodiscard]] bus::AccessResult read(std::uint64_t offset,
+                                         bus::AccessWidth width,
+                                         bus::AccessType type) override;
 
-    [[nodiscard]] bus::AccessResult write(
-        std::uint64_t offset,
-        bus::AccessWidth width,
-        std::uint64_t value,
-        bus::AccessType type) override;
+    [[nodiscard]] bus::AccessResult write(std::uint64_t offset,
+                                          bus::AccessWidth width,
+                                          std::uint64_t value,
+                                          bus::AccessType type) override;
 
-    [[nodiscard]] bus::AccessResult compare_exchange(
-        std::uint64_t offset,
-        bus::AccessWidth width,
-        std::uint64_t expected,
-        std::uint64_t desired,
-        bus::AccessType type) override;
+    [[nodiscard]] bus::AccessResult compare_exchange(std::uint64_t offset,
+                                                     bus::AccessWidth width,
+                                                     std::uint64_t expected,
+                                                     std::uint64_t desired,
+                                                     bus::AccessType type) override;
 
-private:
-    [[nodiscard]] bus::AccessResult validate(
-        std::uint64_t offset,
-        bus::AccessWidth width) const;
+   private:
+    [[nodiscard]] bus::AccessResult validate(std::uint64_t offset, bus::AccessWidth width) const;
     [[nodiscard]] std::uint64_t read_unlocked(std::uint64_t offset, bus::AccessWidth width) const;
     void write_unlocked(std::uint64_t offset, bus::AccessWidth width, std::uint64_t value);
 

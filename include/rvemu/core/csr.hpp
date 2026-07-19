@@ -89,8 +89,10 @@ struct PendingInterrupt final {
 };
 
 class CsrFile final {
-public:
-    CsrFile() noexcept { reset(); }
+   public:
+    CsrFile() noexcept {
+        reset();
+    }
 
     // 将所有 CSR 恢复为单 Hart 上电状态；实现能力、XLEN 和只读 ID 由读取逻辑派生。
     void reset() noexcept;
@@ -125,18 +127,24 @@ public:
     void clear_vector_start_after_instruction() noexcept;
     // vxsat 是黏滞标志：只有实际饱和时才能置一，清零必须使用来宾 CSR 写入语义。
     void accrue_vector_saturation(bool saturated) noexcept;
-    // 仅由 CPU 已完成编码、权限和完整 vtype 校验的 vset* 路径调用，原子提交 vl/vtype 并标记 VS Dirty。
-    // 来宾通用 CSR 指令不能到达该入口；非法配置也必须已归一为 vill=1、vl=0 后才可提交。
+    // 仅由 CPU 已完成编码、权限和完整 vtype 校验的 vset* 路径调用，原子提交 vl/vtype 并标记 VS
+    // Dirty。 来宾通用 CSR 指令不能到达该入口；非法配置也必须已归一为 vill=1、vl=0 后才可提交。
     void commit_vector_configuration(std::uint64_t vtype, std::uint64_t vl) noexcept;
 
     // 将 CLINT/PLIC 等真实设备的电平状态投影到唯一 mip 底层值；清除不会影响其他中断源。
     void set_interrupt_pending(InterruptCause cause, bool pending) noexcept;
     // time 由未来 CLINT 的真实计时源更新；CSR 文件自身不创建第二套宿主时间逻辑。
-    void set_time(std::uint64_t value) noexcept { time_ = value; }
+    void set_time(std::uint64_t value) noexcept {
+        time_ = value;
+    }
     // CPU 每完成一次解释器硬件步进调用一次；64 位无符号溢出按架构位模式自然回绕。
-    void increment_cycle() noexcept { ++cycle_; }
+    void increment_cycle() noexcept {
+        ++cycle_;
+    }
     // 只对真正退休的指令调用；异常或 WFI 停顿不得增加 instret。
-    void increment_instret() noexcept { ++instret_; }
+    void increment_instret() noexcept {
+        ++instret_;
+    }
     // 判断 WFI 是否应被局部 enable+pending 唤醒；此判断刻意不考虑全局 xIE 与委托。
     [[nodiscard]] bool has_locally_enabled_interrupt() const noexcept;
     // 按规范固定优先级选择当前模式真正可接收的一个中断，同时返回其唯一目标特权级。
@@ -144,45 +152,40 @@ public:
         PrivilegeMode current_privilege) const noexcept;
 
     // 记录 M-mode Trap 的 epc/cause/tval，并把 MIE/来源模式压入 MPIE/MPP。
-    void enter_machine_trap(
-        PrivilegeMode previous_privilege,
-        std::uint64_t program_counter,
-        std::uint64_t cause,
-        std::uint64_t trap_value) noexcept;
+    void enter_machine_trap(PrivilegeMode previous_privilege,
+                            std::uint64_t program_counter,
+                            std::uint64_t cause,
+                            std::uint64_t trap_value) noexcept;
     // 记录 S-mode Trap 的对应状态；不得触碰同名机器级 Trap CSR。
-    void enter_supervisor_trap(
-        PrivilegeMode previous_privilege,
-        std::uint64_t program_counter,
-        std::uint64_t cause,
-        std::uint64_t trap_value) noexcept;
+    void enter_supervisor_trap(PrivilegeMode previous_privilege,
+                               std::uint64_t program_counter,
+                               std::uint64_t cause,
+                               std::uint64_t trap_value) noexcept;
 
     // 弹出 M-mode 中断/特权栈并返回 CPU 应恢复的模式和 mepc；同时执行 MPRV 清理规则。
     [[nodiscard]] TrapReturnState return_from_machine() noexcept;
     // 弹出 S-mode 中断/特权栈并返回 CPU 应恢复的模式和 sepc。
     [[nodiscard]] TrapReturnState return_from_supervisor() noexcept;
     // 根据 Direct/Vectored 模式计算入口；同步异常始终使用 BASE，只有中断增加 4*cause。
-    [[nodiscard]] std::uint64_t trap_vector(
-        PrivilegeMode target,
-        bool interrupt,
-        std::uint64_t cause) const noexcept;
+    [[nodiscard]] std::uint64_t trap_vector(PrivilegeMode target,
+                                            bool interrupt,
+                                            std::uint64_t cause) const noexcept;
 
     // 判断同步异常是否从 S/U 水平委托到 S；M-mode 来源永远不能向下降权。
-    [[nodiscard]] bool exception_delegated(
-        PrivilegeMode source,
-        ExceptionCause cause) const noexcept;
+    [[nodiscard]] bool exception_delegated(PrivilegeMode source,
+                                           ExceptionCause cause) const noexcept;
     // 检查 SRET 的最低特权要求以及 S-mode 下 TSR 拦截；M-mode 不受 TSR 限制。
     [[nodiscard]] bool supervisor_return_allowed(PrivilegeMode current) const noexcept;
     // 本实现不开放 U-mode WFI；S-mode 还必须通过 TW 检查。
     [[nodiscard]] bool wait_for_interrupt_allowed(PrivilegeMode current) const noexcept;
 
-private:
+   private:
     // 仅承认本项目明确实现的 CSR 地址，防止保留地址意外形成可读写存储槽。
     [[nodiscard]] bool exists(CsrAddress address) const noexcept;
     // 集中实施地址编码权限、只读属性、counteren 链和 TVM，调用者不得复制这些判断。
-    [[nodiscard]] bool access_allowed(
-        CsrAddress address,
-        PrivilegeMode privilege,
-        bool write) const noexcept;
+    [[nodiscard]] bool access_allowed(CsrAddress address,
+                                      PrivilegeMode privilege,
+                                      bool write) const noexcept;
     // 生成架构可见值，包括 sstatus/sie/sip 别名、固定 misa 和派生 SD 位。
     [[nodiscard]] std::uint64_t read_value(CsrAddress address) const noexcept;
     // 应用 CSR 专属 WARL/写掩码；调用前必须已由 access_allowed 完成访问合法性检查。

@@ -17,7 +17,7 @@
 namespace rvemu::core {
 
 class CpuState final {
-public:
+   public:
     static constexpr std::size_t kRegisterCount = 32U;
     static constexpr std::size_t kVectorRegisterBytes = vector::VectorState::kRegisterBytes;
     using VectorRegister = vector::VectorState::Register;
@@ -42,27 +42,41 @@ public:
     void set_vector(std::size_t index, const VectorRegister& value);
     // 以下元素入口只接受已经完成寄存器组验证的布局对象；失败不改变状态，成功写入统一标记 VS Dirty。
     [[nodiscard]] std::optional<std::uint64_t> vector_element(
-        const vector::VectorRegisterGroup& group,
-        std::uint64_t element_index) const;
-    [[nodiscard]] bool set_vector_element(
-        const vector::VectorRegisterGroup& group,
-        std::uint64_t element_index,
-        std::uint64_t value);
+        const vector::VectorRegisterGroup& group, std::uint64_t element_index) const;
+    [[nodiscard]] bool set_vector_element(const vector::VectorRegisterGroup& group,
+                                          std::uint64_t element_index,
+                                          std::uint64_t value);
     // 掩码总是从 v0 的位布局读取，不与当前 SEW/LMUL 或普通向量寄存器编号混淆。
     [[nodiscard]] std::optional<bool> vector_mask_bit(std::uint64_t element_index) const noexcept;
 
     // 以下简单访问器共同暴露本 Hart 的唯一 PC、特权级、CSR 和 WFI 状态，不维护影子副本。
-    [[nodiscard]] std::uint64_t program_counter() const noexcept { return program_counter_; }
-    void set_program_counter(std::uint64_t value) noexcept { program_counter_ = value; }
+    [[nodiscard]] std::uint64_t program_counter() const noexcept {
+        return program_counter_;
+    }
+    void set_program_counter(std::uint64_t value) noexcept {
+        program_counter_ = value;
+    }
 
-    [[nodiscard]] PrivilegeMode privilege() const noexcept { return privilege_; }
-    void set_privilege(PrivilegeMode value) noexcept { privilege_ = value; }
+    [[nodiscard]] PrivilegeMode privilege() const noexcept {
+        return privilege_;
+    }
+    void set_privilege(PrivilegeMode value) noexcept {
+        privilege_ = value;
+    }
 
-    [[nodiscard]] CsrFile& csrs() noexcept { return csrs_; }
-    [[nodiscard]] const CsrFile& csrs() const noexcept { return csrs_; }
+    [[nodiscard]] CsrFile& csrs() noexcept {
+        return csrs_;
+    }
+    [[nodiscard]] const CsrFile& csrs() const noexcept {
+        return csrs_;
+    }
 
-    [[nodiscard]] bool waiting_for_interrupt() const noexcept { return waiting_for_interrupt_; }
-    void set_waiting_for_interrupt(bool value) noexcept { waiting_for_interrupt_ = value; }
+    [[nodiscard]] bool waiting_for_interrupt() const noexcept {
+        return waiting_for_interrupt_;
+    }
+    void set_waiting_for_interrupt(bool value) noexcept {
+        waiting_for_interrupt_ = value;
+    }
 
     // LR/SC token 是本 Hart 的不可见执行状态；复位清除，具体地址与失效判定仍由总线负责。
     [[nodiscard]] bus::ReservationToken reservation_token() const noexcept {
@@ -71,9 +85,11 @@ public:
     void set_reservation_token(bus::ReservationToken token) noexcept {
         reservation_token_ = token;
     }
-    void clear_reservation_token() noexcept { reservation_token_ = bus::ReservationToken{}; }
+    void clear_reservation_token() noexcept {
+        reservation_token_ = bus::ReservationToken{};
+    }
 
-private:
+   private:
     std::array<std::uint64_t, kRegisterCount> integer_registers_{};
     std::array<std::uint64_t, kRegisterCount> floating_registers_{};
     vector::VectorState vector_state_{};

@@ -30,8 +30,7 @@ inline constexpr std::uint64_t kCanonicalDoubleNan = 0x7FF8'0000'0000'0000ULL;
 
 // 解析指令 rm。0..4 直接选择模式，7 使用 frm；任何保留编码都返回空。
 [[nodiscard]] std::optional<FloatingRoundingMode> resolve_floating_rounding_mode(
-    std::uint8_t instruction_rounding_mode,
-    std::uint8_t dynamic_rounding_mode) noexcept;
+    std::uint8_t instruction_rounding_mode, std::uint8_t dynamic_rounding_mode) noexcept;
 
 // fflags 只承认低五位；调用方可安全传入宿主或软件浮点后端产生的更宽标志集合。
 [[nodiscard]] constexpr std::uint8_t normalize_floating_exception_flags(
@@ -46,8 +45,7 @@ inline constexpr std::uint64_t kCanonicalDoubleNan = 0x7FF8'0000'0000'0000ULL;
 
 // 非法 NaN box 作为 canonical quiet NaN 输入；合法 box 原样返回低 32 位。
 [[nodiscard]] constexpr std::uint32_t unbox_single_precision(std::uint64_t bits) noexcept {
-    return (bits >> 32U) == 0xFFFF'FFFFULL ? static_cast<std::uint32_t>(bits) :
-                                            kCanonicalSingleNan;
+    return (bits >> 32U) == 0xFFFF'FFFFULL ? static_cast<std::uint32_t>(bits) : kCanonicalSingleNan;
 }
 
 }  // namespace rvemu::core

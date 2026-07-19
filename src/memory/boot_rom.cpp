@@ -20,45 +20,42 @@ namespace {
     return *range;
 }
 
-[[nodiscard]] bus::AccessResult read_only_failure(
-    const bus::AddressRegion& region,
-    std::uint64_t offset,
-    std::uint64_t length,
-    std::string detail) {
+[[nodiscard]] bus::AccessResult read_only_failure(const bus::AddressRegion& region,
+                                                  std::uint64_t offset,
+                                                  std::uint64_t length,
+                                                  std::string detail) {
     auto address_value = region.range().base().value();
     if (offset <= region.range().size()) {
         address_value += offset;
     }
-    return bus::AccessResult::failure(bus::BusError{
-        bus::BusErrorCode::ReadOnly,
-        bus::PhysicalAddress{address_value},
-        length,
-        region.name(),
-        std::move(detail)});
+    return bus::AccessResult::failure(bus::BusError{bus::BusErrorCode::ReadOnly,
+                                                    bus::PhysicalAddress{address_value},
+                                                    length,
+                                                    region.name(),
+                                                    std::move(detail)});
 }
 
 }  // namespace
 
 BootRom::BootRom(bus::PhysicalAddress base, std::size_t size, std::string name)
-    : AddressRegion(std::move(name), require_range(base, size)), bytes_(size, 0U) {}
+    : AddressRegion(std::move(name), require_range(base, size)), bytes_(size, 0U) {
+}
 
-bus::AccessResult BootRom::load(
-    std::uint64_t offset,
-    const std::vector<std::uint8_t>& data) {
+bus::AccessResult BootRom::load(std::uint64_t offset, const std::vector<std::uint8_t>& data) {
     std::lock_guard<std::mutex> lock{mutex_};
     if (sealed_) {
-        return read_only_failure(*this, offset, static_cast<std::uint64_t>(data.size()), "Boot ROM 已密封");
+        return read_only_failure(
+            *this, offset, static_cast<std::uint64_t>(data.size()), "Boot ROM 已密封");
     }
 
     const auto rom_size = static_cast<std::uint64_t>(bytes_.size());
     const auto data_size = static_cast<std::uint64_t>(data.size());
     if (offset > rom_size || data_size > rom_size - offset) {
-        return bus::AccessResult::failure(bus::BusError{
-            bus::BusErrorCode::OutOfBounds,
-            range().base(),
-            data_size,
-            name(),
-            "初始化数据超出 Boot ROM 区域"});
+        return bus::AccessResult::failure(bus::BusError{bus::BusErrorCode::OutOfBounds,
+                                                        range().base(),
+                                                        data_size,
+                                                        name(),
+                                                        "初始化数据超出 Boot ROM 区域"});
     }
 
     const auto destination = bytes_.begin() + static_cast<std::ptrdiff_t>(offset);
@@ -76,35 +73,30 @@ bool BootRom::sealed() const {
     return sealed_;
 }
 
-bus::AccessResult BootRom::validate(
-    std::uint64_t offset,
-    bus::AccessWidth width) const {
+bus::AccessResult BootRom::validate(std::uint64_t offset, bus::AccessWidth width) const {
     const auto length = bus::width_in_bytes(width);
     if (length == 0U) {
-        return bus::AccessResult::failure(bus::BusError{
-            bus::BusErrorCode::InvalidWidth,
-            range().base(),
-            0U,
-            name(),
-            "Boot ROM 收到不支持的访问宽度"});
+        return bus::AccessResult::failure(bus::BusError{bus::BusErrorCode::InvalidWidth,
+                                                        range().base(),
+                                                        0U,
+                                                        name(),
+                                                        "Boot ROM 收到不支持的访问宽度"});
     }
 
     const auto rom_size = static_cast<std::uint64_t>(bytes_.size());
     if (offset > rom_size || length > rom_size - offset) {
-        return bus::AccessResult::failure(bus::BusError{
-            bus::BusErrorCode::OutOfBounds,
-            range().base(),
-            length,
-            name(),
-            "Boot ROM 区域内偏移越界"});
+        return bus::AccessResult::failure(bus::BusError{bus::BusErrorCode::OutOfBounds,
+                                                        range().base(),
+                                                        length,
+                                                        name(),
+                                                        "Boot ROM 区域内偏移越界"});
     }
     return bus::AccessResult::success();
 }
 
-bus::AccessResult BootRom::read(
-    std::uint64_t offset,
-    bus::AccessWidth width,
-    bus::AccessType type) {
+bus::AccessResult BootRom::read(std::uint64_t offset,
+                                bus::AccessWidth width,
+                                bus::AccessType type) {
     static_cast<void>(type);
     std::lock_guard<std::mutex> lock{mutex_};
     const auto validation = validate(offset, width);
@@ -121,26 +113,26 @@ bus::AccessResult BootRom::read(
     return bus::AccessResult::success(value);
 }
 
-bus::AccessResult BootRom::write(
-    std::uint64_t offset,
-    bus::AccessWidth width,
-    std::uint64_t value,
-    bus::AccessType type) {
+bus::AccessResult BootRom::write(std::uint64_t offset,
+                                 bus::AccessWidth width,
+                                 std::uint64_t value,
+                                 bus::AccessType type) {
     static_cast<void>(value);
     static_cast<void>(type);
-    return read_only_failure(*this, offset, bus::width_in_bytes(width), "运行期不允许写入 Boot ROM");
+    return read_only_failure(
+        *this, offset, bus::width_in_bytes(width), "运行期不允许写入 Boot ROM");
 }
 
-bus::AccessResult BootRom::compare_exchange(
-    std::uint64_t offset,
-    bus::AccessWidth width,
-    std::uint64_t expected,
-    std::uint64_t desired,
-    bus::AccessType type) {
+bus::AccessResult BootRom::compare_exchange(std::uint64_t offset,
+                                            bus::AccessWidth width,
+                                            std::uint64_t expected,
+                                            std::uint64_t desired,
+                                            bus::AccessType type) {
     static_cast<void>(expected);
     static_cast<void>(desired);
     static_cast<void>(type);
-    return read_only_failure(*this, offset, bus::width_in_bytes(width), "Boot ROM 不支持原子写事务");
+    return read_only_failure(
+        *this, offset, bus::width_in_bytes(width), "Boot ROM 不支持原子写事务");
 }
 
 }  // namespace rvemu::memory

@@ -20,14 +20,14 @@ enum class AccessWidth : std::uint8_t {
 
 [[nodiscard]] constexpr std::uint64_t width_in_bytes(AccessWidth width) noexcept {
     switch (width) {
-    case AccessWidth::Byte:
-        return 1U;
-    case AccessWidth::HalfWord:
-        return 2U;
-    case AccessWidth::Word:
-        return 4U;
-    case AccessWidth::DoubleWord:
-        return 8U;
+        case AccessWidth::Byte:
+            return 1U;
+        case AccessWidth::HalfWord:
+            return 2U;
+        case AccessWidth::Word:
+            return 4U;
+        case AccessWidth::DoubleWord:
+            return 8U;
     }
     return 0U;
 }
@@ -69,11 +69,12 @@ struct AccessResult final {
     std::uint64_t value{0U};
     bool exchanged{false};
 
-    [[nodiscard]] bool ok() const noexcept { return error.code == BusErrorCode::None; }
+    [[nodiscard]] bool ok() const noexcept {
+        return error.code == BusErrorCode::None;
+    }
 
-    [[nodiscard]] static AccessResult success(
-        std::uint64_t result_value = 0U,
-        bool did_exchange = false) noexcept {
+    [[nodiscard]] static AccessResult success(std::uint64_t result_value = 0U,
+                                              bool did_exchange = false) noexcept {
         AccessResult result{};
         result.value = result_value;
         result.exchanged = did_exchange;
@@ -92,7 +93,9 @@ struct AccessResult final {
 struct ReservationToken final {
     std::uint64_t value{0U};
 
-    [[nodiscard]] bool valid() const noexcept { return value != 0U; }
+    [[nodiscard]] bool valid() const noexcept {
+        return value != 0U;
+    }
 };
 
 // LR 必须把读取值与保留建立作为一个不可分割事务，因此不能用两个独立返回值调用完成。

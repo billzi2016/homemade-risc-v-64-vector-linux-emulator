@@ -11,7 +11,7 @@ namespace rvemu::vector {
 
 // 向量寄存器文件只承载字节级架构位模式；元素宽度、LMUL 分组和掩码解释属于后续执行器。
 class VectorState final {
-public:
+   public:
     static constexpr std::size_t kRegisterCount = 32U;
     static constexpr std::size_t kRegisterBytes = 32U;
     using Register = std::array<std::uint8_t, kRegisterBytes>;
@@ -27,7 +27,7 @@ public:
     [[nodiscard]] std::uint8_t byte_value(std::size_t register_index, std::size_t byte_index) const;
     void set_byte_value(std::size_t register_index, std::size_t byte_index, std::uint8_t value);
 
-private:
+   private:
     std::array<Register, kRegisterCount> registers_{};
 };
 

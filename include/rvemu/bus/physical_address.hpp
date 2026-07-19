@@ -8,12 +8,15 @@
 namespace rvemu::bus {
 
 class PhysicalAddress final {
-public:
-    explicit constexpr PhysicalAddress(std::uint64_t value = 0U) noexcept : value_(value) {}
+   public:
+    explicit constexpr PhysicalAddress(std::uint64_t value = 0U) noexcept : value_(value) {
+    }
 
-    [[nodiscard]] constexpr std::uint64_t value() const noexcept { return value_; }
+    [[nodiscard]] constexpr std::uint64_t value() const noexcept {
+        return value_;
+    }
 
-private:
+   private:
     std::uint64_t value_;
 };
 

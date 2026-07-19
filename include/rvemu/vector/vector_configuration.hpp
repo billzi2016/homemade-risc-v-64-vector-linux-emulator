@@ -29,20 +29,17 @@ struct VectorConfiguration final {
 
 // 在规范允许的范围内以确定性策略选择 vl：AVL 小于 VLMAX 时精确取 AVL，其余非零容量情形取 VLMAX。
 // 该策略覆盖 AVL>=2*VLMAX 和中间区间，避免不同 vset* 路径作出不一致选择。
-[[nodiscard]] std::uint64_t select_vector_length(
-    std::uint64_t application_vector_length,
-    std::uint64_t vlmax) noexcept;
+[[nodiscard]] std::uint64_t select_vector_length(std::uint64_t application_vector_length,
+                                                 std::uint64_t vlmax) noexcept;
 
 // 只有旧、新配置都合法且 VLMAX 不变时，rs1=x0 且 rd=x0 的保留当前 vl 形式才允许提交。
 // 它独立于具体指令编码，使 CPU 不会复制 vill 与 VLMAX 比较规则。
-[[nodiscard]] bool can_preserve_vector_length(
-    std::uint64_t previous_vtype,
-    std::uint64_t requested_vtype) noexcept;
+[[nodiscard]] bool can_preserve_vector_length(std::uint64_t previous_vtype,
+                                              std::uint64_t requested_vtype) noexcept;
 
 // 为 EEW 不同于 SEW 的向量访存计算数据寄存器使用的 EMUL；返回空表示 EMUL 超出本实现范围。
 // 结果保留原 VLMAX，因而可直接交给寄存器组布局层定位同一逻辑元素序列。
 [[nodiscard]] std::optional<VectorConfiguration> derive_memory_configuration(
-    const VectorConfiguration& current,
-    std::uint64_t element_width_bits) noexcept;
+    const VectorConfiguration& current, std::uint64_t element_width_bits) noexcept;
 
 }  // namespace rvemu::vector

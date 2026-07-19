@@ -15,9 +15,11 @@ namespace rvemu::core::soft_float_detail {
 constexpr std::size_t kWideLimbs = 72U;
 
 class WideUnsigned final {
-public:
+   public:
     constexpr WideUnsigned() noexcept = default;
-    explicit constexpr WideUnsigned(std::uint64_t value) noexcept { limbs_[0] = value; }
+    explicit constexpr WideUnsigned(std::uint64_t value) noexcept {
+        limbs_[0] = value;
+    }
 
     [[nodiscard]] bool zero() const noexcept;
     [[nodiscard]] std::size_t bit_length() const noexcept;
@@ -29,9 +31,11 @@ public:
     [[nodiscard]] int compare(const WideUnsigned& other) const noexcept;
     void add(const WideUnsigned& other) noexcept;
     void subtract(const WideUnsigned& other) noexcept;
-    [[nodiscard]] std::uint64_t low64() const noexcept { return limbs_[0]; }
+    [[nodiscard]] std::uint64_t low64() const noexcept {
+        return limbs_[0];
+    }
 
-private:
+   private:
     std::array<std::uint64_t, kWideLimbs> limbs_{};
 };
 
@@ -70,32 +74,26 @@ struct Unpacked final {
 [[nodiscard]] std::uint64_t infinity(const Format& format, bool sign) noexcept;
 
 // magnitude * 2^exponent 只在此入口舍入并编码，保证全部算术共享相同 flags 规则。
-[[nodiscard]] FloatingResult round_and_pack(
-    const Format& format,
-    bool sign,
-    WideUnsigned magnitude,
-    std::int32_t exponent,
-    FloatingRoundingMode rounding) noexcept;
+[[nodiscard]] FloatingResult round_and_pack(const Format& format,
+                                            bool sign,
+                                            WideUnsigned magnitude,
+                                            std::int32_t exponent,
+                                            FloatingRoundingMode rounding) noexcept;
 
 // 浮点转整数使用同一 half/sticky 与五舍入模式判定，避免另建一套舍入逻辑。
-[[nodiscard]] WideUnsigned round_to_integer_magnitude(
-    WideUnsigned magnitude,
-    std::int32_t exponent,
-    bool sign,
-    FloatingRoundingMode rounding,
-    bool& inexact) noexcept;
+[[nodiscard]] WideUnsigned round_to_integer_magnitude(WideUnsigned magnitude,
+                                                      std::int32_t exponent,
+                                                      bool sign,
+                                                      FloatingRoundingMode rounding,
+                                                      bool& inexact) noexcept;
 
-[[nodiscard]] WideUnsigned multiply_significands(
-    std::uint64_t lhs,
-    std::uint64_t rhs) noexcept;
-[[nodiscard]] WideUnsigned divide_significands(
-    std::uint64_t numerator,
-    std::uint64_t denominator,
-    std::size_t precision,
-    bool& inexact) noexcept;
-[[nodiscard]] WideUnsigned square_root_significand(
-    std::uint64_t significand,
-    std::size_t shift_pairs,
-    bool& inexact) noexcept;
+[[nodiscard]] WideUnsigned multiply_significands(std::uint64_t lhs, std::uint64_t rhs) noexcept;
+[[nodiscard]] WideUnsigned divide_significands(std::uint64_t numerator,
+                                               std::uint64_t denominator,
+                                               std::size_t precision,
+                                               bool& inexact) noexcept;
+[[nodiscard]] WideUnsigned square_root_significand(std::uint64_t significand,
+                                                   std::size_t shift_pairs,
+                                                   bool& inexact) noexcept;
 
 }  // namespace rvemu::core::soft_float_detail

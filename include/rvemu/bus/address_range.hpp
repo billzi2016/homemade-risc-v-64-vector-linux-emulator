@@ -11,15 +11,20 @@
 namespace rvemu::bus {
 
 class AddressRange final {
-public:
+   public:
     // size 必须非零，且 base + size 不能溢出 64 位地址空间。
-    [[nodiscard]] static std::optional<AddressRange> create(
-        PhysicalAddress base,
-        std::uint64_t size) noexcept;
+    [[nodiscard]] static std::optional<AddressRange> create(PhysicalAddress base,
+                                                            std::uint64_t size) noexcept;
 
-    [[nodiscard]] PhysicalAddress base() const noexcept { return base_; }
-    [[nodiscard]] std::uint64_t size() const noexcept { return size_; }
-    [[nodiscard]] std::uint64_t end_exclusive() const noexcept { return end_exclusive_; }
+    [[nodiscard]] PhysicalAddress base() const noexcept {
+        return base_;
+    }
+    [[nodiscard]] std::uint64_t size() const noexcept {
+        return size_;
+    }
+    [[nodiscard]] std::uint64_t end_exclusive() const noexcept {
+        return end_exclusive_;
+    }
     [[nodiscard]] PhysicalAddress last_address() const noexcept {
         return PhysicalAddress{end_exclusive_ - 1U};
     }
@@ -29,12 +34,12 @@ public:
     [[nodiscard]] bool overlaps(const AddressRange& other) const noexcept;
     [[nodiscard]] std::uint64_t offset_of(PhysicalAddress address) const noexcept;
 
-private:
-    constexpr AddressRange(
-        PhysicalAddress base,
-        std::uint64_t size,
-        std::uint64_t end_exclusive) noexcept
-        : base_(base), size_(size), end_exclusive_(end_exclusive) {}
+   private:
+    constexpr AddressRange(PhysicalAddress base,
+                           std::uint64_t size,
+                           std::uint64_t end_exclusive) noexcept
+        : base_(base), size_(size), end_exclusive_(end_exclusive) {
+    }
 
     PhysicalAddress base_;
     std::uint64_t size_;

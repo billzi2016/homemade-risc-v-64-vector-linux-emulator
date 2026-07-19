@@ -9,7 +9,6 @@
 namespace rvemu::core {
 
 // 合法指令和 HINT 返回一条现有 RV64I/F/D 编码；reserved/custom/永久非法编码返回空。
-[[nodiscard]] std::optional<std::uint32_t> decompress_rv64c(
-    std::uint16_t bits) noexcept;
+[[nodiscard]] std::optional<std::uint32_t> decompress_rv64c(std::uint16_t bits) noexcept;
 
 }  // namespace rvemu::core
