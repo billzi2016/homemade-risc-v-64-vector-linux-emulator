@@ -287,16 +287,16 @@
     queue ready 前置校验、`DRIVER_OK` 前通知门控，以及 ready queue 通知队列。
   - 验证结果：非法 queue size 不 ready、合法布局 ready、复位清 queue 和 `DRIVER_OK`
     后通知可消费测试通过；常规与 ASan/UBSan 完整 CTest 均为 23/23 通过。
-- [ ] **VIO-003** 完成描述符链安全解析父级里程碑。
-  - [ ] **VIO-003A** 校验 head、next 和间接表中的所有描述符索引范围。
+- [x] **VIO-003** 完成描述符链安全解析父级里程碑。
+  - [x] **VIO-003A** 校验 head、next 和间接表中的所有描述符索引范围。
   - [x] **VIO-003B** 检测描述符链循环、超长链和非法嵌套。
   - [x] **VIO-003C** 根据设备请求布局校验每段描述符的设备读写方向。
   - [x] **VIO-003D** 检查 `address + length`、总长度求和及 DMA 范围溢出。
-  - [ ] **VIO-003E** 仅在 feature 协商后实现并接受合法间接描述符。
+  - [x] **VIO-003E** 仅在 feature 协商后实现并接受合法间接描述符。
   - [x] **VIO-003F** 保证整条链验证完成前不执行任何设备 DMA 或宿主 I/O。
   - 已验证结果：公共解析器只读取描述符元数据并返回不可变 segment 视图；覆盖合法直接链、
-    direct head/next 越界、循环、方向错误、DMA 地址溢出、总长度溢出检查和未协商
-    indirect 受控拒绝。间接表内部索引验证仍待 `VIO-003E` 完成后勾选 `VIO-003A`。
+    direct head/next 越界、间接表 next 越界、循环、方向错误、DMA 地址溢出、总长度溢出检查、
+    未协商 indirect 受控拒绝、协商后合法 indirect 接受，以及嵌套 indirect 拒绝。
   - 完成条件：以上子任务全部完成，恶意描述符输入只能产生受控设备错误。
 - [ ] **VIO-004** 完成 available/used ring 索引与提交顺序父级里程碑。
   - [x] **VIO-004A** 实现 16 位模 2^16 索引差值和 `0xFFFF -> 0x0000` 回绕。
@@ -304,12 +304,13 @@
   - [x] **VIO-004C** 检测驱动一次公布的未处理条目数超过队列容量。
   - [ ] **VIO-004D** 按规范顺序读取 descriptor 内容并观察 available idx。
   - [x] **VIO-004E** 先写 used element，再以正确可见性发布 used idx。
-  - [ ] **VIO-004F** 实现通知抑制，并仅在协商后实现 `EVENT_IDX` 回绕判断。
+  - [x] **VIO-004F** 实现通知抑制，并仅在协商后实现 `EVENT_IDX` 回绕判断。
   - [ ] **VIO-004G** 在设备复位时隔离队列代际，禁止旧请求提交到新队列。
   - [ ] **VIO-004H** 让真实块和网络请求持续跨越至少一次完整 16 位索引回绕。
   - 已验证结果：公共 `VirtqueueRuntimeState` 覆盖 idx 差值、槽位计算、pending 超容量拒绝、
-    available head 消费、used element 与 used idx 发布顺序，以及 runtime reset 代际递增；
-    descriptor-before-idx 的完整设备处理顺序和 transport 复位代际接线仍待真实请求处理层验证。
+    available head 消费、used element 与 used idx 发布顺序、avail flags 通知抑制、
+    协商后 `EVENT_IDX` 回绕公式，以及 runtime reset 代际递增；descriptor-before-idx
+    的完整设备处理顺序和 transport 复位代际接线仍待真实请求处理层验证。
   - 完成条件：以上子任务全部完成，长期压力测试无丢项、重复完成、越界或死锁。
 - [x] **BLK-001** 实现 VirtIO-Blk 请求头、IN/OUT、状态字节和只读策略。
   - 证据：`include/rvemu/devices/virtio_block.hpp`、`src/devices/virtio_block.cpp` 与

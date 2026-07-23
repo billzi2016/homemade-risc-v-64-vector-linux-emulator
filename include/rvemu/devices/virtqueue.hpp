@@ -65,6 +65,7 @@ struct VirtqueueLayout final {
     bus::PhysicalAddress used_ring{};
     bool ready{false};
     bool indirect_enabled{false};
+    bool event_idx_enabled{false};
 };
 
 /** 描述一次 available ring 观察到的可处理 head；available_index 保留完整 16 位回绕计数。 */
@@ -92,6 +93,19 @@ struct VirtqueueAvailableResult final {
 }
 
 /**
+ * VirtIO EVENT_IDX 通知抑制公式。
+ *
+ * 当且仅当设备/驱动协商 EVENT_IDX 后调用；old_index 是本次提交前 idx，new_index 是发布后 idx，
+ * event_index 是对端写入的事件阈值。公式保留完整 16 位回绕语义。
+ */
+[[nodiscard]] constexpr bool virtqueue_event_needed(std::uint16_t event_index,
+                                                    std::uint16_t new_index,
+                                                    std::uint16_t old_index) noexcept {
+    return static_cast<std::uint16_t>(new_index - event_index - 1U)
+           < static_cast<std::uint16_t>(new_index - old_index);
+}
+
+/**
  * split virtqueue 的设备侧运行态，维护 last_available_idx、used_idx 与队列代际。
  *
  * 本类只处理公共 ring 索引和提交顺序，不解释描述符链内容。复位会递增 generation，
@@ -111,6 +125,11 @@ class VirtqueueRuntimeState final {
                                                       const VirtqueueLayout& layout,
                                                       std::uint32_t id,
                                                       std::uint32_t length);
+
+    /** 按协商 feature 判断是否需要通知驱动；EVENT_IDX 未协商时使用 avail flags。 */
+    [[nodiscard]] VirtqueueRingErrorCode driver_notification_needed(bus::Bus& bus,
+                                                                    const VirtqueueLayout& layout,
+                                                                    bool& needed) const;
 
     [[nodiscard]] std::uint16_t last_available_index() const noexcept {
         return last_available_idx_;

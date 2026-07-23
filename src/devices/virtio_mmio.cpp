@@ -48,6 +48,8 @@ constexpr std::uint32_t kStatusKnownMask = kStatusAcknowledge | kStatusDriver | 
                                            | kStatusFeaturesOk | kStatusDeviceNeedsReset
                                            | kStatusFailed;
 constexpr std::uint32_t kInterruptUsedBuffer = 1U;
+constexpr std::uint64_t kFeatureIndirectDesc = 1ULL << 28U;
+constexpr std::uint64_t kFeatureEventIdx = 1ULL << 29U;
 
 [[nodiscard]] bus::AddressRange require_range(const VirtioMmioConfig& config) {
     const auto range =
@@ -134,12 +136,15 @@ VirtqueueLayout VirtioMmioTransport::queue_layout(std::uint16_t queue_index) con
         return {};
     }
     const auto& queue = queues_[queue_index];
+    const auto accepted_features =
+        (status_ & kStatusFeaturesOk) != 0U ? (driver_features_ & offered_features_) : 0U;
     return VirtqueueLayout{queue.size,
                            bus::PhysicalAddress{queue.descriptor_table},
                            bus::PhysicalAddress{queue.available_ring},
                            bus::PhysicalAddress{queue.used_ring},
                            queue.ready,
-                           (driver_features_ & (1ULL << 28U)) != 0U};
+                           (accepted_features & kFeatureIndirectDesc) != 0U,
+                           (accepted_features & kFeatureEventIdx) != 0U};
 }
 
 bus::AccessResult VirtioMmioTransport::validate_register_access(std::uint64_t offset,

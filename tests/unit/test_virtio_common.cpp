@@ -22,6 +22,7 @@ constexpr std::uint64_t kDesc = kRamBase + 0x1000U;
 constexpr std::uint64_t kAvail = kRamBase + 0x2000U;
 constexpr std::uint64_t kUsed = kRamBase + 0x3000U;
 constexpr std::uint64_t kBuffer = kRamBase + 0x4000U;
+constexpr std::uint64_t kIndirect = kRamBase + 0x4800U;
 
 constexpr std::uint64_t kMagic = 0x000U;
 constexpr std::uint64_t kVersion = 0x004U;
@@ -47,6 +48,8 @@ constexpr std::uint64_t kQueueDeviceHigh = 0x0A4U;
 constexpr std::uint16_t kDescNext = 1U << 0U;
 constexpr std::uint16_t kDescWrite = 1U << 1U;
 constexpr std::uint16_t kDescIndirect = 1U << 2U;
+constexpr std::uint64_t kFeatureIndirectDesc = 1ULL << 28U;
+constexpr std::uint64_t kFeatureEventIdx = 1ULL << 29U;
 
 /** 累积断言失败，使一次执行报告多个 transport/queue 状态偏差。 */
 void expect(bool condition, const std::string& message, int& failures) {
@@ -66,7 +69,7 @@ class Fixture final {
                                                rvemu::bus::address_map::kVirtioBlock.size,
                                                rvemu::devices::VirtioDeviceId::Block,
                                                0x554D'4552U,
-                                               1ULL << 5U,
+                                               (1ULL << 5U) | kFeatureIndirectDesc | kFeatureEventIdx,
                                                1U,
                                                2U,
                                                8U})),
@@ -123,6 +126,24 @@ class Fixture final {
         expect(write_reg(kQueueReady, 1U), "queue ready", failures);
     }
 
+    void negotiate_common_features(std::uint64_t features) {
+        expect(write_reg(kDriverFeaturesSel, 0U),
+               "选择 driver feature 低 32 位页",
+               failures);
+        expect(write_reg(kDriverFeatures, static_cast<std::uint32_t>(features)),
+               "写入 driver feature 低 32 位页",
+               failures);
+        expect(write_reg(kDriverFeaturesSel, 1U),
+               "选择 driver feature 高 32 位页",
+               failures);
+        expect(write_reg(kDriverFeatures, static_cast<std::uint32_t>((features >> 32U) | 1U)),
+               "写入 driver feature 高 32 位页和 VERSION_1",
+               failures);
+        expect(write_reg(kStatus, 1U | 2U | 8U) && read_reg(kStatus) == (1U | 2U | 8U),
+               "FEATURES_OK 必须接受请求的公共 feature 子集",
+               failures);
+    }
+
     int failures{0};
     rvemu::bus::Bus bus{};
     std::shared_ptr<rvemu::devices::VirtioMmioTransport> transport;
@@ -136,6 +157,20 @@ void write_descriptor(Fixture& fixture,
                       std::uint16_t flags,
                       std::uint16_t next) {
     const auto base = kDesc + static_cast<std::uint64_t>(index) * 16U;
+    fixture.write_mem(base, rvemu::bus::AccessWidth::DoubleWord, address);
+    fixture.write_mem(base + 8U, rvemu::bus::AccessWidth::Word, length);
+    fixture.write_mem(base + 12U, rvemu::bus::AccessWidth::HalfWord, flags);
+    fixture.write_mem(base + 14U, rvemu::bus::AccessWidth::HalfWord, next);
+}
+
+void write_descriptor_at(Fixture& fixture,
+                         std::uint64_t table,
+                         std::uint16_t index,
+                         std::uint64_t address,
+                         std::uint32_t length,
+                         std::uint16_t flags,
+                         std::uint16_t next) {
+    const auto base = table + static_cast<std::uint64_t>(index) * 16U;
     fixture.write_mem(base, rvemu::bus::AccessWidth::DoubleWord, address);
     fixture.write_mem(base + 8U, rvemu::bus::AccessWidth::Word, length);
     fixture.write_mem(base + 12U, rvemu::bus::AccessWidth::HalfWord, flags);
@@ -268,6 +303,47 @@ void test_descriptor_chain_rejections(int& failures) {
            failures);
 }
 
+/** 验证间接描述符只在协商后接受，且嵌套 indirect 会被公共解析器拒绝。 */
+void test_indirect_descriptor_chain(int& failures) {
+    Fixture fixture;
+    fixture.negotiate_common_features(kFeatureIndirectDesc);
+    fixture.configure_queue();
+    failures += fixture.failures;
+    write_descriptor(fixture, 0U, kIndirect, 32U, kDescIndirect, 0U);
+    write_descriptor_at(fixture, kIndirect, 0U, kBuffer, 16U, kDescNext, 1U);
+    write_descriptor_at(fixture, kIndirect, 1U, kBuffer + 0x100U, 1U, kDescWrite, 0U);
+
+    auto layout = fixture.transport->queue_layout(0U);
+    expect(layout.indirect_enabled, "FEATURES_OK 后 queue layout 必须导出 indirect 协商状态", failures);
+    layout.indirect_enabled = false;
+    expect(rvemu::devices::parse_descriptor_chain(fixture.bus, layout, 0U).code
+               == rvemu::devices::VirtqueueParseErrorCode::IndirectUnsupported,
+           "未协商 indirect 时必须拒绝间接描述符",
+           failures);
+    layout.indirect_enabled = true;
+    const auto parsed = rvemu::devices::parse_descriptor_chain(
+        fixture.bus,
+        layout,
+        0U,
+        {rvemu::devices::VirtqueueDescriptorDirection::DeviceReads,
+         rvemu::devices::VirtqueueDescriptorDirection::DeviceWrites});
+    expect(parsed.ok() && parsed.segments.size() == 2U,
+           "协商 indirect 后必须解析间接表",
+           failures);
+
+    write_descriptor_at(fixture, kIndirect, 0U, kBuffer, 16U, kDescNext, 9U);
+    expect(rvemu::devices::parse_descriptor_chain(fixture.bus, layout, 0U).code
+               == rvemu::devices::VirtqueueParseErrorCode::IndexOutOfRange,
+           "间接表 next 越界必须拒绝",
+           failures);
+
+    write_descriptor_at(fixture, kIndirect, 0U, kBuffer, 16U, kDescIndirect, 0U);
+    expect(rvemu::devices::parse_descriptor_chain(fixture.bus, layout, 0U).code
+               == rvemu::devices::VirtqueueParseErrorCode::IndirectUnsupported,
+           "嵌套 indirect 必须拒绝",
+           failures);
+}
+
 /** 验证 16 位 idx 回绕差值、ring 槽位和 pending 超过 queue size 的拒绝。 */
 void test_ring_index_wrap_and_available(int& failures) {
     expect(rvemu::devices::virtqueue_index_delta(0x0000U, 0xFFFFU) == 1U,
@@ -333,6 +409,51 @@ void test_used_publish_and_generation(int& failures) {
            failures);
 }
 
+/** 验证普通 avail flags 和 EVENT_IDX 两种通知抑制路径。 */
+void test_notification_suppression(int& failures) {
+    Fixture fixture;
+    fixture.negotiate_common_features(kFeatureEventIdx);
+    fixture.configure_queue(4U);
+    failures += fixture.failures;
+    rvemu::devices::VirtqueueRuntimeState runtime;
+    runtime.reset();
+    auto layout = fixture.transport->queue_layout(0U);
+    expect(runtime.publish_used(fixture.bus, layout, 1U, 1U)
+               == rvemu::devices::VirtqueueRingErrorCode::None,
+           "准备 used idx=1",
+           failures);
+    layout.event_idx_enabled = false;
+    bool needed = false;
+    expect(runtime.driver_notification_needed(fixture.bus, layout, needed)
+               == rvemu::devices::VirtqueueRingErrorCode::None
+               && needed,
+           "未协商 EVENT_IDX 且 avail flags 未抑制时必须通知",
+           failures);
+    fixture.write_mem(kAvail, rvemu::bus::AccessWidth::HalfWord, 1U);
+    expect(runtime.driver_notification_needed(fixture.bus, layout, needed)
+               == rvemu::devices::VirtqueueRingErrorCode::None
+               && !needed,
+           "未协商 EVENT_IDX 时 avail flags bit0 必须抑制通知",
+           failures);
+
+    layout = fixture.transport->queue_layout(0U);
+    expect(layout.event_idx_enabled,
+           "FEATURES_OK 后 queue layout 必须导出 EVENT_IDX 协商状态",
+           failures);
+    fixture.write_mem(kAvail + 4U + 4U * 2U, rvemu::bus::AccessWidth::HalfWord, 0U);
+    expect(runtime.driver_notification_needed(fixture.bus, layout, needed)
+               == rvemu::devices::VirtqueueRingErrorCode::None
+               && needed,
+           "协商 EVENT_IDX 后 used_event=old 必须触发通知",
+           failures);
+    fixture.write_mem(kAvail + 4U + 4U * 2U, rvemu::bus::AccessWidth::HalfWord, 1U);
+    expect(runtime.driver_notification_needed(fixture.bus, layout, needed)
+               == rvemu::devices::VirtqueueRingErrorCode::None
+               && !needed,
+           "协商 EVENT_IDX 后 used_event=new 必须抑制通知",
+           failures);
+}
+
 }  // namespace
 
 int main() {
@@ -342,8 +463,10 @@ int main() {
         test_queue_configuration_and_notify(failures);
         test_descriptor_chain_success(failures);
         test_descriptor_chain_rejections(failures);
+        test_indirect_descriptor_chain(failures);
         test_ring_index_wrap_and_available(failures);
         test_used_publish_and_generation(failures);
+        test_notification_suppression(failures);
     } catch (const std::exception& exception) {
         std::cerr << "VirtIO 公共测试基础设施失败：" << exception.what() << '\n';
         return 1;
