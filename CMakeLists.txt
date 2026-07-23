@@ -74,6 +74,18 @@ target_link_libraries(rvemu_devices PUBLIC rvemu_core)
 target_compile_features(rvemu_devices PUBLIC cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_devices)
 
+add_library(rvemu_platform STATIC
+    src/platform/terminal.cpp
+)
+
+target_include_directories(rvemu_platform
+    PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+)
+
+target_compile_features(rvemu_platform PUBLIC cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_platform)
+
 add_library(rvemu_conformance STATIC
     src/conformance/elf_loader.cpp
 )

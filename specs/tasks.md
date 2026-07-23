@@ -250,7 +250,15 @@
     `git diff --check` 无输出。
   - 已知边界：宿主终端 Raw 模式、非阻塞输入、异常退出恢复和持续交互验收仍归属
     `DEV-004`、`DEV-005`。
-- [ ] **DEV-004** 实现宿主终端 Raw 模式、非阻塞输入和异常退出恢复。
+- [x] **DEV-004** 实现宿主终端 Raw 模式、非阻塞输入和异常退出恢复。
+  - 证据：`include/rvemu/platform/terminal.hpp`、`src/platform/terminal.cpp` 与
+    `tests/unit/test_terminal.cpp`；实现 TTY 校验、原始 `termios` 与 fd flags 保存、
+    Raw 模式切换、`O_NONBLOCK` 输入、逐字节读取、短写/暂不可写输出报告，以及析构和
+    显式 `restore()` 的幂等恢复。
+  - 验证结果：伪终端专项测试覆盖 Raw 位、`Ctrl+C` 字节透传、无输入 WouldBlock、非 TTY
+    拒绝和恢复原状态；严格构建和完整 CTest 为 22/22 通过；`build/sanitize` 的
+    AddressSanitizer/UndefinedBehaviorSanitizer 构建与完整 CTest 为 22/22 通过；
+    `git diff --check` 无输出。
 - [ ] **DEV-005** 验证定时器、外部中断和 UART 控制台持续交互。
 
 ## 11. 阶段 9：VirtIO 公共层与块设备
