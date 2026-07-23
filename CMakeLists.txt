@@ -59,24 +59,8 @@ target_link_libraries(rvemu_core PUBLIC rvemu_bus_memory)
 target_compile_features(rvemu_core PUBLIC cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_core)
 
-add_library(rvemu_devices STATIC
-    src/devices/clint.cpp
-    src/devices/plic.cpp
-    src/devices/uart16550.cpp
-    src/devices/virtio_mmio.cpp
-    src/devices/virtqueue.cpp
-)
-
-target_include_directories(rvemu_devices
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}/include
-)
-
-target_link_libraries(rvemu_devices PUBLIC rvemu_core)
-target_compile_features(rvemu_devices PUBLIC cxx_std_17)
-rvemu_enable_strict_warnings(rvemu_devices)
-
 add_library(rvemu_platform STATIC
+    src/platform/disk_backend.cpp
     src/platform/terminal.cpp
 )
 
@@ -87,6 +71,24 @@ target_include_directories(rvemu_platform
 
 target_compile_features(rvemu_platform PUBLIC cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_platform)
+
+add_library(rvemu_devices STATIC
+    src/devices/clint.cpp
+    src/devices/plic.cpp
+    src/devices/uart16550.cpp
+    src/devices/virtio_block.cpp
+    src/devices/virtio_mmio.cpp
+    src/devices/virtqueue.cpp
+)
+
+target_include_directories(rvemu_devices
+    PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+)
+
+target_link_libraries(rvemu_devices PUBLIC rvemu_core rvemu_platform)
+target_compile_features(rvemu_devices PUBLIC cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_devices)
 
 add_library(rvemu_runtime STATIC
     src/runtime/event_loop.cpp

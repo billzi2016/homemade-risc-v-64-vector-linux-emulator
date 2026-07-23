@@ -47,6 +47,7 @@ constexpr std::uint32_t kStatusFailed = 128U;
 constexpr std::uint32_t kStatusKnownMask = kStatusAcknowledge | kStatusDriver | kStatusDriverOk
                                            | kStatusFeaturesOk | kStatusDeviceNeedsReset
                                            | kStatusFailed;
+constexpr std::uint32_t kInterruptUsedBuffer = 1U;
 
 [[nodiscard]] bus::AddressRange require_range(const VirtioMmioConfig& config) {
     const auto range =
@@ -120,6 +121,11 @@ bool VirtioMmioTransport::pop_notification(std::uint16_t& queue_index) noexcept 
     queue_index = notifications_.front();
     notifications_.pop_front();
     return true;
+}
+
+void VirtioMmioTransport::raise_used_buffer_interrupt() noexcept {
+    std::lock_guard<std::mutex> lock{mutex_};
+    interrupt_status_ |= kInterruptUsedBuffer;
 }
 
 VirtqueueLayout VirtioMmioTransport::queue_layout(std::uint16_t queue_index) const noexcept {

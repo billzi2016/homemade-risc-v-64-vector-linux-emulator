@@ -311,8 +311,20 @@
     available head 消费、used element 与 used idx 发布顺序，以及 runtime reset 代际递增；
     descriptor-before-idx 的完整设备处理顺序和 transport 复位代际接线仍待真实请求处理层验证。
   - 完成条件：以上子任务全部完成，长期压力测试无丢项、重复完成、越界或死锁。
-- [ ] **BLK-001** 实现 VirtIO-Blk 请求头、IN/OUT、状态字节和只读策略。
-- [ ] **BLK-002** 实现 512 字节扇区的安全宿主文件读写与边界检查。
+- [x] **BLK-001** 实现 VirtIO-Blk 请求头、IN/OUT、状态字节和只读策略。
+  - 证据：`include/rvemu/devices/virtio_block.hpp`、`src/devices/virtio_block.cpp` 与
+    `tests/unit/test_virtio_block.cpp`；实现 16 字节请求头读取、`VIRTIO_BLK_T_IN`、
+    `VIRTIO_BLK_T_OUT`、unsupported 请求状态、status 字节写入、used element/idx 发布和
+    used-buffer interrupt status。
+  - 验证结果：VirtIO-Blk 专项测试覆盖 IN 读入来宾缓冲、OUT 写入宿主镜像、越界请求返回
+    `IOERR`；严格构建和完整 CTest 为 25/25 通过；ASan/UBSan 完整 CTest 为 25/25 通过。
+- [x] **BLK-002** 实现 512 字节扇区的安全宿主文件读写与边界检查。
+  - 证据：`include/rvemu/platform/disk_backend.hpp`、`src/platform/disk_backend.cpp` 与
+    `tests/unit/test_virtio_block.cpp`；宿主镜像只打开既有普通文件，拒绝非 512 字节整数倍容量，
+    capacity 以扇区冻结，I/O 使用 `pread/pwrite` 且检查 `sector * 512`、`offset + length`
+    和 `off_t` 表示范围。
+  - 验证结果：专项测试只创建 1024 字节临时镜像并执行固定少量 512 字节读写，不进行压力写、
+    大文件写或刷盘；常规与 ASan/UBSan 完整 CTest 均为 25/25 通过；`git diff --check` 无输出。
 - [ ] **BLK-003** 验证真实 ext4 镜像读写、完成中断和错误恢复。
 
 ## 12. 阶段 10：VirtIO 网络与宿主链路

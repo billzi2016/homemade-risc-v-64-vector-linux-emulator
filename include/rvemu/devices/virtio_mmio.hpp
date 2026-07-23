@@ -60,6 +60,9 @@ class VirtioMmioTransport final : public bus::AddressRegion {
     /** 取出一个 DRIVER_OK 后收到的队列通知；返回 false 表示当前没有待处理队列。 */
     [[nodiscard]] bool pop_notification(std::uint16_t& queue_index) noexcept;
 
+    /** 设备请求完成后设置 used-buffer interrupt status；PLIC 电平由 synchronize 投影。 */
+    void raise_used_buffer_interrupt() noexcept;
+
     /** 为共享描述符解析器导出指定队列的不可变布局快照。 */
     [[nodiscard]] VirtqueueLayout queue_layout(std::uint16_t queue_index) const noexcept;
 

@@ -127,6 +127,12 @@ target_compile_features(rvemu_virtio_common_tests PRIVATE cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_virtio_common_tests)
 add_test(NAME rvemu.virtio_common COMMAND rvemu_virtio_common_tests)
 
+add_executable(rvemu_virtio_block_tests unit/test_virtio_block.cpp)
+target_link_libraries(rvemu_virtio_block_tests PRIVATE rvemu_devices)
+target_compile_features(rvemu_virtio_block_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_virtio_block_tests)
+add_test(NAME rvemu.virtio_block COMMAND rvemu_virtio_block_tests)
+
 add_executable(rvemu_terminal_tests unit/test_terminal.cpp)
 target_link_libraries(rvemu_terminal_tests PRIVATE rvemu_platform)
 target_compile_features(rvemu_terminal_tests PRIVATE cxx_std_17)
