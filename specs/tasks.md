@@ -393,7 +393,7 @@ DHCP、DNS 或 ICMP 网络链路。以下任务保留为规格边界记录，全
     `tests/unit/test_boot_runtime.cpp`；专项测试验证 macOS 无网络整机只注册 5 个区域、
     打开真实 512 字节磁盘镜像、设置 BIOS PC，并拒绝 `--net tap0`。
   - 完成条件：整机注册冲突、缺设备、地址/FDT 不一致都能在进入 Raw 终端前失败退出。
-- [ ] **RUN-001** 实现规范 CLI 和稳定错误退出码。
+- [x] **RUN-001** 实现规范 CLI 和稳定错误退出码。
   - [x] **RUN-001A** 解析 `--bios`、`--kernel`、`--disk`、`--net`、`--bios-format raw` 和 `--kernel-format raw`。
   - [x] **RUN-001B** 拒绝未知、重复、缺值、空值和不支持格式，省略 `--net` 等价于 `none`。
   - [x] **RUN-001C** 生产入口在真实运行链路未接通前返回内部错误，拒绝伪造 OpenSBI/Linux 输出。
