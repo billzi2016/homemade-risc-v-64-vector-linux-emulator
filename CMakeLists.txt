@@ -63,6 +63,8 @@ add_library(rvemu_devices STATIC
     src/devices/clint.cpp
     src/devices/plic.cpp
     src/devices/uart16550.cpp
+    src/devices/virtio_mmio.cpp
+    src/devices/virtqueue.cpp
 )
 
 target_include_directories(rvemu_devices
