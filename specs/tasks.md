@@ -240,7 +240,16 @@
   - 验证结果：PLIC 专项测试通过；clang-format 严格检查通过；严格构建和完整 CTest 为
     20/20 通过；`build/sanitize` 的 AddressSanitizer/UndefinedBehaviorSanitizer 构建与完整
     CTest 为 20/20 通过；`git diff --check` 无输出。
-- [ ] **DEV-003** 实现 UART THR/RBR/LSR 及必要的 16550A 寄存器行为。
+- [x] **DEV-003** 实现 UART THR/RBR/LSR 及必要的 16550A 寄存器行为。
+  - 证据：`include/rvemu/devices/uart16550.hpp`、`src/devices/uart16550.cpp` 与
+    `tests/unit/test_uart16550.cpp`；实现 RBR/THR/DLL、IER/DLM、IIR/FCR、LCR、MCR、
+    LSR、MSR、SCR 的 8 位 MMIO 访问，覆盖 DLAB 复用、接收/发送 FIFO、LSR DR/OE/THRE/TEMT、
+    IIR 接收可用/发送空/线路状态优先级，以及 UART source 到 PLIC 的电平投影。
+  - 验证结果：UART 专项测试通过；严格构建和完整 CTest 为 21/21 通过；`build/sanitize`
+    的 AddressSanitizer/UndefinedBehaviorSanitizer 构建与完整 CTest 为 21/21 通过；
+    `git diff --check` 无输出。
+  - 已知边界：宿主终端 Raw 模式、非阻塞输入、异常退出恢复和持续交互验收仍归属
+    `DEV-004`、`DEV-005`。
 - [ ] **DEV-004** 实现宿主终端 Raw 模式、非阻塞输入和异常退出恢复。
 - [ ] **DEV-005** 验证定时器、外部中断和 UART 控制台持续交互。
 

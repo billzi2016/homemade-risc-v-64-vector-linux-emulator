@@ -115,6 +115,12 @@ target_compile_features(rvemu_plic_tests PRIVATE cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_plic_tests)
 add_test(NAME rvemu.plic COMMAND rvemu_plic_tests)
 
+add_executable(rvemu_uart16550_tests unit/test_uart16550.cpp)
+target_link_libraries(rvemu_uart16550_tests PRIVATE rvemu_devices)
+target_compile_features(rvemu_uart16550_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_uart16550_tests)
+add_test(NAME rvemu.uart16550 COMMAND rvemu_uart16550_tests)
+
 add_executable(rvemu_cpu_m_tests
     unit/test_cpu_m.cpp
 )
