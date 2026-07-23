@@ -10,6 +10,7 @@
 #include "rvemu/runtime/fdt.hpp"
 #include "rvemu/runtime/host_signal.hpp"
 #include "rvemu/runtime/machine.hpp"
+#include "rvemu/runtime/runner.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -19,7 +20,10 @@
 #include <signal.h>
 #include <stdexcept>
 #include <string>
+#include <termios.h>
+#include <util.h>
 #include <vector>
+#include <unistd.h>
 
 namespace {
 
@@ -208,6 +212,68 @@ void test_host_signal_stop_flag(int& failures) {
            failures);
 }
 
+class PtyPair final {
+   public:
+    PtyPair() {
+        if (openpty(&master_, &slave_, nullptr, nullptr, nullptr) != 0) {
+            throw std::runtime_error("创建 runner 伪终端失败");
+        }
+    }
+
+    ~PtyPair() {
+        if (master_ >= 0) {
+            static_cast<void>(close(master_));
+        }
+        if (slave_ >= 0) {
+            static_cast<void>(close(slave_));
+        }
+    }
+
+    [[nodiscard]] int slave() const noexcept {
+        return slave_;
+    }
+
+   private:
+    int master_{-1};
+    int slave_{-1};
+};
+
+void test_runner_limited_loop(int& failures) {
+    const auto temp = std::filesystem::path{"build"} / "runner-test";
+    std::filesystem::create_directories(temp);
+    const auto bios = temp / "opensbi.raw";
+    const auto kernel = temp / "Image.raw";
+    const auto disk = temp / "rootfs.ext4";
+    write_file(bios, {0x13U, 0x00U, 0x00U, 0x00U});
+    write_file(kernel, {0x13U, 0x00U, 0x00U, 0x00U});
+    write_file(disk, std::vector<std::uint8_t>(512U, 0U));
+
+    rvemu::runtime::MachineConfig config;
+    config.cli.bios_path = bios.string();
+    config.cli.kernel_path = kernel.string();
+    config.cli.disk_path = disk.string();
+    config.cli.net = "none";
+    config.boot_layout.ram_size = 0x0040'0000U;
+    config.boot_layout.fdt_address = config.boot_layout.ram_base + 0x0030'0000U;
+    config.boot_layout.fdt_reserved_size = 0x0002'0000U;
+    auto built = rvemu::runtime::build_machine(config);
+    expect(built.ok(), "runner 测试整机必须组装成功", failures);
+    if (!built.ok()) {
+        return;
+    }
+
+    PtyPair pty;
+    rvemu::platform::TerminalBackend terminal{pty.slave(), pty.slave()};
+    expect(terminal.activate_raw().ok(), "runner 测试终端必须进入 Raw 模式", failures);
+    rvemu::runtime::clear_host_stop_request();
+    const auto result =
+        rvemu::runtime::run_machine(*built.machine, terminal, rvemu::runtime::RunOptions{1U, 3U});
+    expect(result.ok() && result.iterations == 3U,
+           "runner 必须复用唯一事件循环并遵守测试迭代上限",
+           failures);
+    expect(terminal.restore().ok(), "runner 测试终端必须恢复", failures);
+}
+
 }  // namespace
 
 int main() {
@@ -218,6 +284,7 @@ int main() {
         test_boot_load(failures);
         test_machine_build(failures);
         test_host_signal_stop_flag(failures);
+        test_runner_limited_loop(failures);
     } catch (const std::exception& exception) {
         std::cerr << "启动运行测试基础设施失败：" << exception.what() << '\n';
         return 1;

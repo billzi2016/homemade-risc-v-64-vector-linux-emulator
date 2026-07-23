@@ -97,6 +97,7 @@ add_library(rvemu_runtime STATIC
     src/runtime/fdt.cpp
     src/runtime/host_signal.cpp
     src/runtime/machine.cpp
+    src/runtime/runner.cpp
 )
 
 target_include_directories(rvemu_runtime

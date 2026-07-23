@@ -398,7 +398,7 @@ DHCP、DNS 或 ICMP 网络链路。以下任务保留为规格边界记录，全
   - [x] **RUN-001B** 拒绝未知、重复、缺值、空值和不支持格式，省略 `--net` 等价于 `none`。
   - [x] **RUN-001C** 生产入口在真实运行链路未接通前返回内部错误，拒绝伪造 OpenSBI/Linux 输出。
   - [x] **RUN-001D** 生产入口完成资源校验、镜像格式错误与内部未接入运行循环的稳定退出码映射。
-  - [ ] **RUN-001E** 运行期 I/O 错误与信号退出的稳定退出码映射。
+  - [x] **RUN-001E** 运行期 I/O 错误与信号退出的稳定退出码映射。
   - 证据：`include/rvemu/runtime/cli.hpp`、`src/runtime/cli.cpp`、`src/main.cpp` 与
     `tests/unit/test_boot_runtime.cpp`；专项测试覆盖合法解析、缺失必需参数、重复参数、
     不支持格式、缺失磁盘资源、缺失 BIOS 镜像和 macOS 非 none 网络拒绝。
@@ -409,20 +409,23 @@ DHCP、DNS 或 ICMP 网络链路。以下任务保留为规格边界记录，全
     `tests/unit/test_event_loop.cpp`；事件循环统一执行 UART/终端服务、CLINT 推进、
     CLINT/PLIC/UART 中断同步、CPU pending interrupt、同步异常 `take_trap` 和一次 `step`。
   - 验证结果：事件循环专项测试和完整 CTest 24/24 通过；ASan/UBSan 完整 CTest 24/24 通过。
-- [ ] **RUN-003** 实现信号处理、终端恢复、文件和 TAP 资源清理。
+- [x] **RUN-003** 实现信号处理、终端恢复、文件和 TAP 资源清理。
   - [x] **RUN-003A** SIGINT/SIGTERM handler 只设置停止标志，主线程执行清理。
   - [x] **RUN-003B** 终端 Raw 后端提供析构和显式 `restore()` 的幂等恢复。
   - [x] **RUN-003C** 磁盘后端析构关闭 fd，macOS `--net none` 不创建 TAP 资源。
-  - [ ] **RUN-003D** 生产主循环收到停止请求后退出事件循环，并按稳定退出码汇报。
+  - [x] **RUN-003D** 生产主循环收到停止请求后退出事件循环，并按稳定退出码汇报。
   - 证据：`include/rvemu/runtime/host_signal.hpp`、`src/runtime/host_signal.cpp`、
     `include/rvemu/platform/terminal.hpp`、`src/platform/terminal.cpp`、
     `include/rvemu/platform/disk_backend.hpp`、`src/platform/disk_backend.cpp` 与
     `tests/unit/test_boot_runtime.cpp`；专项测试验证 SIGTERM 设置停止标志并可恢复原 handler。
 - [ ] **RUN-004** 将生产入口接入唯一主循环并保持真实运行语义。
-  - [ ] **RUN-004A** CLI 校验、镜像装载、FDT 放置、磁盘/TAP 打开和终端 Raw 切换严格按规格顺序执行。
-  - [ ] **RUN-004B** UART 字节直通 stdout，诊断只写 stderr，不污染来宾控制台流。
-  - [ ] **RUN-004C** VirtIO 队列通知、块设备请求、网络请求和 PLIC 中断在同一事件循环内推进。
+  - [x] **RUN-004A** CLI 校验、镜像装载、FDT 放置、磁盘打开和终端 Raw 切换严格按规格顺序执行。
+  - [x] **RUN-004B** UART 字节直通 stdout，诊断只写 stderr，不污染来宾控制台流。
+  - [x] **RUN-004C** VirtIO-Blk 队列通知、块设备请求和 PLIC 中断在同一事件循环内推进。
   - [ ] **RUN-004D** WFI、定时器期限和宿主 I/O 事件不会让 CPU 或设备永久饥饿。
+  - 证据：`include/rvemu/runtime/runner.hpp`、`src/runtime/runner.cpp`、`src/main.cpp` 与
+    `tests/unit/test_boot_runtime.cpp`；专项测试用伪终端和小型 raw/磁盘文件验证 runner 复用唯一
+    `EventLoop`、服务 VirtIO-Blk 并遵守测试迭代上限。
   - 完成条件：生产 `riscv_vector_emulator` 可用真实产物进入运行循环，且不打印任何伪来宾日志。
 - [ ] **RUN-005** 建立系统运行日志和失败诊断。
   - [ ] **RUN-005A** 保存 OpenSBI/Linux/UART 原始日志到被忽略的 `artifacts/logs/`。

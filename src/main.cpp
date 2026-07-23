@@ -4,8 +4,10 @@
 #include "rvemu/runtime/cli.hpp"
 #include "rvemu/runtime/host_signal.hpp"
 #include "rvemu/runtime/machine.hpp"
+#include "rvemu/runtime/runner.hpp"
 
 #include <iostream>
+#include <unistd.h>
 
 int main(int argc, char** argv) {
     const auto parsed = rvemu::runtime::parse_cli(argc, argv);
@@ -27,11 +29,28 @@ int main(int argc, char** argv) {
         std::cerr << signals.detail << '\n';
         return static_cast<int>(rvemu::runtime::ExitCode::Resource);
     }
-    const auto restored = rvemu::runtime::restore_host_signal_handlers();
-    if (!restored.ok()) {
-        std::cerr << restored.detail << '\n';
+
+    rvemu::platform::TerminalBackend terminal{STDIN_FILENO, STDOUT_FILENO};
+    const auto raw = terminal.activate_raw();
+    if (!raw.ok()) {
+        static_cast<void>(rvemu::runtime::restore_host_signal_handlers());
+        std::cerr << raw.detail << '\n';
         return static_cast<int>(rvemu::runtime::ExitCode::Resource);
     }
-    std::cerr << "整机资源和启动镜像校验已通过，但运行循环尚未接入生产入口；拒绝伪造 OpenSBI/Linux 输出。\n";
-    return static_cast<int>(rvemu::runtime::ExitCode::Internal);
+
+    const auto run = rvemu::runtime::run_machine(*machine.machine, terminal);
+    const auto terminal_restore = terminal.restore();
+    const auto signal_restore = rvemu::runtime::restore_host_signal_handlers();
+    if (!terminal_restore.ok()) {
+        std::cerr << terminal_restore.detail << '\n';
+        return static_cast<int>(rvemu::runtime::ExitCode::Resource);
+    }
+    if (!signal_restore.ok()) {
+        std::cerr << signal_restore.detail << '\n';
+        return static_cast<int>(rvemu::runtime::ExitCode::Resource);
+    }
+    if (!run.ok()) {
+        std::cerr << run.error << '\n';
+    }
+    return static_cast<int>(run.exit_code);
 }
