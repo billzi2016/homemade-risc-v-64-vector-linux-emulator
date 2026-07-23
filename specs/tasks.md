@@ -328,24 +328,24 @@
     大文件写或刷盘；常规与 ASan/UBSan 完整 CTest 均为 25/25 通过；`git diff --check` 无输出。
 - [ ] **BLK-003** 验证真实 ext4 镜像读写、完成中断和错误恢复。
 
-## 12. 阶段 10：macOS 不做网络链路
+## 12. 阶段 10：macOS 不做网络链路（macOS 做不了）
 
 当前收尾目标固定为 macOS `--net none` 真实无网络启动。原因是 macOS 不提供 Linux TAP/TUN
 同语义设备，网桥/NAT/路由配置还需要宿主网络管理权限，会改变宿主网络状态并引入不可控恢复风险。
 本项目当前不申请、不修改这类宿主网络权限；因此 macOS 不实现、不验证、不伪造 Linux TAP/网桥/NAT、
 DHCP、DNS 或 ICMP 网络链路。以下任务保留为规格边界记录，全部不打勾。
 
-- [ ] **NET-LOCKED-001** VirtIO-Net feature、队列及 10/12 字节头协商。
+- [ ] **NET-LOCKED-001（macOS 做不了）** VirtIO-Net feature、队列及 10/12 字节头协商。
   - 锁定原因：当前 macOS 档位不做网络设备；不得为了打勾实现无宿主链路的半套 VirtIO-Net。
-- [ ] **NET-LOCKED-002** 来宾 TX 描述符收集、头部处理和 TAP 写入。
+- [ ] **NET-LOCKED-002（macOS 做不了）** 来宾 TX 描述符收集、头部处理和 TAP 写入。
   - 锁定原因：macOS 不创建 Linux TAP，也不写伪 TAP 后端。
-- [ ] **NET-LOCKED-003** TAP 收包、RX 缓冲填充、used ring 和 PLIC 中断。
+- [ ] **NET-LOCKED-003（macOS 做不了）** TAP 收包、RX 缓冲填充、used ring 和 PLIC 中断。
   - 锁定原因：没有真实 TAP 收包链路时不得用 mock 包或宿主命令冒充。
-- [ ] **NET-LOCKED-004** 非阻塞事件处理、背压、短读写和包边界保护。
+- [ ] **NET-LOCKED-004（macOS 做不了）** 非阻塞事件处理、背压、短读写和包边界保护。
   - 锁定原因：网络事件循环只属于 Linux TAP 档位，当前 macOS 收尾不做。
-- [ ] **NET-LOCKED-005** TAP/网桥/NAT 配置脚本和恢复步骤。
+- [ ] **NET-LOCKED-005（macOS 做不了）** TAP/网桥/NAT 配置脚本和恢复步骤。
   - 锁定原因：macOS 收尾不得修改宿主网络，不提供伪配置。
-- [ ] **NET-LOCKED-006** 真实链路验证 DHCP、ARP、DNS 和 ICMP。
+- [ ] **NET-LOCKED-006（macOS 做不了）** 真实链路验证 DHCP、ARP、DNS 和 ICMP。
   - 锁定原因：当前环境无法执行 Linux TAP 验收，保持未完成且不作为 macOS 交付阻断。
 
 ## 13. 阶段 11：引导与运行时
@@ -397,9 +397,11 @@ DHCP、DNS 或 ICMP 网络链路。以下任务保留为规格边界记录，全
   - [x] **RUN-001A** 解析 `--bios`、`--kernel`、`--disk`、`--net`、`--bios-format raw` 和 `--kernel-format raw`。
   - [x] **RUN-001B** 拒绝未知、重复、缺值、空值和不支持格式，省略 `--net` 等价于 `none`。
   - [x] **RUN-001C** 生产入口在真实运行链路未接通前返回内部错误，拒绝伪造 OpenSBI/Linux 输出。
-  - [ ] **RUN-001D** 生产入口完成资源校验、镜像格式错误、运行期 I/O 错误与信号退出的稳定退出码映射。
-  - 证据：`include/rvemu/runtime/cli.hpp`、`src/runtime/cli.cpp` 与 `src/main.cpp`；专项测试覆盖合法解析、
-    缺失必需参数、重复参数和不支持格式。
+  - [x] **RUN-001D** 生产入口完成资源校验、镜像格式错误与内部未接入运行循环的稳定退出码映射。
+  - [ ] **RUN-001E** 运行期 I/O 错误与信号退出的稳定退出码映射。
+  - 证据：`include/rvemu/runtime/cli.hpp`、`src/runtime/cli.cpp`、`src/main.cpp` 与
+    `tests/unit/test_boot_runtime.cpp`；专项测试覆盖合法解析、缺失必需参数、重复参数、
+    不支持格式、缺失磁盘资源、缺失 BIOS 镜像和 macOS 非 none 网络拒绝。
   - 完成条件：同时支持省略网络或 `--net none` 的无网络启动，以及 Linux `--net <tap>`；不得在 macOS 创建伪网络后端。
 - [x] **RUN-002** 实现取指、执行、设备 tick、中断检查的唯一主循环。
   - 证据：`include/rvemu/runtime/event_loop.hpp`、`src/runtime/event_loop.cpp` 与
@@ -444,11 +446,11 @@ DHCP、DNS 或 ICMP 网络链路。以下任务保留为规格边界记录，全
   - [ ] **SYS-005A** 普通键入字符由宿主 Raw 终端进入 UART RX，再被来宾 Shell 读取。
   - [ ] **SYS-005B** `Ctrl+C` 等控制字节传给来宾，不被宿主提前截获。
   - [ ] **SYS-005C** 退出流程使用文档化宿主退出机制并恢复终端。
-### Linux TAP 网络验收锁定：macOS 不做也不打勾
+### Linux TAP 网络验收锁定（macOS 做不了）
 
-- [ ] **SYS-LOCKED-006** 在 Linux TAP 档位的来宾执行 `dhclient eth0` 并获取独立 IP。
+- [ ] **SYS-LOCKED-006（macOS 做不了）** 在 Linux TAP 档位的来宾执行 `dhclient eth0` 并获取独立 IP。
   - 锁定原因：当前项目收尾只做 macOS `--net none`；没有 Linux TAP 环境时不得伪造 DHCP。
-- [ ] **SYS-LOCKED-007** 在 Linux TAP 档位的来宾解析 `google.com` 并执行 `ping -c 4 google.com`。
+- [ ] **SYS-LOCKED-007（macOS 做不了）** 在 Linux TAP 档位的来宾解析 `google.com` 并执行 `ping -c 4 google.com`。
   - 锁定原因：当前项目收尾只做 macOS `--net none`；不得用宿主 DNS/ping 或跳过网络替代。
 - [ ] **SYS-008** 完成全部需求追踪复核，无伪造、跳过或未声明偏差。
   - [ ] **SYS-008A** 逐项复核 `specs/` 强制需求到实现、测试和系统日志证据。

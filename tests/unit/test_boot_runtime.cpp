@@ -170,6 +170,20 @@ void test_machine_build(int& failures) {
     expect(!rejected.ok() && rejected.exit_code == rvemu::runtime::ExitCode::Resource,
            "macOS 档位必须拒绝非 none 网络",
            failures);
+
+    config.cli.net = "none";
+    config.cli.disk_path = (temp / "missing.ext4").string();
+    const auto missing_disk = rvemu::runtime::build_machine(config);
+    expect(!missing_disk.ok() && missing_disk.exit_code == rvemu::runtime::ExitCode::Resource,
+           "缺失磁盘镜像必须映射为资源错误",
+           failures);
+
+    config.cli.disk_path = disk.string();
+    config.cli.bios_path = (temp / "missing-opensbi.raw").string();
+    const auto missing_bios = rvemu::runtime::build_machine(config);
+    expect(!missing_bios.ok() && missing_bios.exit_code == rvemu::runtime::ExitCode::ImageFormat,
+           "缺失 BIOS 必须映射为镜像错误且不进入运行循环",
+           failures);
 }
 
 }  // namespace
