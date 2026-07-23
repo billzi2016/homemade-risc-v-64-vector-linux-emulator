@@ -328,21 +328,72 @@
     大文件写或刷盘；常规与 ASan/UBSan 完整 CTest 均为 25/25 通过；`git diff --check` 无输出。
 - [ ] **BLK-003** 验证真实 ext4 镜像读写、完成中断和错误恢复。
 
-## 12. 阶段 10：VirtIO 网络与宿主链路
+## 12. 阶段 10：macOS 不做网络链路
 
-- [ ] **NET-001** 实现 VirtIO-Net feature、队列及 10/12 字节头协商。
-- [ ] **NET-002** 实现来宾 TX 描述符收集、头部处理和 TAP 写入。
-- [ ] **NET-003** 实现 TAP 收包、RX 缓冲填充、used ring 和 PLIC 中断。
-- [ ] **NET-004** 实现非阻塞事件处理、背压、短读写和包边界保护。
-- [ ] **NET-005** 提供经确认的 TAP/网桥/NAT 配置脚本和恢复步骤。
-- [ ] **NET-006** 使用真实链路验证 DHCP、ARP、DNS 和 ICMP。
+当前收尾目标固定为 macOS `--net none` 真实无网络启动。macOS 不实现、不验证、不伪造
+Linux TAP/网桥/NAT、DHCP、DNS 或 ICMP 网络链路；以下任务保留为规格边界记录，全部不打勾。
+
+- [ ] **NET-LOCKED-001** VirtIO-Net feature、队列及 10/12 字节头协商。
+  - 锁定原因：当前 macOS 档位不做网络设备；不得为了打勾实现无宿主链路的半套 VirtIO-Net。
+- [ ] **NET-LOCKED-002** 来宾 TX 描述符收集、头部处理和 TAP 写入。
+  - 锁定原因：macOS 不创建 Linux TAP，也不写伪 TAP 后端。
+- [ ] **NET-LOCKED-003** TAP 收包、RX 缓冲填充、used ring 和 PLIC 中断。
+  - 锁定原因：没有真实 TAP 收包链路时不得用 mock 包或宿主命令冒充。
+- [ ] **NET-LOCKED-004** 非阻塞事件处理、背压、短读写和包边界保护。
+  - 锁定原因：网络事件循环只属于 Linux TAP 档位，当前 macOS 收尾不做。
+- [ ] **NET-LOCKED-005** TAP/网桥/NAT 配置脚本和恢复步骤。
+  - 锁定原因：macOS 收尾不得修改宿主网络，不提供伪配置。
+- [ ] **NET-LOCKED-006** 真实链路验证 DHCP、ARP、DNS 和 ICMP。
+  - 锁定原因：当前环境无法执行 Linux TAP 验收，保持未完成且不作为 macOS 交付阻断。
 
 ## 13. 阶段 11：引导与运行时
 
+- [ ] **ART-001** 冻结真实 OpenSBI、Linux、rootfs 和工具版本。
+  - [ ] **ART-001A** 记录 OpenSBI 来源、版本、构建配置、许可证和 SHA-256。
+  - [ ] **ART-001B** 记录 Linux LTS 来源、版本、`.config`、构建参数、许可证和 SHA-256。
+  - [ ] **ART-001C** 记录 rootfs 来源、包清单、账号策略、许可证和 SHA-256。
+  - [ ] **ART-001D** 记录 `dtc`、交叉工具链和 ext4 工具版本；缺失工具不得用模型输出或字符串测试替代。
+  - 完成条件：所有外部产物均可复现，二进制和镜像不提交 Git。
+- [ ] **ART-002** 准备真实 ext4 rootfs 镜像且控制宿主写入规模。
+  - [ ] **ART-002A** rootfs 是真实 ext4，不使用 initramfs、tar 目录或 mock 镜像冒充。
+  - [ ] **ART-002B** rootfs 包含 init、Shell、proc/sys/dev 挂载逻辑、`cat`、`pwd`、`ls`、网络工具和 DNS 配置。
+  - [ ] **ART-002C** 镜像容量与文件系统大小一致，VirtIO-Blk 可按 512 字节扇区安全访问。
+  - [ ] **ART-002D** 记录镜像创建或导入步骤、校验值和预计写入量；禁止压力循环、大文件刷写或无意义反复 fsync。
+  - 完成条件：`BLK-003` 可使用该镜像做真实读写和错误恢复验证。
 - [ ] **BOOT-001** 实现 BIOS、内核和磁盘参数校验及安全装载。
+  - [x] **BOOT-001A** 明确 raw BIOS/kernel 格式，不按文件名猜测 ELF 或 raw。
+  - [x] **BOOT-001B** 装载前校验文件非空、目标范围、RAM 包含关系、地址溢出和镜像重叠。
+  - [x] **BOOT-001C** BIOS/kernel/FDT 只经统一物理总线初始化写入，不绕过 RAM 或伪造来宾输出。
+  - [ ] **BOOT-001D** 生产入口打开并校验 `--disk` 指定的真实 rootfs 镜像，再绑定 VirtIO-Blk。
+  - [ ] **BOOT-001E** 若支持 ELF BIOS 或 ELF kernel，必须复用严格 ELF64 RISC-V 校验并验证段权限与范围。
+  - 证据：`include/rvemu/runtime/boot.hpp`、`src/runtime/boot.cpp` 与
+    `tests/unit/test_boot_runtime.cpp`；当前完成 raw BIOS/kernel 与 FDT 的安全装载基础。
+  - 已知缺口：磁盘路径已由 CLI 解析，但生产入口尚未打开真实 ext4 镜像并绑定块设备。
 - [ ] **BOOT-002** 生成与机器模型一致的 FDT，并放置于规定内存位置。
-- [ ] **BOOT-003** 设置 OpenSBI 入口寄存器、PC 和 RAM 布局。
+  - [x] **BOOT-002A** 由统一地址图生成 RAM、chosen、单 Hart CPU/Sv39、CLINT、PLIC、UART 和两个 VirtIO MMIO 节点。
+  - [x] **BOOT-002B** 将 DTB 放入 RAM 内明确保留区，并在 memreserve 中保护该范围。
+  - [ ] **BOOT-002C** 使用 `dtc`、`fdtdump` 或等价正式工具反编译验证 DTB 结构、地址和中断属性。
+  - 证据：`include/rvemu/runtime/fdt.hpp`、`src/runtime/fdt.cpp`；专项测试验证 DTB magic、
+    `virtio,mmio`、`root=/dev/vda` 和 `riscv,sv39` 字符串存在。
+  - 已知缺口：当前宿主未发现 `dtc`、`fdtdump` 或 `fdtget`，因此父项不得勾选。
+- [x] **BOOT-003** 设置 OpenSBI 入口寄存器、PC 和 RAM 布局。
+  - 证据：`BootLayout` 冻结 `BIOS=0x80000000`、`kernel=0x80200000`、FDT 位于 RAM 保留区；
+    `load_boot_images()` 成功后复位 CPU 到 M-mode，设置 `PC=bios_load_address`、
+    `a0=hartid 0`、`a1=fdt_address`。
+  - 验证结果：专项测试读取 CPU 真实状态验证 PC/a0/a1；不打印伪 OpenSBI Banner。
+- [ ] **BOOT-004** 组装真实单 Hart 机器实例。
+  - [ ] **BOOT-004A** 生产入口注册 RAM、CLINT、PLIC、UART、VirtIO-Blk、VirtIO-Net 和必要 Boot/FDT 内存区域。
+  - [ ] **BOOT-004B** 所有设备地址、中断源、queue 数量和 feature 与 FDT 使用同一配置来源。
+  - [ ] **BOOT-004C** VirtIO-Blk 使用真实 `DiskBackend`，只打开用户传入镜像，不创建或下载镜像。
+  - [ ] **BOOT-004D** macOS `--net none` 不创建 TAP；Linux TAP 档位只在明确指定接口时打开真实 TAP。
+  - 完成条件：整机注册冲突、缺设备、地址/FDT 不一致都能在进入 Raw 终端前失败退出。
 - [ ] **RUN-001** 实现规范 CLI 和稳定错误退出码。
+  - [x] **RUN-001A** 解析 `--bios`、`--kernel`、`--disk`、`--net`、`--bios-format raw` 和 `--kernel-format raw`。
+  - [x] **RUN-001B** 拒绝未知、重复、缺值、空值和不支持格式，省略 `--net` 等价于 `none`。
+  - [x] **RUN-001C** 生产入口在真实运行链路未接通前返回内部错误，拒绝伪造 OpenSBI/Linux 输出。
+  - [ ] **RUN-001D** 生产入口完成资源校验、镜像格式错误、运行期 I/O 错误与信号退出的稳定退出码映射。
+  - 证据：`include/rvemu/runtime/cli.hpp`、`src/runtime/cli.cpp` 与 `src/main.cpp`；专项测试覆盖合法解析、
+    缺失必需参数、重复参数和不支持格式。
   - 完成条件：同时支持省略网络或 `--net none` 的无网络启动，以及 Linux `--net <tap>`；不得在 macOS 创建伪网络后端。
 - [x] **RUN-002** 实现取指、执行、设备 tick、中断检查的唯一主循环。
   - 证据：`include/rvemu/runtime/event_loop.hpp`、`src/runtime/event_loop.cpp` 与
@@ -350,18 +401,53 @@
     CLINT/PLIC/UART 中断同步、CPU pending interrupt、同步异常 `take_trap` 和一次 `step`。
   - 验证结果：事件循环专项测试和完整 CTest 24/24 通过；ASan/UBSan 完整 CTest 24/24 通过。
 - [ ] **RUN-003** 实现信号处理、终端恢复、文件和 TAP 资源清理。
+- [ ] **RUN-004** 将生产入口接入唯一主循环并保持真实运行语义。
+  - [ ] **RUN-004A** CLI 校验、镜像装载、FDT 放置、磁盘/TAP 打开和终端 Raw 切换严格按规格顺序执行。
+  - [ ] **RUN-004B** UART 字节直通 stdout，诊断只写 stderr，不污染来宾控制台流。
+  - [ ] **RUN-004C** VirtIO 队列通知、块设备请求、网络请求和 PLIC 中断在同一事件循环内推进。
+  - [ ] **RUN-004D** WFI、定时器期限和宿主 I/O 事件不会让 CPU 或设备永久饥饿。
+  - 完成条件：生产 `riscv_vector_emulator` 可用真实产物进入运行循环，且不打印任何伪来宾日志。
+- [ ] **RUN-005** 建立系统运行日志和失败诊断。
+  - [ ] **RUN-005A** 保存 OpenSBI/Linux/UART 原始日志到被忽略的 `artifacts/logs/`。
+  - [ ] **RUN-005B** 失败诊断包含 PC、特权级、trap cause、设备名和宿主 I/O errno。
+  - [ ] **RUN-005C** 日志不包含宿主绝对工作区路径、隐私信息或伪造状态。
+  - 完成条件：系统验收失败时有可审查证据，成功时有完整原始日志。
 
 ## 14. 阶段 12：真实系统验收
 
 - [ ] **SYS-001** 使用真实 OpenSBI 观察并保存 Banner 证据。
+  - [ ] **SYS-001A** 运行用户提供或已冻结 SHA-256 的 OpenSBI 二进制，不使用测试字符串或伪固件。
+  - [ ] **SYS-001B** 日志显示 OpenSBI 识别 hart、platform、ISA、timebase 和 next stage。
+  - [ ] **SYS-001C** 记录 OpenSBI 实际设置的委托、中断和计时器相关状态。
+  - 完成条件：原始 UART 日志中出现真实 OpenSBI 输出，且能追溯到对应二进制校验值。
 - [ ] **SYS-002** 使用真实 Linux 内核完成启动，无 Kernel Panic。
+  - [ ] **SYS-002A** Linux 通过 FDT 识别 RAM、CPU ISA、Sv39、CLINT、PLIC 和 UART。
+  - [ ] **SYS-002B** Linux 识别 VirtIO MMIO transport、VirtIO-Blk 和可选 VirtIO-Net。
+  - [ ] **SYS-002C** 启动日志无 kernel panic、oops、根设备超时或驱动探测伪成功。
+  - 完成条件：原始日志覆盖从 kernel entry 到 init 启动前后的真实输出。
 - [ ] **SYS-003** 挂载真实 ext4 rootfs 并进入可交互 Shell。
-- [ ] **SYS-003A** 在 macOS 使用 `--net none` 完成真实启动，并在来宾 Shell 执行 `ls /`、`pwd` 和 `cat /proc/cpuinfo`。
-- [ ] **SYS-004** 验证 UART 字符和控制组合键由来宾接收。
-- [ ] **SYS-005** 在 Linux TAP 档位的来宾执行 `dhclient eth0` 并获取独立 IP。
-- [ ] **SYS-006** 在 Linux TAP 档位的来宾解析 `google.com` 并执行 `ping -c 4 google.com`。
-- [ ] **SYS-007** 在 Linux TAP 档位确认 4 个 ICMP 响应且丢包率为 0%，保存完整日志和环境说明。
+  - [ ] **SYS-003A** Linux 以 `root=/dev/vda rootfstype=ext4` 挂载真实 VirtIO-Blk rootfs。
+  - [ ] **SYS-003B** init 脚本挂载 proc、sysfs 和 devtmpfs 或等价真实设备管理。
+  - [ ] **SYS-003C** 进入真实 Shell，能够执行用户空间命令，不使用 initramfs 冒充 ext4。
+  - 完成条件：Shell 提示符和命令响应来自来宾 UART 原始流。
+- [ ] **SYS-004** 在 macOS 使用 `--net none` 完成真实启动并执行基础命令。
+  - [ ] **SYS-004A** 生产命令使用 `--net none`，不创建 TAP、不修改宿主网络。
+  - [ ] **SYS-004B** 在来宾 Shell 执行 `ls /`、`pwd` 和 `cat /proc/cpuinfo`。
+  - [ ] **SYS-004C** 保存完整 UART 日志和命令输出，明确运行日期、产物 SHA-256 和宿主系统。
+- [ ] **SYS-005** 验证 UART 字符和控制组合键由来宾接收。
+  - [ ] **SYS-005A** 普通键入字符由宿主 Raw 终端进入 UART RX，再被来宾 Shell 读取。
+  - [ ] **SYS-005B** `Ctrl+C` 等控制字节传给来宾，不被宿主提前截获。
+  - [ ] **SYS-005C** 退出流程使用文档化宿主退出机制并恢复终端。
+### Linux TAP 网络验收锁定：macOS 不做也不打勾
+
+- [ ] **SYS-LOCKED-006** 在 Linux TAP 档位的来宾执行 `dhclient eth0` 并获取独立 IP。
+  - 锁定原因：当前项目收尾只做 macOS `--net none`；没有 Linux TAP 环境时不得伪造 DHCP。
+- [ ] **SYS-LOCKED-007** 在 Linux TAP 档位的来宾解析 `google.com` 并执行 `ping -c 4 google.com`。
+  - 锁定原因：当前项目收尾只做 macOS `--net none`；不得用宿主 DNS/ping 或跳过网络替代。
 - [ ] **SYS-008** 完成全部需求追踪复核，无伪造、跳过或未声明偏差。
+  - [ ] **SYS-008A** 逐项复核 `specs/` 强制需求到实现、测试和系统日志证据。
+  - [ ] **SYS-008B** 明确列出仍未满足的限制，禁止把单元测试当作 OpenSBI/Linux 验收。
+  - [ ] **SYS-008C** 全量常规 CTest、ASan/UBSan CTest、系统日志和产物校验均保存或引用。
 
 ## 15. 文档站与 GitHub Pages
 

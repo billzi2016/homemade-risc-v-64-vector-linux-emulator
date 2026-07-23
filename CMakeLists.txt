@@ -91,7 +91,10 @@ target_compile_features(rvemu_devices PUBLIC cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_devices)
 
 add_library(rvemu_runtime STATIC
+    src/runtime/boot.cpp
+    src/runtime/cli.cpp
     src/runtime/event_loop.cpp
+    src/runtime/fdt.cpp
 )
 
 target_include_directories(rvemu_runtime
@@ -102,6 +105,17 @@ target_include_directories(rvemu_runtime
 target_link_libraries(rvemu_runtime PUBLIC rvemu_core rvemu_devices rvemu_platform)
 target_compile_features(rvemu_runtime PUBLIC cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_runtime)
+
+add_executable(riscv_vector_emulator
+    src/main.cpp
+)
+
+target_link_libraries(riscv_vector_emulator
+    PRIVATE
+        rvemu_runtime
+)
+target_compile_features(riscv_vector_emulator PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(riscv_vector_emulator)
 
 add_library(rvemu_conformance STATIC
     src/conformance/elf_loader.cpp

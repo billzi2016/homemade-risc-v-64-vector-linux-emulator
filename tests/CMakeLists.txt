@@ -145,6 +145,12 @@ target_compile_features(rvemu_event_loop_tests PRIVATE cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_event_loop_tests)
 add_test(NAME rvemu.event_loop COMMAND rvemu_event_loop_tests)
 
+add_executable(rvemu_boot_runtime_tests unit/test_boot_runtime.cpp)
+target_link_libraries(rvemu_boot_runtime_tests PRIVATE rvemu_runtime)
+target_compile_features(rvemu_boot_runtime_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_boot_runtime_tests)
+add_test(NAME rvemu.boot_runtime COMMAND rvemu_boot_runtime_tests)
+
 add_executable(rvemu_cpu_m_tests
     unit/test_cpu_m.cpp
 )
