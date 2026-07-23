@@ -19,6 +19,7 @@ struct FdtConfig final {
     std::uint32_t timebase_frequency{10'000'000U};
     std::string bootargs{"console=ttyS0,115200 earlycon root=/dev/vda rw rootfstype=ext4"};
     std::string isa{"rv64imafdcv"};
+    bool include_network{false};
 };
 
 struct FdtBuildResult final {

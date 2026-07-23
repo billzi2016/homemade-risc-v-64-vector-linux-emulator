@@ -8,6 +8,7 @@
 #include "rvemu/runtime/boot.hpp"
 #include "rvemu/runtime/cli.hpp"
 #include "rvemu/runtime/fdt.hpp"
+#include "rvemu/runtime/machine.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -88,6 +89,9 @@ void test_fdt(int& failures) {
     expect(blob_text.find("riscv,sv39") != std::string::npos,
            "FDT CPU 节点必须声明 Sv39",
            failures);
+    expect(blob_text.find("10002000") == std::string::npos,
+           "macOS --net none 默认 FDT 不得暴露 VirtIO-Net 节点",
+           failures);
 }
 
 void test_boot_load(int& failures) {
@@ -129,6 +133,45 @@ void test_boot_load(int& failures) {
     expect(!rejected.ok(), "BIOS/kernel 范围重叠必须拒绝", failures);
 }
 
+void test_machine_build(int& failures) {
+    const auto temp = std::filesystem::path{"build"} / "machine-build-test";
+    std::filesystem::create_directories(temp);
+    const auto bios = temp / "opensbi.raw";
+    const auto kernel = temp / "Image.raw";
+    const auto disk = temp / "rootfs.ext4";
+    write_file(bios, {0x13U, 0x00U, 0x00U, 0x00U});
+    write_file(kernel, {0x6FU, 0x00U, 0x00U, 0x00U});
+    write_file(disk, std::vector<std::uint8_t>(512U, 0x5AU));
+
+    rvemu::runtime::MachineConfig config;
+    config.cli.bios_path = bios.string();
+    config.cli.kernel_path = kernel.string();
+    config.cli.disk_path = disk.string();
+    config.cli.net = "none";
+    config.boot_layout.ram_size = 0x0040'0000U;
+    config.boot_layout.fdt_address = config.boot_layout.ram_base + 0x0030'0000U;
+    config.boot_layout.fdt_reserved_size = 0x0002'0000U;
+    const auto built = rvemu::runtime::build_machine(config);
+    expect(built.ok(), "macOS --net none 整机资源必须组装成功", failures);
+    if (built.ok()) {
+        expect(built.machine->bus.region_count() == 5U,
+               "macOS --net none 只注册 RAM/CLINT/PLIC/UART/VirtIO-Blk",
+               failures);
+        expect(built.machine->cpu.state().program_counter() == config.boot_layout.bios_load_address,
+               "整机组装后 CPU PC 必须指向 BIOS",
+               failures);
+        expect(built.machine->disk.capacity_sectors() == 1U,
+               "整机组装必须打开并校验真实磁盘镜像",
+               failures);
+    }
+
+    config.cli.net = "tap0";
+    const auto rejected = rvemu::runtime::build_machine(config);
+    expect(!rejected.ok() && rejected.exit_code == rvemu::runtime::ExitCode::Resource,
+           "macOS 档位必须拒绝非 none 网络",
+           failures);
+}
+
 }  // namespace
 
 int main() {
@@ -137,6 +180,7 @@ int main() {
         test_cli(failures);
         test_fdt(failures);
         test_boot_load(failures);
+        test_machine_build(failures);
     } catch (const std::exception& exception) {
         std::cerr << "启动运行测试基础设施失败：" << exception.what() << '\n';
         return 1;

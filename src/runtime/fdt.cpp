@@ -256,14 +256,16 @@ FdtBuildResult build_machine_fdt(const FdtConfig& config) {
     writer.prop_u32("interrupts", kVirtioBlockInterrupt);
     writer.end_node();
 
-    writer.begin_node("virtio@10002000");
-    writer.prop_string("compatible", "virtio,mmio");
-    writer.prop_u64_pair("reg",
-                         bus::address_map::kVirtioNetwork.base,
-                         bus::address_map::kVirtioNetwork.size);
-    writer.prop_u32("interrupt-parent", kPlicPhandle);
-    writer.prop_u32("interrupts", kVirtioNetworkInterrupt);
-    writer.end_node();
+    if (config.include_network) {
+        writer.begin_node("virtio@10002000");
+        writer.prop_string("compatible", "virtio,mmio");
+        writer.prop_u64_pair("reg",
+                             bus::address_map::kVirtioNetwork.base,
+                             bus::address_map::kVirtioNetwork.size);
+        writer.prop_u32("interrupt-parent", kPlicPhandle);
+        writer.prop_u32("interrupts", kVirtioNetworkInterrupt);
+        writer.end_node();
+    }
     writer.end_node();
     writer.end_node();
 

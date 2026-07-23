@@ -95,6 +95,7 @@ add_library(rvemu_runtime STATIC
     src/runtime/cli.cpp
     src/runtime/event_loop.cpp
     src/runtime/fdt.cpp
+    src/runtime/machine.cpp
 )
 
 target_include_directories(rvemu_runtime
