@@ -362,12 +362,12 @@ DHCP、DNS 或 ICMP 网络链路。以下任务保留为规格边界记录，全
   - [ ] **ART-002C** 镜像容量与文件系统大小一致，VirtIO-Blk 可按 512 字节扇区安全访问。
   - [ ] **ART-002D** 记录镜像创建或导入步骤、校验值和预计写入量；禁止压力循环、大文件刷写或无意义反复 fsync。
   - 完成条件：`BLK-003` 可使用该镜像做真实读写和错误恢复验证。
-- [ ] **BOOT-001** 实现 BIOS、内核和磁盘参数校验及安全装载。
+- [x] **BOOT-001** 实现 BIOS、内核和磁盘参数校验及安全装载。
   - [x] **BOOT-001A** 明确 raw BIOS/kernel 格式，不按文件名猜测 ELF 或 raw。
   - [x] **BOOT-001B** 装载前校验文件非空、目标范围、RAM 包含关系、地址溢出和镜像重叠。
   - [x] **BOOT-001C** BIOS/kernel/FDT 只经统一物理总线初始化写入，不绕过 RAM 或伪造来宾输出。
   - [x] **BOOT-001D** 生产入口打开并校验 `--disk` 指定的真实 rootfs 镜像，再绑定 VirtIO-Blk。
-  - [ ] **BOOT-001E** 若支持 ELF BIOS 或 ELF kernel，必须复用严格 ELF64 RISC-V 校验并验证段权限与范围。
+  - [x] **BOOT-001E** 当前生产 CLI 明确不支持 ELF BIOS/kernel，非 `raw` 格式必须在装载前拒绝。
   - 证据：`include/rvemu/runtime/boot.hpp`、`src/runtime/boot.cpp`、
     `include/rvemu/runtime/machine.hpp`、`src/runtime/machine.cpp` 与
     `tests/unit/test_boot_runtime.cpp`；当前完成 raw BIOS/kernel/FDT 安全装载，并由整机组装
