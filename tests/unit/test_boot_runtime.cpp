@@ -8,6 +8,7 @@
 #include "rvemu/runtime/boot.hpp"
 #include "rvemu/runtime/cli.hpp"
 #include "rvemu/runtime/fdt.hpp"
+#include "rvemu/runtime/host_signal.hpp"
 #include "rvemu/runtime/machine.hpp"
 
 #include <cstdint>
@@ -15,6 +16,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <signal.h>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -186,6 +188,26 @@ void test_machine_build(int& failures) {
            failures);
 }
 
+void test_host_signal_stop_flag(int& failures) {
+    expect(rvemu::runtime::install_host_signal_handlers().ok(),
+           "宿主信号 handler 必须安装成功",
+           failures);
+    expect(!rvemu::runtime::host_stop_requested(),
+           "安装 handler 必须清除旧停止请求",
+           failures);
+    raise(SIGTERM);
+    expect(rvemu::runtime::host_stop_requested(),
+           "SIGTERM 必须只设置停止请求标志",
+           failures);
+    rvemu::runtime::clear_host_stop_request();
+    expect(!rvemu::runtime::host_stop_requested(),
+           "停止请求必须可由主线程清除",
+           failures);
+    expect(rvemu::runtime::restore_host_signal_handlers().ok(),
+           "宿主信号 handler 必须可恢复",
+           failures);
+}
+
 }  // namespace
 
 int main() {
@@ -195,6 +217,7 @@ int main() {
         test_fdt(failures);
         test_boot_load(failures);
         test_machine_build(failures);
+        test_host_signal_stop_flag(failures);
     } catch (const std::exception& exception) {
         std::cerr << "启动运行测试基础设施失败：" << exception.what() << '\n';
         return 1;

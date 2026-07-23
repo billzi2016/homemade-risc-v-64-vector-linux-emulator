@@ -402,13 +402,22 @@ DHCP、DNS 或 ICMP 网络链路。以下任务保留为规格边界记录，全
   - 证据：`include/rvemu/runtime/cli.hpp`、`src/runtime/cli.cpp`、`src/main.cpp` 与
     `tests/unit/test_boot_runtime.cpp`；专项测试覆盖合法解析、缺失必需参数、重复参数、
     不支持格式、缺失磁盘资源、缺失 BIOS 镜像和 macOS 非 none 网络拒绝。
-  - 完成条件：同时支持省略网络或 `--net none` 的无网络启动，以及 Linux `--net <tap>`；不得在 macOS 创建伪网络后端。
+  - 完成条件：当前 macOS 收尾档位支持省略网络或 `--net none` 的无网络启动；非 `none` 网络按
+    `NET-LOCKED-*（macOS 做不了）` 拒绝，不创建伪网络后端。
 - [x] **RUN-002** 实现取指、执行、设备 tick、中断检查的唯一主循环。
   - 证据：`include/rvemu/runtime/event_loop.hpp`、`src/runtime/event_loop.cpp` 与
     `tests/unit/test_event_loop.cpp`；事件循环统一执行 UART/终端服务、CLINT 推进、
     CLINT/PLIC/UART 中断同步、CPU pending interrupt、同步异常 `take_trap` 和一次 `step`。
   - 验证结果：事件循环专项测试和完整 CTest 24/24 通过；ASan/UBSan 完整 CTest 24/24 通过。
 - [ ] **RUN-003** 实现信号处理、终端恢复、文件和 TAP 资源清理。
+  - [x] **RUN-003A** SIGINT/SIGTERM handler 只设置停止标志，主线程执行清理。
+  - [x] **RUN-003B** 终端 Raw 后端提供析构和显式 `restore()` 的幂等恢复。
+  - [x] **RUN-003C** 磁盘后端析构关闭 fd，macOS `--net none` 不创建 TAP 资源。
+  - [ ] **RUN-003D** 生产主循环收到停止请求后退出事件循环，并按稳定退出码汇报。
+  - 证据：`include/rvemu/runtime/host_signal.hpp`、`src/runtime/host_signal.cpp`、
+    `include/rvemu/platform/terminal.hpp`、`src/platform/terminal.cpp`、
+    `include/rvemu/platform/disk_backend.hpp`、`src/platform/disk_backend.cpp` 与
+    `tests/unit/test_boot_runtime.cpp`；专项测试验证 SIGTERM 设置停止标志并可恢复原 handler。
 - [ ] **RUN-004** 将生产入口接入唯一主循环并保持真实运行语义。
   - [ ] **RUN-004A** CLI 校验、镜像装载、FDT 放置、磁盘/TAP 打开和终端 Raw 切换严格按规格顺序执行。
   - [ ] **RUN-004B** UART 字节直通 stdout，诊断只写 stderr，不污染来宾控制台流。

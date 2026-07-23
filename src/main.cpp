@@ -2,6 +2,7 @@
 // 边界：当前入口不伪造 Linux 启动；整机运行在后续 SYS 验证具备真实产物后接入。
 
 #include "rvemu/runtime/cli.hpp"
+#include "rvemu/runtime/host_signal.hpp"
 #include "rvemu/runtime/machine.hpp"
 
 #include <iostream>
@@ -20,6 +21,16 @@ int main(int argc, char** argv) {
     if (!machine.ok()) {
         std::cerr << machine.error << '\n';
         return static_cast<int>(machine.exit_code);
+    }
+    const auto signals = rvemu::runtime::install_host_signal_handlers();
+    if (!signals.ok()) {
+        std::cerr << signals.detail << '\n';
+        return static_cast<int>(rvemu::runtime::ExitCode::Resource);
+    }
+    const auto restored = rvemu::runtime::restore_host_signal_handlers();
+    if (!restored.ok()) {
+        std::cerr << restored.detail << '\n';
+        return static_cast<int>(rvemu::runtime::ExitCode::Resource);
     }
     std::cerr << "整机资源和启动镜像校验已通过，但运行循环尚未接入生产入口；拒绝伪造 OpenSBI/Linux 输出。\n";
     return static_cast<int>(rvemu::runtime::ExitCode::Internal);
