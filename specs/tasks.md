@@ -259,7 +259,16 @@
     拒绝和恢复原状态；严格构建和完整 CTest 为 22/22 通过；`build/sanitize` 的
     AddressSanitizer/UndefinedBehaviorSanitizer 构建与完整 CTest 为 22/22 通过；
     `git diff --check` 无输出。
-- [ ] **DEV-005** 验证定时器、外部中断和 UART 控制台持续交互。
+- [x] **DEV-005** 验证定时器、外部中断和 UART 控制台持续交互。
+  - 证据：`include/rvemu/runtime/event_loop.hpp`、`src/runtime/event_loop.cpp` 与
+    `tests/unit/test_event_loop.cpp`；单 Hart 事件循环在同一指令边界服务终端输入、UART RX/TX、
+    CLINT tick、UART 到 PLIC 电平、CLINT/PLIC 到 CSR pending，以及 CPU interrupt/trap/step。
+  - 验证结果：伪终端集成测试覆盖终端输入进入 UART RBR 并触发机器外部中断、UART THR 输出到
+    宿主终端、CLINT `mtimecmp` 定时器中断进入 `mtvec`；严格构建和完整 CTest 为 24/24
+    通过；`build/sanitize` 的 AddressSanitizer/UndefinedBehaviorSanitizer 构建与完整 CTest
+    为 24/24 通过；`git diff --check` 无输出。
+  - 已知边界：该任务完成的是设备与事件循环级持续交互验证，不替代 OpenSBI/Linux 控制台
+    系统验收；真实 Shell 交互仍由 `SYS-004` 覆盖。
 
 ## 11. 阶段 9：VirtIO 公共层与块设备
 
@@ -322,7 +331,11 @@
 - [ ] **BOOT-003** 设置 OpenSBI 入口寄存器、PC 和 RAM 布局。
 - [ ] **RUN-001** 实现规范 CLI 和稳定错误退出码。
   - 完成条件：同时支持省略网络或 `--net none` 的无网络启动，以及 Linux `--net <tap>`；不得在 macOS 创建伪网络后端。
-- [ ] **RUN-002** 实现取指、执行、设备 tick、中断检查的唯一主循环。
+- [x] **RUN-002** 实现取指、执行、设备 tick、中断检查的唯一主循环。
+  - 证据：`include/rvemu/runtime/event_loop.hpp`、`src/runtime/event_loop.cpp` 与
+    `tests/unit/test_event_loop.cpp`；事件循环统一执行 UART/终端服务、CLINT 推进、
+    CLINT/PLIC/UART 中断同步、CPU pending interrupt、同步异常 `take_trap` 和一次 `step`。
+  - 验证结果：事件循环专项测试和完整 CTest 24/24 通过；ASan/UBSan 完整 CTest 24/24 通过。
 - [ ] **RUN-003** 实现信号处理、终端恢复、文件和 TAP 资源清理。
 
 ## 14. 阶段 12：真实系统验收

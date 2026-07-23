@@ -133,6 +133,12 @@ target_compile_features(rvemu_terminal_tests PRIVATE cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_terminal_tests)
 add_test(NAME rvemu.terminal COMMAND rvemu_terminal_tests)
 
+add_executable(rvemu_event_loop_tests unit/test_event_loop.cpp)
+target_link_libraries(rvemu_event_loop_tests PRIVATE rvemu_runtime)
+target_compile_features(rvemu_event_loop_tests PRIVATE cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_event_loop_tests)
+add_test(NAME rvemu.event_loop COMMAND rvemu_event_loop_tests)
+
 add_executable(rvemu_cpu_m_tests
     unit/test_cpu_m.cpp
 )

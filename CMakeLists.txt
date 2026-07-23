@@ -88,6 +88,19 @@ target_include_directories(rvemu_platform
 target_compile_features(rvemu_platform PUBLIC cxx_std_17)
 rvemu_enable_strict_warnings(rvemu_platform)
 
+add_library(rvemu_runtime STATIC
+    src/runtime/event_loop.cpp
+)
+
+target_include_directories(rvemu_runtime
+    PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+)
+
+target_link_libraries(rvemu_runtime PUBLIC rvemu_core rvemu_devices rvemu_platform)
+target_compile_features(rvemu_runtime PUBLIC cxx_std_17)
+rvemu_enable_strict_warnings(rvemu_runtime)
+
 add_library(rvemu_conformance STATIC
     src/conformance/elf_loader.cpp
 )
