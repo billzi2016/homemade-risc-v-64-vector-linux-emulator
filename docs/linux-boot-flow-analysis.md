@@ -281,18 +281,18 @@ The table below maps the key booting phases in the Linux logs directly to the em
 
 | Booting Phase & Mechanism | MMIO / CSR Address | Emulator C++ Source File | Key Logic & Class Responsibility |
 | --- | --- | --- | --- |
-| **Boot ROM Reset** | `0x00001000` | [`src/memory/boot_rom.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/memory/boot_rom.cpp) | `BootRom`: Read-only init code loading, write-protection & sealing |
-| **OpenSBI Firmware Loading** | `0x80000000` (RAM) | [`src/runtime/boot.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/runtime/boot.cpp) | `load_boot_images()`: Safe binary loading, initializes `PC=0x80000000` |
-| **FDT Placement** | `0x82200000` (RAM) | [`src/runtime/fdt.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/runtime/fdt.cpp) | `FdtBuilder`: Generates DTB nodes, passes DTB base address in `a1` |
-| **Sv39 MMU Page Walk** | `satp` CSR | [`src/memory/mmu.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/memory/mmu.cpp) | `Mmu`: 3-level page table walk, TLB flushing, atomic A/D bit updates |
-| **RVV 1.0 Vector Engine** | `vtype`, `vl` CSRs | [`src/vector/vector_state.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/vector/vector_state.cpp) | `VectorState`: 32x256-bit vector register state & `mstatus.VS` maintenance |
-| **CLINT Timer Interrupt** | `0x02000000` | [`src/devices/clint.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/devices/clint.cpp) | `Clint`: `mtime` vs `mtimecmp` comparison, drives MTIP timer interrupts |
-| **PLIC Interrupt Controller** | `0x0C000000` | [`src/devices/plic.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/devices/plic.cpp) | `Plic`: 31 external interrupt priority arbitration & Claim/Complete |
-| **UART 16550A Serial** | `0x10000000` | [`src/devices/uart16550.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/devices/uart16550.cpp) | `Uart16550`: 8-bit MMIO registers, RBR/THR FIFOs & terminal bridge |
-| **VirtIO-Blk Device** | `0x10001000` | [`src/devices/virtio_block.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/devices/virtio_block.cpp) | `VirtioBlock`: 512-byte sector DMA I/O & Virtqueue descriptor chain parsing |
-| **VirtIO-Net NIC** | `0x10002000` | [`src/devices/virtio_mmio.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/devices/virtio_mmio.cpp) | `VirtioMmio`: VirtIO 1.0 state machine, RX/TX queues & TAP forwarding |
-| **Host Terminal Raw Mode** | Host PTY | [`src/platform/terminal.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/platform/terminal.cpp) | `TerminalBackend`: Host `termios` raw mode toggling & `O_NONBLOCK` I/O |
-| **Single-Hart Event Loop** | Cpu & Devices | [`src/runtime/event_loop.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/runtime/event_loop.cpp) | `EventLoop`: Instruction step, interrupt checks, & device ticks |
+| **Boot ROM Reset** | `0x00001000` | `src/memory/boot_rom.cpp` | `BootRom`: Read-only init code loading, write-protection & sealing |
+| **OpenSBI Firmware Loading** | `0x80000000` (RAM) | `src/runtime/boot.cpp` | `load_boot_images()`: Safe binary loading, initializes `PC=0x80000000` |
+| **FDT Placement** | `0x82200000` (RAM) | `src/runtime/fdt.cpp` | `FdtBuilder`: Generates DTB nodes, passes DTB base address in `a1` |
+| **Sv39 MMU Page Walk** | `satp` CSR | `src/memory/mmu.cpp` | `Mmu`: 3-level page table walk, TLB flushing, atomic A/D bit updates |
+| **RVV 1.0 Vector Engine** | `vtype`, `vl` CSRs | `src/vector/vector_state.cpp` | `VectorState`: 32x256-bit vector register state & `mstatus.VS` maintenance |
+| **CLINT Timer Interrupt** | `0x02000000` | `src/devices/clint.cpp` | `Clint`: `mtime` vs `mtimecmp` comparison, drives MTIP timer interrupts |
+| **PLIC Interrupt Controller** | `0x0C000000` | `src/devices/plic.cpp` | `Plic`: 31 external interrupt priority arbitration & Claim/Complete |
+| **UART 16550A Serial** | `0x10000000` | `src/devices/uart16550.cpp` | `Uart16550`: 8-bit MMIO registers, RBR/THR FIFOs & terminal bridge |
+| **VirtIO-Blk Device** | `0x10001000` | `src/devices/virtio_block.cpp` | `VirtioBlock`: 512-byte sector DMA I/O & Virtqueue descriptor chain parsing |
+| **VirtIO-Net NIC** | `0x10002000` | `src/devices/virtio_mmio.cpp` | `VirtioMmio`: VirtIO 1.0 state machine, RX/TX queues & TAP forwarding |
+| **Host Terminal Raw Mode** | Host PTY | `src/platform/terminal.cpp` | `TerminalBackend`: Host `termios` raw mode toggling & `O_NONBLOCK` I/O |
+| **Single-Hart Event Loop** | Cpu & Devices | `src/runtime/event_loop.cpp` | `EventLoop`: Instruction step, interrupt checks, & device ticks |
 
 ---
 
