@@ -433,7 +433,12 @@ DHCP、DNS 或 ICMP 网络链路。以下任务保留为规格边界记录，全
   - 完成条件：生产 `riscv_vector_emulator` 可用真实产物进入运行循环，且不打印任何伪来宾日志。
 - [ ] **RUN-005** 建立系统运行日志和失败诊断。
   - [x] **RUN-005A** 保存 OpenSBI/Linux/UART 原始日志到可提交审查的 `artifacts/logs/`。
-  - [ ] **RUN-005B** 失败诊断包含 PC、特权级、trap cause、设备名和宿主 I/O errno。
+  - [x] **RUN-005B** 失败诊断包含 PC、特权级、trap cause、设备名和宿主 I/O errno。
+    - 证据：`EventLoopIterationResult` 保存终端 errno 快照；`run_machine` 的运行期 I/O 错误输出
+      `device=`、`pc=0x`、`priv=`、`trap_cause=` 和 `errno=` 字段。
+    - 验证命令：`cmake --build build --target rvemu_boot_runtime_tests --parallel`；
+      `./build/tests/rvemu_boot_runtime_tests`。
+    - 验证结果：runner 专项测试通过，覆盖宿主终端输出错误诊断。
   - [x] **RUN-005C** 日志不包含宿主绝对工作区路径、隐私信息或伪造状态。
   - 证据：`run_all_logs.sh` 固定覆盖 `artifacts/logs/build.log`、`artifacts/logs/ctest.log`、
     `artifacts/logs/linux-boot-uart.log`；`RUN_DEBUG_BOOT=1` 时固定覆盖
@@ -441,8 +446,7 @@ DHCP、DNS 或 ICMP 网络链路。以下任务保留为规格边界记录，全
   - 验证命令：`BOOT_SECONDS=35 ./run_all_logs.sh`；对 `artifacts/logs/*.log`、运行脚本和文档执行宿主绝对路径关键字扫描。
   - 验证结果：构建日志生成成功；CTest 日志显示 `26/26` 通过；UART 日志保存真实 OpenSBI 输出；
     绝对路径扫描无命中。
-  - 已知缺口：`RUN-005B` 仍未完整覆盖设备名和宿主 I/O errno；完整 Linux 到 Shell 成功日志仍待
-    `SYS-002..SYS-004` 完成，因此父项暂不勾选。
+  - 已知缺口：完整 Linux 到 Shell 成功日志仍待 `SYS-002..SYS-004` 完成，因此父项暂不勾选。
   - 完成条件：系统验收失败时有可审查证据，成功时有完整原始日志。
 
 ## 14. 阶段 12：真实系统验收

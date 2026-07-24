@@ -13,6 +13,7 @@
 #include "rvemu/runtime/runner.hpp"
 
 #include <cstdint>
+#include <cerrno>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -46,7 +47,8 @@ void write_file(const std::filesystem::path& path, const std::vector<std::uint8_
     if (!stream) {
         throw std::runtime_error("无法创建测试镜像文件");
     }
-    stream.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    stream.write(reinterpret_cast<const char*>(bytes.data()),
+                 static_cast<std::streamsize>(bytes.size()));
     if (!stream) {
         throw std::runtime_error("无法写入测试镜像文件");
     }
@@ -70,12 +72,14 @@ void test_cli(int& failures) {
            "缺少 disk 必须报错",
            failures);
 
-    const char* duplicate[] = {"rvemu", "--bios", "b", "--bios", "b2", "--kernel", "k", "--disk", "d"};
+    const char* duplicate[] = {
+        "rvemu", "--bios", "b", "--bios", "b2", "--kernel", "k", "--disk", "d"};
     expect(!rvemu::runtime::parse_cli(9, const_cast<char**>(duplicate)).ok(),
            "重复参数必须报错",
            failures);
 
-    const char* bad_format[] = {"rvemu", "--bios", "b", "--kernel", "k", "--disk", "d", "--kernel-format", "elf"};
+    const char* bad_format[] = {
+        "rvemu", "--bios", "b", "--kernel", "k", "--disk", "d", "--kernel-format", "elf"};
     expect(!rvemu::runtime::parse_cli(9, const_cast<char**>(bad_format)).ok(),
            "不支持格式必须报错，不能按文件名猜测",
            failures);
@@ -95,16 +99,14 @@ void test_fdt(int& failures) {
     expect(blob_text.find("rootwait") != std::string::npos,
            "FDT chosen bootargs 必须等待 VirtIO-Blk root 出现",
            failures);
-    expect(blob_text.find("riscv,sv39") != std::string::npos,
-           "FDT CPU 节点必须声明 Sv39",
-           failures);
+    expect(
+        blob_text.find("riscv,sv39") != std::string::npos, "FDT CPU 节点必须声明 Sv39", failures);
     expect(blob_text.find("riscv,isa-base") != std::string::npos
                && blob_text.find("riscv,isa-extensions") != std::string::npos,
            "FDT CPU 节点必须提供新版 RISC-V ISA 属性",
            failures);
-    expect(blob_text.find("cpu-map") != std::string::npos,
-           "FDT 必须声明单 Hart CPU 拓扑",
-           failures);
+    expect(
+        blob_text.find("cpu-map") != std::string::npos, "FDT 必须声明单 Hart CPU 拓扑", failures);
     expect(blob_text.find("sifive,clint0") != std::string::npos
                && blob_text.find("riscv,plic0") != std::string::npos,
            "FDT 中断控制器 compatible 必须兼容 OpenSBI/Linux virt 约定",
@@ -210,17 +212,11 @@ void test_host_signal_stop_flag(int& failures) {
     expect(rvemu::runtime::install_host_signal_handlers().ok(),
            "宿主信号 handler 必须安装成功",
            failures);
-    expect(!rvemu::runtime::host_stop_requested(),
-           "安装 handler 必须清除旧停止请求",
-           failures);
+    expect(!rvemu::runtime::host_stop_requested(), "安装 handler 必须清除旧停止请求", failures);
     raise(SIGTERM);
-    expect(rvemu::runtime::host_stop_requested(),
-           "SIGTERM 必须只设置停止请求标志",
-           failures);
+    expect(rvemu::runtime::host_stop_requested(), "SIGTERM 必须只设置停止请求标志", failures);
     rvemu::runtime::clear_host_stop_request();
-    expect(!rvemu::runtime::host_stop_requested(),
-           "停止请求必须可由主线程清除",
-           failures);
+    expect(!rvemu::runtime::host_stop_requested(), "停止请求必须可由主线程清除", failures);
     expect(rvemu::runtime::restore_host_signal_handlers().ok(),
            "宿主信号 handler 必须可恢复",
            failures);
@@ -288,6 +284,62 @@ void test_runner_limited_loop(int& failures) {
     expect(terminal.restore().ok(), "runner 测试终端必须恢复", failures);
 }
 
+void test_runner_terminal_error_diagnostic(int& failures) {
+    const auto temp = std::filesystem::path{"build"} / "runner-diagnostic-test";
+    std::filesystem::create_directories(temp);
+    const auto bios = temp / "opensbi.raw";
+    const auto kernel = temp / "Image.raw";
+    const auto disk = temp / "rootfs.ext4";
+    write_file(bios, {0x13U, 0x00U, 0x00U, 0x00U});
+    write_file(kernel, {0x13U, 0x00U, 0x00U, 0x00U});
+    write_file(disk, std::vector<std::uint8_t>(512U, 0U));
+
+    rvemu::runtime::MachineConfig config;
+    config.cli.bios_path = bios.string();
+    config.cli.kernel_path = kernel.string();
+    config.cli.disk_path = disk.string();
+    config.cli.net = "none";
+    config.boot_layout.ram_size = 0x0040'0000U;
+    config.boot_layout.fdt_address = config.boot_layout.ram_base + 0x0030'0000U;
+    config.boot_layout.fdt_reserved_size = 0x0002'0000U;
+    auto built = rvemu::runtime::build_machine(config);
+    expect(built.ok(), "诊断测试整机必须组装成功", failures);
+    if (!built.ok()) {
+        return;
+    }
+
+    PtyPair pty;
+    rvemu::platform::TerminalBackend terminal{pty.slave(), -1};
+    expect(terminal.activate_raw().ok(), "诊断测试终端必须进入 Raw 模式", failures);
+    expect(built.machine->uart
+               ->write(rvemu::devices::Uart16550::kRbrThrDllOffset,
+                       rvemu::bus::AccessWidth::Byte,
+                       static_cast<std::uint8_t>('E'),
+                       rvemu::bus::AccessType::Store)
+               .ok(),
+           "诊断测试必须预置 UART TX 字节",
+           failures);
+
+    rvemu::runtime::clear_host_stop_request();
+    const auto result =
+        rvemu::runtime::run_machine(*built.machine, terminal, rvemu::runtime::RunOptions{1U, 3U});
+    expect(!result.ok() && result.exit_code == rvemu::runtime::ExitCode::RuntimeIo,
+           "终端输出错误必须映射为运行期 I/O 错误",
+           failures);
+    expect(result.error.find("device=terminal-output") != std::string::npos,
+           "诊断必须包含设备名",
+           failures);
+    expect(result.error.find("pc=0x") != std::string::npos, "诊断必须包含 PC", failures);
+    expect(result.error.find("priv=M") != std::string::npos, "诊断必须包含特权级", failures);
+    expect(result.error.find("trap_cause=") != std::string::npos,
+           "诊断必须包含 trap cause 字段",
+           failures);
+    expect(result.error.find("errno=" + std::to_string(EBADF)) != std::string::npos,
+           "诊断必须包含宿主 errno",
+           failures);
+    expect(terminal.restore().ok(), "诊断测试终端必须恢复", failures);
+}
+
 }  // namespace
 
 int main() {
@@ -299,6 +351,7 @@ int main() {
         test_machine_build(failures);
         test_host_signal_stop_flag(failures);
         test_runner_limited_loop(failures);
+        test_runner_terminal_error_diagnostic(failures);
     } catch (const std::exception& exception) {
         std::cerr << "启动运行测试基础设施失败：" << exception.what() << '\n';
         return 1;

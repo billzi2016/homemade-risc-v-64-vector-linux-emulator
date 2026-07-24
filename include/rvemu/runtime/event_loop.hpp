@@ -34,6 +34,8 @@ struct EventLoopIterationResult final {
     std::optional<core::Trap> synchronous_trap{};
     platform::TerminalIoStatus terminal_input_status{platform::TerminalIoStatus::Ready};
     platform::TerminalIoStatus terminal_output_status{platform::TerminalIoStatus::Ready};
+    int terminal_input_errno{0};
+    int terminal_output_errno{0};
 };
 
 /**

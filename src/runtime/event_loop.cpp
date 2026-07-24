@@ -30,6 +30,7 @@ void EventLoop::service_terminal_input(EventLoopIterationResult& result) noexcep
         std::uint8_t byte = 0U;
         const auto input = terminal_.read_byte(byte);
         result.terminal_input_status = input.status;
+        result.terminal_input_errno = input.errno_value;
         if (input.status != platform::TerminalIoStatus::Ready) {
             return;
         }
@@ -53,6 +54,7 @@ void EventLoop::service_uart_output(EventLoopIterationResult& result) noexcept {
         const auto byte = pending_tx_.front();
         const auto output = terminal_.write_bytes(&byte, 1U);
         result.terminal_output_status = output.status;
+        result.terminal_output_errno = output.errno_value;
         if (output.status != platform::TerminalIoStatus::Ready || output.byte_count == 0U) {
             return;
         }

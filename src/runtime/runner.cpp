@@ -9,6 +9,7 @@
 #include <array>
 #include <cstdlib>
 #include <iostream>
+#include <sstream>
 
 namespace rvemu::runtime {
 namespace {
@@ -58,17 +59,14 @@ void maybe_trace_boot_pc(const Machine& machine, std::uint64_t iterations) {
     if (iterations != 0U && iterations % 5'000'000U == 0U) {
         const auto& state = machine.cpu.state();
         const auto& csrs = state.csrs();
-        std::cerr << "RVEMU_BOOT_TRACE sample iter=" << std::dec << iterations
-                  << " pc=0x" << std::hex << pc
-                  << " ra=0x" << state.integer(1U)
-                  << " sp=0x" << state.integer(2U)
-                  << " a0=0x" << state.integer(10U)
-                  << " a1=0x" << state.integer(11U)
-                  << " satp=0x" << csrs.peek(core::CsrAddress::Satp)
-                  << " mie=0x" << csrs.peek(core::CsrAddress::Mie)
-                  << " mip=0x" << csrs.peek(core::CsrAddress::Mip)
-                  << " mcounteren=0x" << csrs.peek(core::CsrAddress::Mcounteren)
-                  << " priv=" << std::dec << static_cast<unsigned>(state.privilege())
+        std::cerr << "RVEMU_BOOT_TRACE sample iter=" << std::dec << iterations << " pc=0x"
+                  << std::hex << pc << " ra=0x" << state.integer(1U) << " sp=0x"
+                  << state.integer(2U) << " a0=0x" << state.integer(10U) << " a1=0x"
+                  << state.integer(11U) << " satp=0x" << csrs.peek(core::CsrAddress::Satp)
+                  << " mie=0x" << csrs.peek(core::CsrAddress::Mie) << " mip=0x"
+                  << csrs.peek(core::CsrAddress::Mip) << " mcounteren=0x"
+                  << csrs.peek(core::CsrAddress::Mcounteren) << " priv=" << std::dec
+                  << static_cast<unsigned>(state.privilege())
                   << " wfi=" << (state.waiting_for_interrupt() ? 1 : 0) << '\n';
     }
 
@@ -78,15 +76,12 @@ void maybe_trace_boot_pc(const Machine& machine, std::uint64_t iterations) {
         }
         point.printed = true;
         const auto& state = machine.cpu.state();
-        std::cerr << "RVEMU_BOOT_TRACE " << point.label << " pc=0x" << std::hex << pc
-                  << " a0=0x" << state.integer(10U)
-                  << " a1=0x" << state.integer(11U)
-                  << " a2=0x" << state.integer(12U)
-                  << " a3=0x" << state.integer(13U)
-                  << " a4=0x" << state.integer(14U)
-                  << " s3=0x" << state.integer(19U)
-                  << " s5=0x" << state.integer(21U)
-                  << " priv=" << static_cast<unsigned>(state.privilege()) << std::dec << '\n';
+        std::cerr << "RVEMU_BOOT_TRACE " << point.label << " pc=0x" << std::hex << pc << " a0=0x"
+                  << state.integer(10U) << " a1=0x" << state.integer(11U) << " a2=0x"
+                  << state.integer(12U) << " a3=0x" << state.integer(13U) << " a4=0x"
+                  << state.integer(14U) << " s3=0x" << state.integer(19U) << " s5=0x"
+                  << state.integer(21U) << " priv=" << static_cast<unsigned>(state.privilege())
+                  << std::dec << '\n';
         if (point.pc == 0x8000'0CA0ULL) {
             trace_s3_changes = true;
             last_s3 = state.integer(19U);
@@ -95,20 +90,15 @@ void maybe_trace_boot_pc(const Machine& machine, std::uint64_t iterations) {
 
     const auto current_s3 = machine.cpu.state().integer(19U);
     const auto s3_in_scratch_area = current_s3 >= 0x8004'7000ULL && current_s3 < 0x8004'8000ULL;
-    if (trace_s3_changes && current_s3 != last_s3 && pc >= 0x8000'0C00ULL
-        && pc < 0x8001'0000ULL && (s3_in_scratch_area || s3_change_count < 8U)) {
+    if (trace_s3_changes && current_s3 != last_s3 && pc >= 0x8000'0C00ULL && pc < 0x8001'0000ULL
+        && (s3_in_scratch_area || s3_change_count < 8U)) {
         ++s3_change_count;
         const auto& state = machine.cpu.state();
-        std::cerr << "RVEMU_BOOT_TRACE s3_change pc=0x" << std::hex << pc
-                  << " old=0x" << last_s3
-                  << " new=0x" << current_s3
-                  << " a0=0x" << state.integer(10U)
-                  << " ra=0x" << state.integer(1U)
-                  << " sp=0x" << state.integer(2U)
-                  << " s0=0x" << state.integer(8U)
-                  << " s1=0x" << state.integer(9U)
-                  << " s2=0x" << state.integer(18U)
-                  << " s5=0x" << state.integer(21U) << std::dec << '\n';
+        std::cerr << "RVEMU_BOOT_TRACE s3_change pc=0x" << std::hex << pc << " old=0x" << last_s3
+                  << " new=0x" << current_s3 << " a0=0x" << state.integer(10U) << " ra=0x"
+                  << state.integer(1U) << " sp=0x" << state.integer(2U) << " s0=0x"
+                  << state.integer(8U) << " s1=0x" << state.integer(9U) << " s2=0x"
+                  << state.integer(18U) << " s5=0x" << state.integer(21U) << std::dec << '\n';
     }
     last_s3 = current_s3;
 }
@@ -117,6 +107,55 @@ void maybe_trace_boot_pc(const Machine& machine, std::uint64_t iterations) {
     return result.terminal_input_status == platform::TerminalIoStatus::Error
            || result.terminal_output_status == platform::TerminalIoStatus::Error
            || result.terminal_output_status == platform::TerminalIoStatus::Closed;
+}
+
+[[nodiscard]] const char* privilege_name(core::PrivilegeMode privilege) noexcept {
+    switch (privilege) {
+        case core::PrivilegeMode::User:
+            return "U";
+        case core::PrivilegeMode::Supervisor:
+            return "S";
+        case core::PrivilegeMode::Machine:
+            return "M";
+    }
+    return "?";
+}
+
+[[nodiscard]] std::string runtime_diagnostic(const Machine& machine,
+                                             const char* device,
+                                             const EventLoopIterationResult* iteration,
+                                             int host_errno) {
+    const auto& state = machine.cpu.state();
+    std::ostringstream stream;
+    stream << "运行期 I/O 失败"
+           << " device=" << device << " pc=0x" << std::hex << state.program_counter()
+           << " priv=" << privilege_name(state.privilege()) << " trap_cause=";
+    if (iteration != nullptr && iteration->delivery.has_value()) {
+        stream << (iteration->delivery->interrupt ? "interrupt:" : "exception:") << std::dec
+               << iteration->delivery->cause;
+    } else if (iteration != nullptr && iteration->synchronous_trap.has_value()) {
+        stream << "exception:" << std::dec
+               << static_cast<std::uint64_t>(iteration->synchronous_trap->cause);
+    } else {
+        stream << "none";
+    }
+    stream << " errno=" << std::dec << host_errno;
+    return stream.str();
+}
+
+[[nodiscard]] const char* terminal_failure_device(
+    const EventLoopIterationResult& iteration) noexcept {
+    if (iteration.terminal_input_status == platform::TerminalIoStatus::Error) {
+        return "terminal-input";
+    }
+    return "terminal-output";
+}
+
+[[nodiscard]] int terminal_failure_errno(const EventLoopIterationResult& iteration) noexcept {
+    if (iteration.terminal_input_status == platform::TerminalIoStatus::Error) {
+        return iteration.terminal_input_errno;
+    }
+    return iteration.terminal_output_errno;
 }
 
 }  // namespace
@@ -135,13 +174,24 @@ RunResult run_machine(Machine& machine,
         maybe_trace_boot_pc(machine, iterations);
         const auto block_status = machine.block->process_one(machine.bus);
         if (block_status == devices::VirtioBlockProcessStatus::QueueError) {
-            return RunResult{ExitCode::RuntimeIo, iterations, "VirtIO-Blk 队列处理失败"};
+            return RunResult{
+                ExitCode::RuntimeIo,
+                iterations,
+                runtime_diagnostic(machine, "virtio-blk", nullptr, 0),
+            };
         }
 
         const auto iteration = loop.run_once();
         ++iterations;
         if (terminal_failed(iteration)) {
-            return RunResult{ExitCode::RuntimeIo, iterations, "宿主终端 I/O 失败或输出端关闭"};
+            return RunResult{
+                ExitCode::RuntimeIo,
+                iterations,
+                runtime_diagnostic(machine,
+                                   terminal_failure_device(iteration),
+                                   &iteration,
+                                   terminal_failure_errno(iteration)),
+            };
         }
         if (options.max_iterations != 0U && iterations >= options.max_iterations) {
             return RunResult{ExitCode::Success, iterations, {}};
