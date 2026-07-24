@@ -324,7 +324,31 @@ round-trip min/avg/max = 11.8/12.05/12.4 ms
 
 ---
 
-## 4. 总结
+---
 
-通过上述对每一行控制台日志的深度拆解，我们可以清晰看到 `homemade-risc-v-64-vector-linux-emulator` 从最底层的指令集模拟（RV64GCV）、MMU 页表漫游（Sv39）、平台中断分发（CLINT/PLIC）、总线标准（VirtIO MMIO 块设备与网卡）到高级操作系统内核（Linux 6.x）和根文件系统（Ext4）完整且严密的工程实现闭环！
+## 5. 模拟器 C++ 源码实现映射表
+
+下表将 Linux 引导日志中的关键阶段与 `homemade-risc-v-64-vector-linux-emulator` 模拟器源码中的具体 C++ 模块与文件路径进行精确映射：
+
+| 引导阶段与硬件机制 | 对应物理 MMIO / CSR | 模拟器 C++ 源码实现文件 | 关键逻辑与类职责说明 |
+| --- | --- | --- | --- |
+| **Boot ROM 复位** | `0x00001000` | [`src/memory/boot_rom.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/memory/boot_rom.cpp) | `BootRom` 类：只读初始化指令装载，写保护与密封检查 |
+| **OpenSBI 固件装载** | `0x80000000` (RAM) | [`src/runtime/boot.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/runtime/boot.cpp) | `load_boot_images()`：安全装载二进制，初始化 `PC=0x80000000` |
+| **FDT 设备树放置** | `0x82200000` (RAM) | [`src/runtime/fdt.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/runtime/fdt.cpp) | `FdtBuilder` 类：生成设备节点，向 `a1` 寄存器传递 DTB 地址 |
+| **Sv39 MMU 页表漫游** | `satp` CSR | [`src/memory/mmu.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/memory/mmu.cpp) | `Mmu` 类：三级页表漫游、TLB 缓存刷新、A/D 位原子更新 |
+| **RVV 1.0 向量引擎** | `vtype`, `vl` CSR | [`src/vector/vector_state.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/vector/vector_state.cpp) | `VectorState` 类：32×256 位向量寄存器管理与 `mstatus.VS` 维护 |
+| **CLINT 计时器中断** | `0x02000000` | [`src/devices/clint.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/devices/clint.cpp) | `Clint` 类：`mtime` 与 `mtimecmp` 比较，驱动 MTIP 定时器中断 |
+| **PLIC 中断控制器** | `0x0C000000` | [`src/devices/plic.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/devices/plic.cpp) | `Plic` 类：31 个外部中断优先级仲裁、Claim/Complete 机制 |
+| **UART 16550A 串口** | `0x10000000` | [`src/devices/uart16550.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/devices/uart16550.cpp) | `Uart16550` 类：8 位 MMIO 寄存器，RBR/THR FIFO 与终端对接 |
+| **VirtIO-Blk 块设备** | `0x10001000` | [`src/devices/virtio_block.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/devices/virtio_block.cpp) | `VirtioBlock` 类：512 字节扇区 DMA 读写与 Virtqueue 描述符链解析 |
+| **VirtIO-Net 虚拟网卡** | `0x10002000` | [`src/devices/virtio_mmio.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/devices/virtio_mmio.cpp) | `VirtioMmio` 类：VirtIO 1.0 状态机协商、RX/TX 队列与 TAP 转发 |
+| **宿主终端 Raw 模式** | Host PTY | [`src/platform/terminal.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/platform/terminal.cpp) | `TerminalBackend` 类：宿主 `termios` 切换与还原，`O_NONBLOCK` I/O |
+| **单 HART 主事件循环** | Cpu & Devices | [`src/runtime/event_loop.cpp`](file:///Users/bizi/Desktop/GitHub/risc-v_64_vector_linux_emulator/src/runtime/event_loop.cpp) | `EventLoop` 类：指令 Step、中断检查、设备 Tick 统一事件推进 |
+
+---
+
+## 6. 总结
+
+通过上述对每一行控制台日志的深度拆解及 C++ 源码映射，我们可以清晰看到 `homemade-risc-v-64-vector-linux-emulator` 从最底层的指令集模拟（RV64GCV）、MMU 页表漫游（Sv39）、平台中断分发（CLINT/PLIC）、总线标准（VirtIO MMIO 块设备与网卡）到高级操作系统内核（Linux 6.x）和根文件系统（Ext4）完整且严密的工程实现闭环！
+
 

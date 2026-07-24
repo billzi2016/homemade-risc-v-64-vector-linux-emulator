@@ -532,7 +532,8 @@ DHCP、DNS 或 ICMP 网络链路。以下任务保留为规格边界记录，全
   - 证据：`.github/workflows/docs-pages.yml`
 - [x] **DOCS-009** 使用锁定依赖执行本地严格构建并验证桌面/移动导航与链接。
   - 验证结果：使用 `docs-site/build.sh` 执行 `mkdocs build --strict`，0 警告、0 错误，成功生成静态站点至 `docs-site/site`。
-- [ ] **DOCS-010** 在 GitHub Actions 中真实部署 Pages，并核对公开 URL、语言切换和全部导航。
+- [x] **DOCS-010** 在 GitHub Actions 中真实部署 Pages，并核对公开 URL、语言切换和全部导航。
+  - 验证结果：GitHub Actions `Docs Pages` Workflow 触发自动部署；公开 URL `https://billzi2016.github.io/homemade-risc-v-64-vector-linux-emulator/` 成功上线，已验证简体中文/English 双语切换与 Mermaid 架构图渲染无缝正常。
 
 ## 16. 任务证据模板
 

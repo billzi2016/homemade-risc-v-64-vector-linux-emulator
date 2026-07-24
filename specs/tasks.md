@@ -448,7 +448,8 @@ The current closing target is fixed to macOS `--net none` real non-network boot.
   - Evidence: `.github/workflows/docs-pages.yml`
 - [x] **DOCS-009** Execute local strict builds with frozen dependencies, verifying desktop/mobile navigation and links.
   - Verification Result: Executed `mkdocs build --strict` via `docs-site/build.sh`, 0 warnings, 0 errors, generated site to `docs-site/site`.
-- [ ] **DOCS-010** Deploy Pages on GitHub Actions, checking public URLs, language switching, and all navigation links.
+- [x] **DOCS-010** Deploy Pages on GitHub Actions, checking public URLs, language switching, and all navigation links.
+  - Verification Result: GitHub Actions `Docs Pages` workflow deployed successfully; public URL `https://billzi2016.github.io/homemade-risc-v-64-vector-linux-emulator/` verified for bilingual switching and Mermaid rendering.
 
 ## 16. Task Evidence Template
 
