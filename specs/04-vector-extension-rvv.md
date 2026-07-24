@@ -1,174 +1,176 @@
-# RVV 1.0 向量扩展规格
+# RVV 1.0 Vector Extension Specification
 
-## 1. 固定硬件参数
+## 1. Fixed Hardware Parameters
 
-- **RVV-REQ-001**：实现 32 个向量寄存器 `v0..v31`。
-- **RVV-REQ-002**：`VLEN=256` 位，`VLENB=32` 字节，`vlenb` CSR 恒定只读为 32。
-- **RVV-REQ-003**：支持 SEW 8、16、32、64。
-- **RVV-REQ-004**：支持规范编码的 LMUL，包括 PRD 要求的 1、2、4、8；分数 LMUL 是否启用必须依据 RVV 1.0 与 Linux 工具链需求冻结，不能误译为保留编码。
-- **RVV-REQ-005**：所有向量元素按小端来宾内存模型与寄存器位布局解释。
+- **RVV-REQ-001**: Implement 32 vector registers `v0..v31`.
+- **RVV-REQ-002**: `VLEN=256` bits, `VLENB=32` bytes, `vlenb` CSR is constant read-only 32.
+- **RVV-REQ-003**: Support SEW 8, 16, 32, 64.
+- **RVV-REQ-004**: Support spec-encoded LMULs, including 1, 2, 4, 8 required by PRD; whether fractional LMULs are enabled must freeze based on RVV 1.0 and Linux toolchain requirements, avoiding misinterpreting as reserved encodings.
+- **RVV-REQ-005**: All vector elements interpret per little-endian guest memory model and register bit layout.
 
-### 1.1 首版 `vtype` 能力冻结
+### 1.1 Initial `vtype` Capability Freeze
 
-固定 `ELEN=64`、最小 SEW=8 的 RVV 1.0 实现必须支持整数 LMUL `m1=0b000`、
-`m2=0b001`、`m4=0b010`、`m8=0b011`，以及分数 LMUL `mf8=0b101`、`mf4=0b110`、
-`mf2=0b111`。支持的 SEW 编码为 `e8/e16/e32/e64` 对应 `vsew=0b000..0b011`，但
-分数 LMUL 的合法 SEW 受 `SEW ≤ LMUL × ELEN` 约束：`mf8` 仅支持 `e8`，`mf4`
-支持 `e8/e16`，`mf2` 支持 `e8/e16/e32`；整数 LMUL 支持全部四种 SEW。
+Fixed `ELEN=64` and minimum SEW=8 RVV 1.0 implementations must support integer LMULs `m1=0b000`,
+`m2=0b001`, `m4=0b010`, `m8=0b011`, and fractional LMULs `mf8=0b101`, `mf4=0b110`,
+`mf2=0b111`. Supported SEW encodings are `e8/e16/e32/e64` corresponding to `vsew=0b000..0b011`, but
+legal SEWs for fractional LMULs are constrained by `SEW ≤ LMUL × ELEN`: `mf8`
+supports `e8` only, `mf4` supports `e8/e16`, `mf2` supports `e8/e16/e32`;
+integer LMULs support all four SEWs.
 
-全部保留 `vlmul/vsew` 编码、超出上述分数 LMUL 宽度上限的组合以及任何非零保留高位都
-不是可被静默降级的配置：`vsetvli`、`vsetivli` 或 `vsetvl` 请求此类完整 `vtype` 值时，
-必须写入 `vtype.vill=1`、将其余可见 `vtype` 位清零，并将 `vl=0`。后续依赖 `vtype`
-的向量指令遇到当前 `vill=1` 必须触发非法指令异常。
+All reserved `vlmul/vsew` encodings, combinations exceeding fractional LMUL width upper bounds, and
+any set reserved high bits are configurations that must not be silently degraded:
+when `vsetvli`, `vsetivli`, or `vsetvl` request such full `vtype` values, they
+must write `vtype.vill=1`, clear remaining visible `vtype` bits to zero, and set `vl=0`. Subsequent
+instructions depending on `vtype` encountering current `vill=1` must trigger illegal instruction exceptions.
 
-合法 `vtype` 的低位布局冻结为 `vlmul[2:0]`、`vsew[5:3]`、`vta[6]`、`vma[7]`；除
-`XLEN-1` 的 `vill` 外，任何置位的保留高位都会使 `vtype` 非法。这样可避免不同模块
-各自解释保留位或分数 LMUL，保持 `VLMAX` 计算的单一事实来源。
+Low-bit layouts for legal `vtype` freeze to `vlmul[2:0]`, `vsew[5:3]`, `vta[6]`, `vma[7]`; besides
+`vill` at `XLEN-1`, any set reserved high bit renders `vtype` illegal. This avoids different
+modules interpreting reserved bits or fractional LMULs independently, maintaining a single source of truth for `VLMAX`.
 
-## 2. 向量 CSR
+## 2. Vector CSRs
 
-- `vl`：当前有效元素数，任何合法设置都不得大于当前 `VLMAX`。
-- `vtype`：包含 `vill`、`vma`、`vta`、`vsew` 和 `vlmul`。
-- `vstart`：可重启异常的下一元素索引，成功完成指令后按规范清零。
-- `vxrm/vxsat/vcsr`：定点舍入和饱和状态。
-- `vlenb`：只读硬件常量。
+- `vl`: Current active element count; no legal setting may exceed current `VLMAX`.
+- `vtype`: Contains `vill`, `vma`, `vta`, `vsew`, and `vlmul`.
+- `vstart`: Next element index for restartable exceptions, cleared to zero upon successful instruction completion per spec.
+- `vxrm/vxsat/vcsr`: Fixed-point rounding and saturation states.
+- `vlenb`: Read-only hardware constant.
 
-`mstatus.VS`/`sstatus.VS` 为 Off 时执行向量指令必须产生非法指令；修改向量架构状态必须标记 VS Dirty。
+Executing vector instructions when `mstatus.VS`/`sstatus.VS` is Off must generate illegal instructions; modifying vector architectural state must mark VS Dirty.
 
-向量 CSR 地址冻结为：`vstart=0x008`、`vxsat=0x009`、`vxrm=0x00A`、`vcsr=0x00F`、
-`vl=0xC20`、`vtype=0xC21`、`vlenb=0xC22`。`vstart/vxsat/vxrm/vcsr` 是来宾可写的
-向量状态；`vl/vtype/vlenb` 是来宾只读 CSR，其中只有后续 `vset*` 的唯一内部配置入口
-能够更新 `vl/vtype`。当 `VS=Off` 时，访问这些 CSR 或执行任何向量指令均必须产生
-非法指令；`vlenb` 虽为只读常量，也不得绕过该上下文门控。写入可写 CSR 或由 `vset*`
-提交合法配置的状态变化必须把 VS 标记为 Dirty。
+Vector CSR addresses freeze to: `vstart=0x008`, `vxsat=0x009`, `vxrm=0x00A`, `vcsr=0x00F`,
+`vl=0xC20`, `vtype=0xC21`, `vlenb=0xC22`. `vstart/vxsat/vxrm/vcsr` are guest-writable
+vector states; `vl/vtype/vlenb` are guest read-only CSRs, where only the sole internal configuration entry point
+of subsequent `vset*` can update `vl/vtype`. When `VS=Off`, accessing these CSRs or executing
+any vector instruction must generate illegal instructions; although `vlenb` is a read-only constant,
+it must not bypass this context gating. Writing writable CSRs or state changes committed by `vset*`
+must mark VS as Dirty.
 
-`misa.V` 只能在项目声明范围内的 RVV 指令、CSR、访存、异常重启和一致性验证均完成后
-置位。前置模块可以建立真实向量状态，但不得因部分实现向来宾虚假宣称完整 V 扩展。
+`misa.V` can be set only after vector instructions, CSRs, memory accesses, exception restarts, and conformance verification
+within the project scope are completed. Prerequisite modules may build real vector states, but must not falsely advertise full V extension to guest due to partial implementations.
 
-为保证单 Hart 复位可重复，向量 CSR 的冻结复位值为：`vl=0`、`vtype.vill=1` 且其余
-`vtype` 位为零、`vstart=0`、`vxrm=0`、`vxsat=0`。该默认非法配置要求软件先执行后续
-`vset*` 建立合法 SEW/LMUL；它不是对任何具体实现的未声明复位值假设。
+To guarantee repeatable single-hart reset, frozen reset values for vector CSRs are: `vl=0`, `vtype.vill=1` with remaining
+`vtype` bits zero, `vstart=0`, `vxrm=0`, `vxsat=0`. This default illegal configuration requires software to first execute
+subsequent `vset*` to establish legal SEW/LMUL; it is not an un-declared reset value assumption for any concrete implementation.
 
-## 3. `vset*` 语义
+## 3. `vset*` Semantics
 
-- **RVV-REQ-006**：实现 `vsetvli`、`vsetivli`、`vsetvl`。
-- 根据 AVL、SEW、LMUL 和 VLEN 计算 `VLMAX` 与新 `vl`。
-- 非法或不支持的 `vtype` 设置 `vill` 并按规范设置 `vl`。
-- 必须实现 `rd=x0`、`rs1=x0` 等特殊 AVL 组合，不能一律按普通寄存器值处理。
+- **RVV-REQ-006**: Implement `vsetvli`, `vsetivli`, `vsetvl`.
+- Calculate `VLMAX` and new `vl` based on AVL, SEW, LMUL, and VLEN.
+- Illegal or unsupported `vtype` sets `vill` and sets `vl` per spec rules.
+- Special AVL combinations such as `rd=x0`, `rs1=x0` must be implemented, rather than treating all as normal register values.
 
-### 3.1 编码、提交与确定性策略
+### 3.1 Encoding, Submission, and Deterministic Policy
 
-三种配置指令均使用 `OP-V=0x57` 与 `funct3=0b111`：`vsetvli` 要求 bit31 为零并从
-bit30:20 取得 11 位 `vtypei`；`vsetivli` 要求 bit31:30 为二进制 `11`，从 bit29:20
-取得 10 位 `vtypei`，并将 rs1 字段作为零扩展的 5 位 AVL；`vsetvl` 要求
-`funct7=0b1000000`，从 rs2 取得完整 XLEN 宽 `vtype`。不符合这些判别字段的 OP-V
-编码在本阶段必须是非法指令，不能被当作某种配置近似执行。
+All three configuration instructions use `OP-V=0x57` with `funct3=0b111`: `vsetvli` requires bit31 to be zero and
+obtains 11-bit `vtypei` from bit30:20; `vsetivli` requires bit31:30 to be binary `11`, obtains 10-bit `vtypei` from bit29:20,
+and uses rs1 field as zero-extended 5-bit AVL; `vsetvl` requires `funct7=0b1000000`, obtaining full XLEN-wide `vtype`
+from rs2. OP-V encodings not matching these discriminant fields must be illegal instructions in this stage, rather than
+executed as configuration approximations.
 
-合法配置的 `VLMAX=(VLEN/SEW)×LMUL`。当 `rs1!=x0` 时 AVL 来自 x[rs1]；对于
-`vsetvli/vsetvl`，`rs1=x0, rd!=x0` 表示 AVL 为全一 XLEN 值，`vsetivli` 则始终以其
-5 位立即数作为 AVL。项目冻结确定性选择 `vl=min(AVL,VLMAX)`：它精确满足
-`AVL≤VLMAX`，且在 `AVL>VLMAX` 的规范允许范围选择 `VLMAX`。成功的 `vset*` 必须
-写回 `rd`、提交 `vl/vtype`、标记 VS Dirty 并把 `vstart` 清零。
+Legal configuration `VLMAX=(VLEN/SEW)×LMUL`. When `rs1!=x0`, AVL comes from x[rs1]; for `vsetvli/vsetvl`,
+`rs1=x0, rd!=x0` indicates AVL is all-ones XLEN value, while `vsetivli` always uses its 5-bit immediate as AVL.
+Project deterministically chooses `vl=min(AVL,VLMAX)`: it precisely satisfies `AVL≤VLMAX`, and selects `VLMAX`
+in the spec-permitted range when `AVL>VLMAX`. Successful `vset*` must write back `rd`, commit `vl/vtype`,
+mark VS Dirty, and clear `vstart` to zero.
 
-`rs1=x0, rd=x0` 的保持 `vl` 形式仅在旧、新 `vtype` 都合法且 VLMAX 相同的情况下
-允许；它保留现有 `vl`。其他这种保留形式必须触发非法指令，避免容量变化时让旧 `vl`
-越过新 VLMAX。请求非法完整 `vtype` 本身不是非法指令：`vset*` 必须提交仅置 vill 的
-`vtype`、`vl=0` 和 `rd=0`，供来宾软件探测实现能力。
+The `rs1=x0, rd=x0` keep-`vl` form is permitted only when old and new `vtype` are both legal with identical VLMAX;
+it retains existing `vl`. Other such keeping forms must trigger illegal instructions, avoiding keeping old `vl` crossing
+new VLMAX when capacity changes. Requesting illegal full `vtype` itself is not an illegal instruction: `vset*` must commit `vtype`
+with vill set only, `vl=0`, and `rd=0` for guest software to probe implementation capabilities.
 
-## 4. 寄存器分组与重叠
+## 4. Register Grouping and Overlap
 
-- LMUL>1 时目标寄存器号必须满足分组对齐且不得超出 v31。
-- 宽化、窄化和掩码指令必须遵守源/目标寄存器重叠限制。
-- 非法分组或保留组合触发非法指令，不能截断到可用寄存器。
-- `v0` 作为掩码源时按单比特元素布局读取；掩码禁用时所有活动元素视为启用。
+- When LMUL>1, target register numbers must satisfy group alignment and not exceed v31.
+- Widening, narrowing, and mask instructions must observe source/target register overlap constraints.
+- Illegal grouping or reserved combinations trigger illegal instructions, without truncating to available registers.
+- When `v0` serves as mask source, read per single-bit element layout; when mask is disabled, all active elements are treated as enabled.
 
-### 4.1 统一元素映射与基础状态接口
+### 4.1 Unified Element Mapping and Base State Interface
 
-寄存器组、元素访问和掩码位必须通过唯一布局层解释，不允许各指令按自身理解计算字节偏移。
-元素以小端打包：元素最低有效字节位于最低编号寄存器的最低可用字节；整数 LMUL 跨组时，
-填满较低编号寄存器后连续进入下一寄存器。整数 LMUL 的基寄存器必须按组大小对齐，且整个
-组不得越过 `v31`。分数 LMUL 只使用基寄存器的低 `LMUL×VLEN` 位，剩余空间为 tail，
-不属于可读写的逻辑元素范围。
+Register groups, element accesses, and mask bits must be interpreted via a sole layout layer, disallowing instructions from calculating byte offsets per independent logic.
+Elements pack in little-endian order: element least significant byte resides at lowest available byte of lowest-numbered register;
+when integer LMUL spans groups, fill lower-numbered registers before continuously entering next register. Base registers for integer LMUL
+must align to group size, and entire group must not cross `v31`. Fractional LMUL uses lower `LMUL×VLEN` bits of base register only;
+remaining space is tail, not belonging to readable/writable logical element ranges.
 
-掩码始终从 `v0` 读取，bit 0 是元素 0，随后按低位到高位、低字节到高字节连续编号；它
-不随 SEW 或 LMUL 改变。布局层只验证并定位元素，CPU 状态层是唯一可提交元素写入并标记
-VS Dirty 的入口。
+Masks are always read from `v0`, bit 0 is element 0, sequentially numbered low-to-high bit and low-to-high byte;
+it does not change with SEW or LMUL. Layout layer validates and locates elements only, while CPU state layer is sole entry point
+for committing element writes and marking VS Dirty.
 
-固定 VLEN=256 时，最大 `VLMAX=256`，因此 `vstart` 只保留低 8 个可写位。向量执行器
-在可重启异常处写入故障元素索引；所有成功完成的向量指令均清零 `vstart`，非法指令不得
-改变它。`vxrm` 由 CSR 唯一读取，`vxsat` 是黏滞标志：运算只能累积置一，来宾软件通过
-CSR 写零才能清除。
+With fixed VLEN=256, maximum `VLMAX=256`, so `vstart` retains lower 8 writable bits only. Vector executor writes
+faulting element index at restartable exceptions; all successfully completed vector instructions clear `vstart` to zero,
+while illegal instructions must not alter it. `vxrm` is read solely by CSR, while `vxsat` is a sticky flag: operations
+can accumulate set-1 only, and guest software clears it via CSR write-0 only.
 
-## 5. Tail 与 Mask 策略
+## 5. Tail and Mask Policies
 
-`vta/vma` 控制尾部和被掩码元素的 agnostic/undisturbed 行为。实现必须：
+`vta/vma` control agnostic/undisturbed behaviors of tail and masked-off elements. Implementation must:
 
-- 不错误修改 undisturbed 元素。
-- 对 agnostic 元素采用规范允许且全项目一致的值策略。
-- 区分 prestart、active、inactive 和 tail 元素。
-- 保证从 `vstart` 重启时早于 `vstart` 的元素不被再次修改。
+- Avoid incorrectly modifying undisturbed elements.
+- Adopt spec-permitted and project-wide uniform value policies for agnostic elements.
+- Distinguish prestart, active, inactive, and tail elements.
+- Guarantee elements prior to `vstart` are not modified again when restarting from `vstart`.
 
-## 6. 向量访存
+## 6. Vector Memory Accesses
 
-- **RVV-REQ-007**：支持 unit-stride 向量加载和存储。
-- **RVV-REQ-008**：支持 strided 向量加载和存储，步长按 XLEN 有符号值解释。
-- 支持对齐和非对齐元素访问，但每个字节必须经过统一 MMU/总线语义。
-- 每个活动元素独立进行地址计算、翻译和权限检查。
-- 地址计算按 XLEN 回绕规则，宿主计算不得溢出为未定义行为。
-- 发生元素异常时，精确设置 `vstart`，先前已提交元素保持，后续元素不执行。
-- 首版是否支持 fault-only-first、indexed 或 segment 访存必须在 ISA 清单中明确；未实现编码必须非法，而不是静默近似。
+- **RVV-REQ-007**: Support unit-stride vector loads and stores.
+- **RVV-REQ-008**: Support strided vector loads and stores, with stride interpreted as signed XLEN values.
+- Support aligned and unaligned element accesses, but every byte must pass through uniform MMU/bus semantics.
+- Every active element performs address calculation, translation, and permission checks independently.
+- Address calculations observe XLEN wrapping rules, disallowing host calculations from overflowing into undefined behavior.
+- Upon element exception, set `vstart` precisely, preserving previously committed elements while omitting subsequent elements.
+- Initial support for fault-only-first, indexed, or segment accesses must be explicit in ISA manifest; un-implemented encodings must be illegal rather than silently approximated.
 
-### 6.1 首版访存编码与精确提交
+### 6.1 Initial Memory Access Encodings and Precise Commit
 
-首版只接受普通非分段 `vle8/16/32/64.v`、`vse8/16/32/64.v`、
-`vlse8/16/32/64.v` 与 `vsse8/16/32/64.v`：`nf=0`、`mew=0`，unit-stride 的
-`lumop/sumop=0`，以及 `mop=00` 或 `mop=10`。indexed、segment、whole-register、
-mask load/store 和 fault-only-first 的编码必须非法，不能退化为普通访问。EEW 使用指令
-编码的 8/16/32/64 位值，数据寄存器组必须按 `EMUL=(EEW/SEW)×LMUL` 独立验证。
+Initial release accepts standard non-segmented `vle8/16/32/64.v`, `vse8/16/32/64.v`, `vlse8/16/32/64.v`, and `vsse8/16/32/64.v`
+only: `nf=0`, `mew=0`, unit-stride `lumop/sumop=0`, and `mop=00` or `mop=10`. Encodings for indexed, segment,
+whole-register, mask load/store, and fault-only-first must be illegal, without degrading to normal accesses. EEW uses 8/16/32/64-bit values
+from instruction encoding, and data register groups must be independently validated per `EMUL=(EEW/SEW)×LMUL`.
 
-为保证非对齐和跨页访问不绕过地址翻译，每个活动元素的每个字节都必须经 CPU 的统一
-`guest_read/guest_write`、MMU 和总线入口。load 仅在组成完整元素后写入目标组；当任何
-字节发生异常时，已经完成的较早元素保持，当前元素写入 `vstart`，当前及后续元素不再
-执行。掩码关闭元素绝不访问内存或产生异常；首版对 agnostic 目的元素统一写全一，
-undisturbed 元素保持旧值。成功完成后清零 `vstart`。
+To guarantee unaligned and page-crossing accesses do not bypass address translation, every byte of every active element
+must pass through CPU unified `guest_read/guest_write`, MMU, and bus entry points. Loads write to target group only after forming
+complete elements; when any byte encounters an exception, already completed earlier elements remain, current element is written
+to `vstart`, and current plus subsequent elements are no longer executed. Masked-off elements never access memory or generate exceptions;
+initial release writes all-ones for agnostic target elements and preserves old values for undisturbed elements. Clear `vstart` to zero upon successful completion.
 
-## 7. 整数与掩码运算
+## 7. Integer and Mask Operations
 
-声明范围至少覆盖 PRD 要求的向量整数加、减、乘、除和掩码控制。必须正确处理：
+Declared scope covers at least vector integer addition, subtraction, multiplication, division, and mask controls required by PRD. Correctly handle:
 
-- `vv/vx/vi` 操作数形式和标量扩展。
-- SEW 宽度截断、有符号/无符号比较和除法特殊值。
-- 掩码逻辑、产生掩码的比较及 carry/borrow 类操作中 `v0` 的特殊角色。
-- 除零、最小负数除以 `-1` 等与标量对应宽度一致的定义结果。
+- `vv/vx/vi` operand forms and scalar extension.
+- SEW width truncation, signed/unsigned comparisons, and division special values.
+- Special role of `v0` in mask logic, mask-generating comparisons, and carry/borrow operations.
+- Defined results for divide-by-zero and minimum negative number divided by `-1` consistent with scalar counterparts.
 
-首版实现 `vadd/vsub/vmul/vdiv[u]/vrem[u]` 的 `vv/vx` 形式，以及 `vadd.vi`。所有结果按
-SEW 截断；除零和 signed 最小值除以 `-1` 与标量 M 扩展一致。masked-off 元素不执行，
-依 `vma` 保持或写全一；tail 依 `vta` 保持或写全一；成功后清零 `vstart`。
+Initial release implements `vv/vx` forms of `vadd/vsub/vmul/vdiv[u]/vrem[u]`, and `vadd.vi`. All results truncate to SEW; divide-by-zero
+and signed minimum divided by `-1` align with scalar M extension. Masked-off elements do not execute, preserving or writing all-ones
+per `vma`; tail elements preserve or write all-ones per `vta`; clear `vstart` to zero after success.
 
-## 8. 向量浮点
+## 8. Vector Floating-Point
 
-- 支持 PRD 要求的向量浮点加、减、乘、除，覆盖 SEW=32/64。
-- 使用标量 `frm/fflags`，逐元素异常标志最终按 OR 累积。
-- 掩码关闭、尾部和 prestart 元素不得产生浮点异常。
-- NaN、无穷、零符号和舍入行为必须符合对应 F/D 语义。
+- Support vector floating-point addition, subtraction, multiplication, division required by PRD, covering SEW=32/64.
+- Use scalar `frm/fflags`, with per-element exception flags accumulated via OR finally.
+- Masked-off, tail, and prestart elements must not generate floating-point exceptions.
+- NaN, infinity, zero sign, and rounding behaviors must conform to corresponding F/D semantics.
 
-### 8.1 首版浮点编码与状态提交
+### 8.1 Initial Floating-Point Encoding and State Commit
 
-首版实现 `vfadd/vfsub/vfmul/vfdiv` 的 `vv` 与 `vf` 形式，仅接受 `SEW=32` 或 `SEW=64`。
-`vf` 从标量浮点寄存器读取同宽原始位模式；向量单精度元素不是 NaN-box 载体，因此不套用
-标量 F 寄存器的解箱规则。指令要求 `VS` 与 `FS` 均非 Off，并统一使用动态 `frm`；保留
-`frm` 值触发非法指令且不写目的寄存器。每个活动元素调用既有软件浮点核心，其异常位 OR
-入 `fflags`；masked-off、tail 与 prestart 元素绝不参与浮点计算或制造异常。`vma/vta` 为
-agnostic 时，目的元素写为对应 SEW 的全一位模式；整条指令成功退休后才清零 `vstart`。
+Initial release implements `vv` and `vf` forms of `vfadd/vfsub/vfmul/vfdiv`, accepting `SEW=32` or `SEW=64` only. `vf` reads
+same-width raw bit patterns from scalar floating-point registers; vector single-precision elements are not NaN-box carriers, and thus do not apply
+unboxing rules of scalar F registers. Instructions require both `VS` and `FS` non-Off, uniformly using dynamic `frm`; reserved `frm` values
+trigger illegal instructions without writing destination registers. Each active element invokes existing soft-float core, ORing exception bits into `fflags`;
+masked-off, tail, and prestart elements never participate in floating-point calculations or create exceptions. When `vma/vta` are agnostic,
+destination elements write all-ones patterns of corresponding SEW; clear `vstart` to zero only after full instruction successfully retires.
 
-## 9. 译码完整性
+## 9. Decoder Integrity
 
-向量 opcode 下不能仅靠 funct 子集宽松匹配。译码必须同时校验 `funct6/funct3/vm`、操作数类别、SEW、LMUL、扩展状态及保留位。任何未定义组合都触发非法指令。
+Under vector opcode, loose matching based on funct subsets alone is prohibited. Decoding must validate `funct6/funct3/vm`, operand categories, SEW, LMUL, extension states, and reserved bits simultaneously. Any un-defined combination triggers illegal instructions.
 
-## 10. 验收条件
+## 10. Acceptance Criteria
 
-- `vlenb` 恒为 32，所有合法 `vtype` 的 `VLMAX` 计算正确。
-- 覆盖 `vl=0`、`vl=VLMAX`、不同 SEW/LMUL、mask/tail 策略。
-- 覆盖跨寄存器组边界、非法重叠和非法分组。
-- 覆盖向量访存跨页、非对齐、元素中途页错误及 `vstart` 重启。
-- 使用适用 RVV 1.0 一致性测试，并记录尚未声明支持的合法指令范围。
+- `vlenb` is constantly 32, with correct `VLMAX` calculations for all legal `vtype`.
+- Covers `vl=0`, `vl=VLMAX`, different SEW/LMUL, mask/tail policies.
+- Covers cross-register group boundaries, illegal overlaps, and illegal groupings.
+- Covers vector memory page-crossing, unaligned accesses, element mid-way page faults, and `vstart` restarts.
+- Uses applicable RVV 1.0 conformance tests, logging un-declared supported legal instruction scopes.

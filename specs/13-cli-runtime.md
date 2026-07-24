@@ -1,8 +1,8 @@
-# CLI 与运行生命周期规格
+# CLI & Runtime Lifecycle Specification
 
-## 1. 命令格式
+## 1. Command Format
 
-macOS 或无网络启动：
+macOS or non-networked boot:
 
 ```text
 ./riscv_vector_emulator \
@@ -12,7 +12,7 @@ macOS 或无网络启动：
   --net none
 ```
 
-Linux TAP 网络启动：
+Linux TAP network boot:
 
 ```text
 ./riscv_vector_emulator \
@@ -22,67 +22,67 @@ Linux TAP 网络启动：
   --net tap0
 ```
 
-仓库文件参数示例必须使用根目录相对路径。程序可接受用户明确传入的其他路径，但不得把当前开发机器绝对路径写入默认值、日志模板或配置。
+Repository file argument examples must use relative paths from repository root. Program accepts user explicitly passed alternative paths, but must not write current development machine absolute paths into default values, log templates, or configurations.
 
-## 2. 必需参数
+## 2. Mandatory Arguments
 
-- **RUN-REQ-001**：`--bios` 指定固件。
-- **RUN-REQ-002**：`--kernel` 指定内核。
-- **RUN-REQ-003**：`--disk` 指定 rootfs 镜像。
-- **RUN-REQ-004**：`--net` 是可选网络选择；`none` 关闭网络，其他非空值仅在 Linux 上解释为 TAP 接口名。省略该参数等价于 `--net none`。
+- **RUN-REQ-001**: `--bios` specifies firmware.
+- **RUN-REQ-002**: `--kernel` specifies kernel.
+- **RUN-REQ-003**: `--disk` specifies rootfs image.
+- **RUN-REQ-004**: `--net` is an optional network selection; `none` disables networking, while other non-empty values are interpreted strictly as TAP interface names on Linux. Omitting this argument is equivalent to `--net none`.
 
-重复参数、未知参数、缺少值和空值必须报错。程序不得在 macOS 上把任意字符串伪装成可用 TAP，也不得在省略网络参数时偷偷创建网络后端。
+Duplicate arguments, unknown arguments, missing values, and empty values must report errors. Program must not disguise arbitrary strings as available TAPs on macOS, nor create network backends secretly when network options are omitted.
 
-## 3. 启动校验顺序
+## 3. Startup Validation Sequence
 
-1. 解析参数，不产生外部副作用。
-2. 校验文件可读/写策略、格式、大小和相互兼容性。
-3. 校验 RAM 配置与装载布局。
-4. 打开并验证磁盘；仅在网络模式不是 `none` 时打开并验证 Linux TAP。
-5. 构造机器、装载镜像和 FDT。
-6. 安装资源清理保护。
-7. 最后切换终端 Raw 模式。
-8. 进入运行循环。
+1. Parse arguments, producing no external side effects.
+2. Validate file readability/writability policies, formats, sizes, and mutual compatibility.
+3. Validate RAM configuration and load layout.
+4. Open and validate disk; open and validate Linux TAP only when network mode is not `none`.
+5. Construct machine, load images, and FDT.
+6. Install resource cleanup hooks.
+7. Switch terminal to Raw mode as the final step.
+8. Enter execution loop.
 
-任何早期失败都应在终端仍为正常模式时报告。
+Any early failure must report while the terminal remains in normal mode.
 
-## 4. 唯一主循环
+## 4. Sole Main Loop
 
-- **RUN-REQ-005**：整个项目只能有一个生产执行循环。
-- 在指令边界检查中断、取指、译码、执行和提交 Trap。
-- 以明确策略推进 CLINT 并服务 UART/TAP/virtqueue。
-- 使用非阻塞事件处理，不能让一个宿主 FD 永久阻塞 CPU；无网络档位不创建虚假网络 FD 或轮询分支。
-- 支持 WFI：无事件时可阻塞等待，事件到达或计时器期限时唤醒。
-- 不得通过跳过指令、伪造设备完成或直接调用宿主命令加速验收。
+- **RUN-REQ-005**: The entire project must maintain exactly one production execution loop.
+- Check interrupts, fetch, decode, execute, and commit Traps at instruction boundaries.
+- Advance CLINT and service UART/TAP/virtqueues per explicit policies.
+- Use non-blocking event handling, disallowing a single host FD from permanently blocking CPU; non-networked profile creates no fake network FDs or polling branches.
+- Support WFI: block-wait when no events exist, waking upon event arrival or timer expiration.
+- Skipping instructions, faking device completions, or invoking host commands directly to accelerate acceptance is prohibited.
 
-## 5. 退出与信号
+## 5. Exits and Signals
 
-Raw 模式下 `Ctrl+C` 交给来宾。宿主应通过文档化的转义序列、第二终端信号或其他明确机制请求退出。退出流程必须：
+In Raw mode, `Ctrl+C` is handed to guest. Host requests exit via documented escape sequences, second-terminal signals, or other explicit mechanisms. Exit sequence must:
 
-1. 停止接受新设备工作。
-2. 完成或安全取消宿主异步操作。
-3. 撤销设备中断并关闭磁盘及实际打开的 TAP FD。
-4. 恢复终端属性。
-5. 输出必要诊断并返回稳定退出码。
+1. Stop accepting new device work.
+2. Complete or safely cancel host asynchronous operations.
+3. Deassert device interrupts and close disk and actually opened TAP FDs.
+4. Restore terminal attributes.
+5. Output necessary diagnostics and return stable exit code.
 
-信号处理器本身只执行 async-signal-safe 操作，通过标志通知主循环清理。
+Signal handlers themselves perform only async-signal-safe operations, notifying main loop cleanup via flags.
 
-## 6. 退出码
+## 6. Exit Codes
 
-至少区分：成功退出、CLI 使用错误、资源/权限错误、镜像格式错误、运行期宿主 I/O 错误和模拟器内部错误。来宾关机是否视为成功必须明确；来宾普通 Trap 不应映射为宿主错误退出。
+Distinguish at least: successful exit, CLI usage error, resource/permission error, image format error, runtime host I/O error, and internal emulator error. Whether guest shutdown constitutes success must be explicit; guest normal Traps should not map to host error exits.
 
-## 7. 日志与诊断
+## 7. Logging and Diagnostics
 
-- 默认 UART 字节直通标准输出，诊断使用标准错误，避免污染来宾控制台流。
-- 日志级别和类别明确，默认不输出每指令跟踪。
-- 可选跟踪文件放在如 `artifacts/logs/` 的被忽略相对目录。
-- 诊断包含来宾 PC、特权级、访问类型或设备名，但不得泄露宿主无关数据。
-- 日志不能作为设备行为的替代副作用。
+- Default UART bytes passthrough standard output, diagnostics use standard error, avoiding polluting guest console streams.
+- Log levels and categories are explicit, defaulting to not printing per-instruction traces.
+- Optional trace files are placed in ignored relative directories such as `artifacts/logs/`.
+- Diagnostics contain guest PC, privilege mode, access type, or device name, but must not leak host-unrelated data.
+- Logs cannot replace device side effects.
 
-## 8. 验收条件
+## 8. Acceptance Criteria
 
-- macOS 无网络命令和 Linux TAP 命令均可单次启动，不弹出 GUI 或交互确认框。
-- 所有参数错误在产生外部状态前清楚报告。
-- 持续 UART 和网络活动下 CPU、计时器均继续推进。
-- 正常退出、资源失败和信号退出后终端均恢复。
-- 唯一主循环由真实系统启动测试覆盖。
+- macOS non-networked command and Linux TAP command both launch in a single pass without popping up GUIs or interactive prompts.
+- All argument errors report clearly before producing external state.
+- CPU and timers continue advancing under sustained UART and network activity.
+- Terminal is restored after normal exits, resource failures, and signal exits.
+- Sole main loop is covered by real system boot tests.

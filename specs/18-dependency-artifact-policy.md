@@ -1,84 +1,84 @@
-# 依赖、下载产物与忽略策略
+# Dependency, Download Artifact and Ignore Policy
 
-## 1. 基本原则
+## 1. Fundamental Principles
 
-- **ART-REQ-001**：外部固件、内核、rootfs、磁盘镜像、下载缓存、构建输出和运行日志不得提交 Git。
-- **ART-REQ-002**：所有外部产物必须来自可审计来源，并记录版本、许可证和 SHA-256。
-- **ART-REQ-003**：任何联网下载、依赖安装和构建命令执行前必须说明用途并获得用户确认。
-- **ART-REQ-004**：不得使用来源不明的预编译镜像替代失败下载，也不得伪造校验结果。
-- **ART-REQ-005**：仓库必须保留可复现的配置、补丁、脚本和校验清单，但不保留大二进制结果。
+- **ART-REQ-001**: External firmware, kernel, rootfs, disk images, download caches, build outputs, and execution logs must not be committed to Git.
+- **ART-REQ-002**: All external artifacts must originate from auditable sources, recording versions, licenses, and SHA-256 checksums.
+- **ART-REQ-003**: Any network download, dependency installation, or build command execution requires explaining purpose and obtaining user confirmation beforehand.
+- **ART-REQ-004**: Untraced pre-compiled images must not replace failed downloads, nor may verification results be faked.
+- **ART-REQ-005**: Repository retains reproducible configurations, patches, scripts, and checksum manifests, but does not retain large binary outputs.
 
-## 2. 目录约定
+## 2. Directory Conventions
 
-所有仓库内路径从根目录计算：
+All internal repository paths are calculated from root:
 
 ```text
 artifacts/
-├── downloads/      # 原始下载缓存
-├── firmware/       # OpenSBI 等固件构建结果
-├── kernel/         # Linux 内核构建结果
-├── rootfs/         # rootfs 工作目录或压缩包
-├── disk/           # rootfs.ext4 等磁盘镜像
-└── logs/           # 构建、测试、UART 和网络日志
+├── downloads/      # Raw download cache
+├── firmware/       # Firmware build outputs (e.g., OpenSBI)
+├── kernel/         # Linux kernel build outputs
+├── rootfs/         # rootfs working directories or archives
+├── disk/           # Disk images (e.g., rootfs.ext4)
+└── logs/           # Build, test, UART, and network logs
 ```
 
-实际创建目录和修改 `.gitignore` 属于后续实施任务 `BLD-005`，必须另行说明并取得确认。
+Actual directory creation and `.gitignore` modifications belong to subsequent implementation task `BLD-005`, requiring separate explanations and confirmations.
 
-## 3. 可提交与不可提交内容
+## 3. Committable vs Non-Committable Content
 
-### 3.1 可提交
+### 3.1 Committable
 
-- 下载/构建脚本源文件。
-- Linux `.config`、OpenSBI 构建参数和 rootfs 包清单。
-- 项目自有补丁及补丁来源说明。
-- 小型纯文本 SHA-256 清单、版本锁定文件和许可证说明。
-- 去敏后的测试模板和复现步骤。
+- Download/build script source files.
+- Linux `.config`, OpenSBI build parameters, and rootfs package manifests.
+- Project-owned patches and patch origin explanations.
+- Small plain-text SHA-256 manifests, version lockfiles, and license notices.
+- Sanitized test templates and reproduction steps.
 
-### 3.2 不可提交
+### 3.2 Non-Committable
 
-- `opensbi.bin`、`fw_payload.bin` 等固件二进制。
-- `Image`、`vmlinux`、模块和内核构建树。
-- rootfs 压缩包、目录树和 ext4 镜像。
-- 编译对象、可执行文件、缓存、抓包、日志和 core dump。
-- 工具链压缩包或安装目录。
-- 用户凭据、私钥、网络配置和机器特定绝对路径。
+- `opensbi.bin`, `fw_payload.bin` and other firmware binaries.
+- `Image`, `vmlinux`, modules, and kernel build trees.
+- rootfs archives, directory trees, and ext4 images.
+- Compilation objects, executables, caches, packet captures, logs, and core dumps.
+- Toolchain archives or installation directories.
+- User credentials, private keys, network configurations, and machine-specific absolute paths.
 
-## 4. 来源策略
+## 4. Source Policy
 
-技术依赖优先级：
+Technical dependency priority:
 
-1. 项目官方发布页或官方源码仓库的签名/固定提交。
-2. 可信 Linux 发行版或工具链发布源。
-3. 经用户明确批准的镜像提供方。
+1. Signed releases or fixed commits from official project release pages or official source repositories.
+2. Trusted Linux distributions or toolchain release mirrors.
+3. Mirror providers explicitly approved by user.
 
-每个来源记录：名称、用途、项目主页、精确版本或 commit、下载 URL、发布日期、许可证、SHA-256 和验证日期。版本浮动 URL 不能作为唯一复现依据。
+Each source records: name, purpose, homepage, exact version or commit, download URL, release date, license, SHA-256, and verification date. Floating-version URLs cannot serve as sole reproduction references.
 
-## 5. Linux 最小系统
+## 5. Minimal Linux System
 
-最小系统必须真实下载或从锁定源码/包集合构建，包含：
+Minimal system must be genuinely downloaded or built from locked sources/package sets, including:
 
-- 可工作的 init 与 Shell。
-- ext4 支持匹配的用户空间。
-- macOS 无网络验收所需的 `ls`、`pwd`、`cat` 以及可挂载的 `/proc`。
-- Linux 网络档位额外需要 `dhclient`、`ping`、IP 配置和 DNS 解析所需内容。
-- VirtIO 设备所需 `/dev`、`/proc`、`/sys` 挂载流程。
-- 不含默认密钥、外部服务凭据或个人配置。
+- Working init and Shell.
+- Userspace matching ext4 support.
+- `ls`, `pwd`, `cat`, and mountable `/proc` required for macOS non-networked acceptance.
+- Contents required for `dhclient`, `ping`, IP configuration, and DNS resolution for Linux network profile.
+- `/dev`, `/proc`, `/sys` mount procedures required by VirtIO devices.
+- Free of default keys, external service credentials, or personal configs.
 
-选择 Buildroot、BusyBox 加发行版工具、或其他方案会影响 `dhclient` 可用性、许可证和可复现性。实施前必须比较方案并由用户决定，不得自行用更快方案替代命令要求。
+Selecting Buildroot, BusyBox plus distribution tools, or alternative solutions impacts `dhclient` availability, licensing, and reproducibility. Solutions must be compared and decided by user prior to implementation; faster solutions cannot replace command requirements independently.
 
-## 6. 校验流程
+## 6. Verification Procedure
 
-1. 下载到 `artifacts/downloads/`。
-2. 在解压、构建或执行前计算 SHA-256。
-3. 与官方校验值比对；若官方未提供，记录本项目锁定值和首次获取来源。
-4. 校验失败立即停止，不继续使用文件。
-5. 构建输出可另计算 SHA-256，用于本地验收复现。
+1. Download to `artifacts/downloads/`.
+2. Compute SHA-256 prior to extraction, build, or execution.
+3. Compare against official checksums; if official checksums are unprovided, record project locked values and initial acquisition source.
+4. Stop immediately upon verification failure, omitting further file usage.
+5. Build outputs may separately calculate SHA-256 for local acceptance reproduction.
 
-不得在文档中预填没有实际计算过的哈希值。
+Pre-filling uncalculated hash values in documentation is prohibited.
 
-## 7. `.gitignore` 规格
+## 7. `.gitignore` Specification
 
-实施时 `.gitignore` 至少应精确覆盖：
+Implementation `.gitignore` should accurately cover at least:
 
 ```text
 /artifacts/
@@ -97,18 +97,18 @@ core
 core.*
 ```
 
-最终规则必须审查避免误排源码、配置、许可证或测试 fixture。通配规则若可能排除可提交输入，应改为目录级精确规则。
+Final rules must be reviewed to avoid accidentally excluding source code, configs, licenses, or test fixtures. Wildcard rules that might exclude committable inputs should be converted to directory-level explicit rules.
 
-## 8. 许可证与教育用途
+## 8. Licenses and Educational Use
 
-- 项目自身已采用仓库根目录 `LICENSE` 中的 MIT License。
-- 第三方依赖保持其原许可证，MIT 不会覆盖第三方权利。
-- README 的独立、非官方、教育用途免责声明不能替代遵守第三方许可证。
-- 发布脚本、补丁或配置时必须保留所需版权和许可证通知。
+- Project itself adopts the MIT License in repository root `LICENSE`.
+- Third-party dependencies retain original licenses; MIT does not overwrite third-party rights.
+- README independent, non-official, educational disclaimers do not substitute for open-source license compliance.
+- Releasing scripts, patches, or configs requires retaining necessary copyright and license notices.
 
-## 9. 验收条件
+## 9. Acceptance Criteria
 
-- 仓库状态检查证明外部二进制均未被跟踪。
-- 从干净环境按文档可获得相同版本和校验值的产物。
-- 构建出的 Linux/rootfs 包含最终验收所需工具。
-- 所有来源和许可证完整，无虚假或未经验证的校验记录。
+- Repository state check proves no external binaries are tracked.
+- Clean environment produces identical versions and checksums per documentation.
+- Built Linux/rootfs includes tools required for final acceptance.
+- All sources and licenses are complete, with no faked or unverified checksum logs.

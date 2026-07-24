@@ -1,20 +1,20 @@
-# 内存管理单元与 Sv39 规格
+# Memory Management Unit & Sv39 Specification
 
-## 1. 地址类型
+## 1. Address Types
 
-- 虚拟地址（VA）为 CPU 产生的 64 位地址。
-- Sv39 有效地址由 39 位有效值符号扩展到 64 位；位 63:39 必须全部等于位 38。
-- PTE 为 64 位小端值。
-- 目标物理地址能力按 PRD 记录为 56 位，但 Sv39 PTE 可表达范围和实际 RAM/MMIO 地址必须依据冻结的特权规范校验；超出实现物理地址宽度的访问产生访问错误。
+- Virtual Address (VA) is a 64-bit address produced by CPU.
+- Sv39 canonical address requires bits 63:39 to be sign-extended from bit 38; bits 63:39 must all equal bit 38.
+- PTE is a 64-bit little-endian value.
+- Target physical address capacity is recorded per PRD as 56 bits, but Sv39 PTE expressible range and actual RAM/MMIO addresses must be validated against the frozen privileged spec; accesses exceeding implemented physical address width generate access faults.
 
-## 2. 翻译启用
+## 2. Translation Enablement
 
-- **MMU-REQ-001**：M 模式取指和普通访问默认使用物理地址。
-- **MMU-REQ-002**：S/U 模式且 `satp.MODE=Sv39` 时，取指、加载和存储必须翻译。
-- **MMU-REQ-003**：M 模式在 `mstatus.MPRV=1` 的数据访问按 MPP 指定的有效特权级决定翻译；取指不受 MPRV 影响。
-- **MMU-REQ-004**：`satp.MODE=Bare` 时地址直通，但仍通过物理总线边界检查。
+- **MMU-REQ-001**: M-mode instruction fetch and normal access default to using physical addresses.
+- **MMU-REQ-002**: S/U modes with `satp.MODE=Sv39` require translation for instruction fetch, load, and store.
+- **MMU-REQ-003**: Data access in M-mode with `mstatus.MPRV=1` determines translation per effective privilege mode specified by MPP; instruction fetch is unaffected by MPRV.
+- **MMU-REQ-004**: Address passes through when `satp.MODE=Bare`, but still undergoes physical bus boundary checks.
 
-## 3. Sv39 地址分解
+## 3. Sv39 Address Decomposition
 
 ```text
 VA[38:30] = VPN[2]
@@ -23,98 +23,98 @@ VA[20:12] = VPN[0]
 VA[11:0]  = page offset
 ```
 
-根页表物理地址为 `satp.PPN << 12`。每级 PTE 地址为当前表基址加 `VPN[level] × 8`，所有加法都必须检查物理地址溢出。
+Root page table physical address is `satp.PPN << 12`. Each level PTE address is current table base plus `VPN[level] × 8`; all additions must check physical address overflow.
 
-## 4. PTE 字段与有效性
+## 4. PTE Fields and Validity
 
-至少处理 `V/R/W/X/U/G/A/D`、RSW 和 PPN。保留位及未来扩展位按冻结规范检查。
+Process at least `V/R/W/X/U/G/A/D`, RSW, and PPN. Reserved bits and future extension bits are checked per frozen spec.
 
-- `V=0` 为无效 PTE。
-- `R=0 && W=1` 为保留非法组合，产生页错误。
-- `R=0 && X=0` 表示指向下一级页表。
-- `R=1` 或 `X=1` 表示叶子。
-- 到 level 0 仍未遇到叶子，产生相应页错误。
+- `V=0` indicates invalid PTE.
+- `R=0 && W=1` is a reserved illegal combination, generating page faults.
+- `R=0 && X=0` points to next-level page table.
+- `R=1` or `X=1` indicates a leaf PTE.
+- Reaching level 0 without encountering a leaf generates a corresponding page fault.
 
-## 5. 叶子页与超级页
+## 5. Leaf Pages and Superpages
 
-- level 0 叶子映射 4 KiB 页面。
-- level 1 叶子映射 2 MiB 页面，PTE 的低一级 PPN 字段必须为零。
-- level 2 叶子映射 1 GiB 页面，PTE 的低两级 PPN 字段必须为零。
-- 错位超级页产生页错误，不得自动对齐。
+- level 0 leaf maps a 4 KiB page.
+- level 1 leaf maps a 2 MiB page; lower level PPN fields in PTE must be zero.
+- level 2 leaf maps a 1 GiB page; lower two level PPN fields in PTE must be zero.
+- Misaligned superpages generate page faults and must not be automatically aligned.
 
-物理地址合成必须按叶子级别将未由 PTE 提供的低位 PPN 替换为对应 VPN，不能对所有叶子简单使用 `PTE.PPN + 12 位 offset`。
+Physical address synthesis must replace lower PPN bits not provided by PTE with corresponding VPN per leaf level, rather than simply applying `PTE.PPN + 12-bit offset` for all leaves.
 
-## 6. 权限检查
+## 6. Permission Checks
 
-- **MMU-REQ-005**：取指要求 X；加载要求 R，或在 MXR=1 时允许 X；存储要求 R 与 W。
-- **MMU-REQ-006**：U 模式只可访问 `U=1` 的叶子。
-- **MMU-REQ-007**：S 模式不得从 U 页取指；数据访问 U 页要求 `SUM=1`。
-- **MMU-REQ-008**：权限判断使用发起访问的有效特权级和访问类型，不能只检查当前 CPU 模式。
-- 若实现 PMP，页表物理访问和最终物理访问还需经过 PMP；首版 PMP 范围必须在标准冻结阶段明确，不能虚假宣称完整支持。
+- **MMU-REQ-005**: Instruction fetch requires X; load requires R, or permits X when MXR=1; store requires R and W.
+- **MMU-REQ-006**: U-mode can access leaf PTEs with `U=1` only.
+- **MMU-REQ-007**: S-mode must not fetch instructions from U pages; data access to U pages requires `SUM=1`.
+- **MMU-REQ-008**: Permission checks evaluate effective privilege mode and access type of initiating access, rather than checking current CPU mode alone.
+- If PMP is implemented, page table physical accesses and final physical accesses also pass through PMP; initial release PMP scope must be explicit during standard freeze phase, without falsely claiming full support.
 
-## 7. A/D 位
+## 7. A/D Bits
 
-依据 PRD，本项目选择模拟硬件更新：
+Per PRD, this project selects hardware emulation updates:
 
-- 合法访问且 `A=0` 时，原子设置 A。
-- 合法存储且 `D=0` 时，原子设置 A 和 D。
-- PTE 更新必须采用受控物理原子读改写，并确认 PTE 未在期间变化；变化时重试漫游。
-- PTE 所在物理内存不可写或更新失败时，产生对应页错误，不得只修改 TLB 副本。
-- 权限失败时不得先更新 A/D。
+- Legal access with `A=0` atomically sets A.
+- Legal store with `D=0` atomically sets A and D.
+- PTE updates must utilize controlled physical atomic read-modify-write, confirming PTE has not changed in between; retry page walk if changed.
+- If physical memory hosting PTE is unwritable or update fails, generate matching page fault, without modifying TLB copy alone.
+- Permission failures must not update A/D prematurely.
 
-### 7.1 原子更新事务
+### 7.1 Atomic Update Transactions
 
-- **MMU-REQ-010**：权限检查成功后，使用本次漫游读到的完整 64 位 PTE 作为原始比较值。
-- **MMU-REQ-011**：通过物理总线唯一的原子比较并更新事务设置 A/D，不得以普通 load/store 对模拟原子性。
-- **MMU-REQ-012**：提交时若内存中的 PTE 已不等于原始值，必须丢弃当前翻译结果并从根页表重新漫游。
-- **MMU-REQ-013**：只有原子更新成功后才可合成最终 PA、填充 TLB 并执行引起来宾访问。
-- **MMU-REQ-014**：更新失败时不得在内存中留下部分位变化，也不得只在 TLB 条目中假定 A/D 已设置。
+- **MMU-REQ-010**: After permission check succeeds, use the full 64-bit PTE read during this walk as the original comparison value.
+- **MMU-REQ-011**: Set A/D via the physical bus sole atomic compare-and-update transaction, without simulating atomicity using normal load/store pairs.
+- **MMU-REQ-012**: Upon commit, if in-memory PTE no longer matches original value, discard current translation result and re-walk from root page table.
+- **MMU-REQ-013**: Synthesize final PA, populate TLB, and execute triggering guest access only after atomic update succeeds.
+- **MMU-REQ-014**: Upon update failure, leave no partial bit changes in memory, nor assume A/D is set in TLB entry alone.
 
 ```mermaid
 flowchart TD
-    A[完成页表漫游] --> B[检查叶子与访问权限]
-    B --> C{需要更新 A 或 D?}
-    C -- 否 --> G[合成 PA 并填充 TLB]
-    C -- 是 --> D[原子比较并更新完整 PTE]
-    D --> E{原始 PTE 是否仍匹配?}
-    E -- 否 --> A
-    E -- 是且更新成功 --> G
-    D -->|物理更新失败| F[产生精确页错误]
-    G --> H[执行最终取指或数据访问]
+    A[Complete Page Table Walk] --> B[Check Leaf & Access Permissions]
+    B --> C{Need to update A or D?}
+    C -- No --> G[Synthesize PA & Populate TLB]
+    C -- Yes --> D[Atomically Compare & Update Full PTE]
+    D --> E{Does Original PTE Still Match?}
+    E -- No --> A
+    E -- Yes & Update Succeeded --> G
+    D -->|Physical Update Failed| F[Generate Precise Page Fault]
+    G --> H[Execute Final Fetch or Data Access]
 ```
 
-首版单主循环可以保证没有宿主线程同时修改架构内存，但设备 DMA、AMO、页表写入与未来异步后端仍可能改变同一 PTE。因此原子事务是总线的正式语义，不能依赖“当前大概没有并发”而省略比较和重试。
+Initial single main loop guarantees no host threads mutate architectural memory concurrently, but device DMA, AMOs, page table writes, and future async backends may still alter the same PTE. Therefore, atomic transaction is a formal bus semantic, and cannot omit comparison and retry by assuming "concurrency is unlikely."
 
-## 8. 异常类型
+## 8. Exception Types
 
-- 非规范虚拟地址、无效 PTE、权限失败、错位超级页和 A/D 更新失败产生 instruction/load/store page fault。
-- 页表自身物理读取遇到总线错误时，按照冻结的特权规范映射到相应访问错误或页错误，并用测试固定；不得随意混用。
-- `tval` 保存引起来宾访问的原始虚拟地址，而不是中间 PTE 地址。
+- Non-canonical virtual addresses, invalid PTEs, permission failures, misaligned superpages, and A/D update failures generate instruction/load/store page faults.
+- Bus errors encountered during page table physical reads map to matching access faults or page faults per frozen privileged spec, fixed by tests without arbitrary mixing.
+- `tval` stores the original virtual address triggering guest access, rather than intermediate PTE address.
 
 ## 9. TLB
 
-- **MMU-REQ-009**：至少 64 个有效条目，可全关联或组关联。
-- 条目至少包含虚拟页标签、ASID、页大小/级别、物理页信息、全局标志和权限相关 PTE 位。
-- 命中时仍需结合当前有效特权、SUM/MXR 和访问类型判断权限，或将这些条件完整编码进缓存键。
-- 支持 4 KiB 和超级页匹配。
-- 替换算法必须确定且可测试。
+- **MMU-REQ-009**: At least 64 valid entries, fully-associative or set-associative.
+- Entries contain at least virtual page tag, ASID, page size/level, physical page info, global flag, and permission-related PTE bits.
+- Hits still evaluate current effective privilege, SUM/MXR, and access type for permissions, or encode these conditions fully into cache keys.
+- Supports 4 KiB and superpage matching.
+- Replacement algorithm must be deterministic and testable.
 
 ## 10. `SFENCE.VMA`
 
-- `rs1=x0, rs2=x0`：刷新全部非必要保留条目。
-- 指定 VA：刷新覆盖该地址的匹配页面，包括超级页。
-- 指定 ASID：仅刷新对应非全局映射。
-- 全局映射在仅指定 ASID 的刷新中按规范保留。
-- 执行权限和特权检查必须符合所选规范版本。
-- 写 `satp` 不代替 fence；软件负责按规范排序。
+- `rs1=x0, rs2=x0`: Flushes all non-essential retained entries.
+- Specified VA: Flushes matching pages covering that address, including superpages.
+- Specified ASID: Flushes matching non-global mappings only.
+- Global mappings are preserved per spec when only ASID is specified.
+- Execution permission and privilege checks must conform to chosen spec version.
+- Writing `satp` does not replace fence; software orders per spec.
 
-## 11. 验收条件
+## 11. Acceptance Criteria
 
-- 覆盖所有页级别、规范/非规范地址和超级页对齐。
-- 覆盖 U/S/MPRV、SUM、MXR 与 R/W/X 组合。
-- 验证 A/D 位真实写回内存和并发变化重试。
-- 验证 TLB ASID、global、超级页命中与全部 `SFENCE.VMA` 组合。
-- 分别验证取指、加载、存储故障的 cause、tval 和无错误副作用。
-- 验证原子提交前 PTE 被更改时重新漫游，不使用旧权限或旧 PPN。
-- 验证 PTE 更新失败时 TLB、目标内存和架构寄存器均无非法副作用。
-- 验证加载只置 A、存储置 A/D，且 TLB 填充晚于真实 PTE 写回。
+- Covers all page levels, canonical/non-canonical addresses, and superpage alignment.
+- Covers U/S/MPRV, SUM, MXR, and R/W/X combinations.
+- Verifies real A/D bit writeback to memory and retries on concurrent changes.
+- Verifies TLB ASID, global, superpage hits, and all `SFENCE.VMA` combinations.
+- Verifies fetch, load, store fault cause, tval, and absence of error side effects.
+- Verifies re-walking when PTE is altered prior to atomic commit, without using old permissions or old PPN.
+- Verifies absence of illegal side effects in TLB, target memory, or architectural registers when PTE update fails.
+- Verifies load sets A only, store sets A/D, and TLB population succeeds later than real PTE writeback.

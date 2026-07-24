@@ -1,10 +1,10 @@
-# 目标项目树与职责边界
+# Target Project Tree & Responsibility Boundaries
 
-## 1. 目的
+## 1. Purpose
 
-本文定义目标目录结构。目录树是架构边界的物理表达，用于阻止重复实现、循环依赖和职责漂移；已实施节点按实际文件同步，尚未实施节点仍表达最终目标。
+This document defines the target directory structure. The directory tree is the physical expression of architectural boundaries, used to prevent duplicate implementations, circular dependencies, and scope drift. Implemented nodes sync with actual files, while un-implemented nodes express final target states.
 
-## 2. 目标目录树
+## 2. Target Directory Tree
 
 ```text
 ./
@@ -97,8 +97,8 @@
 │   │   ├── mkdocs_prd.zh.md
 │   │   └── github_action_prd.zh.md
 │   ├── docs/
-│   │   ├── zh/             # 指向中文权威 Markdown 的相对 symlink
-│   │   └── en/             # 指向英文权威 Markdown 的相对 symlink
+│   │   ├── zh/             # Relative symlinks pointing to Chinese source Markdown files
+│   │   └── en/             # Relative symlinks pointing to English source Markdown files
 │   ├── overrides/
 │   └── assets/
 ├── .github/
@@ -108,7 +108,7 @@
 │   ├── build.md
 │   ├── running.md
 │   └── troubleshooting.md
-└── artifacts/                 # 本地外部/构建产物，禁止提交
+└── artifacts/                 # Local external/build artifacts, prohibited from Git tracking
     ├── downloads/
     ├── firmware/
     ├── kernel/
@@ -117,51 +117,51 @@
     └── logs/
 ```
 
-## 3. 核心职责
+## 3. Core Responsibilities
 
 ```mermaid
 flowchart TD
-    Runtime[runtime<br/>CLI 与事件循环] --> Platform[platform<br/>整机组装与宿主适配]
-    Platform --> Core[core<br/>标量 CPU / CSR / Trap]
-    Platform --> Vector[vector<br/>RVV 状态与执行]
-    Core --> Memory[memory<br/>虚拟访问 / Sv39 / TLB]
+    Runtime[runtime<br/>CLI & Event Loop] --> Platform[platform<br/>Machine Orchestration & Host Adaptation]
+    Platform --> Core[core<br/>Scalar CPU / CSR / Trap]
+    Platform --> Vector[vector<br/>RVV State & Execution]
+    Core --> Memory[memory<br/>Virtual Access / Sv39 / TLB]
     Vector --> Memory
-    Memory --> Bus[bus<br/>唯一物理地址分发]
-    Bus --> Devices[devices<br/>MMIO 协议]
+    Memory --> Bus[bus<br/>Sole Physical Address Dispatch]
+    Bus --> Devices[devices<br/>MMIO Protocols]
     Devices --> Platform
 ```
 
 ### 3.1 `core`
 
-负责标量 CPU 状态、CSR、特权态、标量指令译码执行、陷阱入口/返回以及 LR/SC token 生命周期。它不负责物理地址路由、宿主文件或终端操作。
+Responsible for scalar CPU state, CSRs, privilege modes, scalar instruction decoding/execution, trap entries/returns, and LR/SC token lifecycles. It is not responsible for physical address routing, host files, or terminal operations.
 
 ### 3.2 `vector`
 
-负责 RVV 1.0 状态、向量译码和执行。向量访存通过 `memory` 暴露的统一访问接口完成，不直接触碰 RAM。
+Responsible for RVV 1.0 state, vector decoding, and execution. Vector memory accesses complete via unified access interfaces exposed by `memory`, without directly touching RAM.
 
 ### 3.3 `memory`
 
-负责虚拟访问语义、Sv39 页表漫游、TLB、访问权限和物理内存存储。页表读取和最终访问都经 `bus`，但必须区分“页表物理访问”和“来宾虚拟访问”，防止递归翻译。
+Responsible for virtual access semantics, Sv39 page table walks, TLB, access permissions, and physical memory storage. Page table reads and final accesses both pass through `bus`, but must distinguish "page table physical access" from "guest virtual access" to prevent recursive translations.
 
 ### 3.4 `bus`
 
-负责唯一的物理地址分发和单 Hart 物理保留监视。RAM、ROM 和每个 MMIO 设备都注册不重叠区间。总线不解释指令，也不处理虚拟地址。
+Responsible for sole physical address dispatch and single-hart physical reservation monitoring. RAM, ROM, and every MMIO device register non-overlapping intervals. The bus does not decode instructions nor handle virtual addresses.
 
 ### 3.5 `devices`
 
-负责来宾可见硬件协议。VirtIO 公共层只实现传输和队列规则，块设备与网卡共享它，不复制描述符解析逻辑。
+Responsible for guest-visible hardware protocols. VirtIO common layer implements transport and queue rules only; block device and network card share it without duplicating descriptor parsing logic.
 
 ### 3.6 `platform`
 
-负责组装整机以及宿主资源适配：镜像文件、TAP、终端、FDT 和启动镜像加载。宿主后端不能改变来宾硬件语义。
+Responsible for assembling the full machine and host resource adaptation: image files, TAP, terminal, FDT, and boot image loading. Host backends cannot alter guest hardware semantics.
 
 ### 3.7 `runtime`
 
-负责 CLI、事件循环、诊断和受控退出。它编排机器，不实现 CPU 指令或设备寄存器。
+Responsible for CLI, event loop, diagnostics, and controlled exits. It orchestrates the machine, executing no CPU instructions or device registers directly.
 
-## 4. 依赖方向
+## 4. Dependency Directions
 
-允许的主要依赖方向为：
+Permitted primary dependency directions:
 
 ```mermaid
 flowchart LR
@@ -170,33 +170,33 @@ flowchart LR
     Platform --> Core[core]
     Platform --> Vector[vector]
     Platform --> Devices[devices]
-    Core --> Memory[memory 抽象]
+    Core --> Memory[memory abstraction]
     Vector --> Memory
-    Memory --> Bus[bus 抽象]
-    Devices --> DeviceApi[MMIO / DMA / 中断接口]
-    Platform --> Host[宿主操作系统接口]
+    Memory --> Bus[bus abstraction]
+    Devices --> DeviceApi[MMIO / DMA / Interrupt Interfaces]
+    Platform --> Host[Host OS Interfaces]
 ```
 
-禁止设备反向调用 CPU 私有状态，禁止 CPU 根据具体设备类型分支，禁止测试复制生产译码器。
+Device reverse calls to CPU private states, CPU branching per specific device type, and test suites duplicating production decoders are prohibited.
 
-## 5. 单一实现约束
+## 5. Single Implementation Constraints
 
-以下能力在项目中只能各有一个权威入口：
+The following capabilities must maintain exactly one authoritative entry point in the project:
 
-- 指令长度判定与译码分发。
-- CSR 合法性和读改写规则。
-- 虚拟内存权限检查。
-- 物理地址总线分发。
-- 陷阱选择、委托与入口状态更新。
-- Virtqueue 描述符链遍历和边界检查。
-- PLIC 中断源状态更新。
+- Instruction length evaluation and decoding dispatch.
+- CSR validity and read-modify-write rules.
+- Virtual memory permission checks.
+- Physical address bus dispatch.
+- Trap selection, delegation, and entry state updates.
+- Virtqueue descriptor chain traversals and bounds checks.
+- PLIC interrupt source state updates.
 
-测试辅助代码只能构造输入和断言输出，不能重新实现这些规则。
+Test helper code constructs inputs and asserts outputs only, and cannot re-implement these rules.
 
-## 6. 外部产物目录
+## 6. External Artifact Directory
 
-`artifacts/` 只保存本地下载、构建、运行日志和镜像。该目录必须由 `.gitignore` 排除；仓库内只提交可复现脚本、校验清单和文档。实际目录及忽略规则在实施阶段另行确认后创建。
+`artifacts/` saves local downloads, builds, runtime logs, and images only. This directory must be excluded by `.gitignore`; repository commits reproducible scripts, checksum manifests, and documentation only. Actual directory and ignore rules are created after separate confirmation during implementation.
 
-## 7. 文档站目录
+## 7. Documentation Site Directory
 
-`docs-site/` 是独立 MkDocs 工程。其 `docs/zh/` 与 `docs/en/` 只保存相对 symlink，分别指向仓库中的中文和英文权威 Markdown；禁止复制规格正文形成第二套来源。`.github/workflows/docs-pages.yml` 是 GitHub 平台要求的唯一站点目录外工作流文件。
+`docs-site/` is an independent MkDocs project. Its `docs/zh/` and `docs/en/` store relative symlinks only, pointing to Chinese and English authoritative Markdown files in the repository respectively; duplicating specification body text to form a secondary source of truth is prohibited. `.github/workflows/docs-pages.yml` is the sole workflow file outside the site directory required by GitHub Platform.

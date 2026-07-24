@@ -1,76 +1,76 @@
-# 宿主 TAP、网桥与公网链路规格
+# Host TAP, Bridge & Public Link Specification
 
-## 1. 适用平台与权限
+## 1. Applicable Platform and Permissions
 
-PRD 指定的宿主网络支持限定为 Linux TAP。打开 `/dev/net/tun`、创建 TAP、配置网桥/NAT 通常需要 `CAP_NET_ADMIN` 或管理员权限。任何脚本执行前必须由用户明确确认。
+Host network support specified by PRD is limited to Linux TAP. Opening `/dev/net/tun`, creating TAPs, and configuring bridges/NAT typically require `CAP_NET_ADMIN` or administrative privileges. Any script execution must be explicitly confirmed by the user beforehand.
 
-macOS 属于无网络启动档位：模拟器不得尝试打开 Linux 设备节点、创建伪 TAP 或修改宿主网络。来宾仍必须通过同一机器模型启动到 ext4 Shell；该档位不计入本文件的 DHCP/DNS/ICMP 网络验收。
+macOS belongs to the non-networked boot profile: the emulator must not attempt to open Linux device nodes, create pseudo-TAPs, or alter host networking. The guest must still boot to ext4 Shell via the identical machine model; this profile does not count toward DHCP/DNS/ICMP network acceptance in this document.
 
-## 2. 职责分离
+## 2. Separation of Responsibilities
 
-- 模拟器只绑定已经存在且激活的 TAP 接口。
-- 宿主网络准备脚本负责创建、配置和清理 TAP/网桥/NAT。
-- 模拟器不得静默修改宿主路由、防火墙、转发或 DNS。
-- 所有脚本使用配置参数，不硬编码开发者用户名、绝对仓库路径或宿主物理网卡名。
+- The emulator binds only to TAP interfaces that already exist and are active.
+- Host network preparation scripts are responsible for creating, configuring, and cleaning up TAPs/bridges/NAT.
+- The emulator must not silently modify host routing, firewall, forwarding, or DNS.
+- All scripts use configuration parameters, without hardcoding developer usernames, absolute repository paths, or host physical NIC names.
 
-## 3. 支持的拓扑
+## 3. Supported Topologies
 
-### 3.1 二层桥接
+### 3.1 Layer-2 Bridging
 
 ```text
 Guest eth0 <-> VirtIO-Net <-> TAP <-> Linux bridge <-> Host uplink/LAN
 ```
 
-只有宿主上行接口和网络策略允许加入桥时使用。无线接口常不能直接作为普通二层 bridge 端口，脚本不得假定一定可行。
+Used only when host uplink interfaces and network policies permit joining a bridge. Wireless interfaces often cannot act directly as normal layer-2 bridge ports, and scripts must not assume feasibility.
 
-### 3.2 三层转发与 NAT
+### 3.2 Layer-3 Forwarding and NAT
 
 ```text
 Guest eth0 <-> TAP <-> Host bridge/subnet <-> IP forwarding + NAT <-> Internet
 ```
 
-若局域网不提供来宾 DHCP，可在隔离子网提供明确 DHCP 服务或静态配置。但最终命令要求 `dhclient eth0`，验收拓扑必须确有 DHCP 响应。
+If the LAN does not provide guest DHCP, explicit DHCP services or static configurations can be provided in an isolated subnet. However, final commands require `dhclient eth0`, so acceptance topologies must indeed produce DHCP responses.
 
-## 4. 准备脚本要求
+## 4. Preparation Script Requirements
 
-- **HOSTNET-REQ-001**：脚本必须参数化 TAP 名、桥名、子网和上行接口。
-- **HOSTNET-REQ-002**：执行前检查命令、权限、名称冲突和现有配置。
-- **HOSTNET-REQ-003**：只修改明确目标对象，不清空整套防火墙或路由表。
-- **HOSTNET-REQ-004**：重复执行应幂等，或在安全处明确拒绝。
-- **HOSTNET-REQ-005**：提供与创建操作一一对应的恢复步骤，且只移除本脚本创建的对象。
-- **HOSTNET-REQ-006**：所有危险或系统状态修改命令在运行前向用户逐项说明并等待确认。
+- **HOSTNET-REQ-001**: Scripts must parameterize TAP names, bridge names, subnets, and uplink interfaces.
+- **HOSTNET-REQ-002**: Validate commands, permissions, name conflicts, and existing configs prior to execution.
+- **HOSTNET-REQ-003**: Modify designated target objects only, without clearing entire firewall or routing tables.
+- **HOSTNET-REQ-004**: Repeated executions should be idempotent, or explicitly rejected at safe points.
+- **HOSTNET-REQ-005**: Provide restoration steps corresponding one-to-one with creation operations, removing only objects created by this script.
+- **HOSTNET-REQ-006**: All dangerous or system-state modifying commands must be explained item-by-item to the user before running, waiting for confirmation.
 
-## 5. DHCP 与 DNS
+## 5. DHCP and DNS
 
-- 来宾 DHCP 请求必须经 VirtIO/TAP 真实发出。
-- DHCP 响应必须来自明确的局域网或受控宿主 DHCP 服务，不得由模拟器伪造。
-- DHCP 应提供 IP、前缀、默认路由和 DNS。
-- 域名解析测试必须在来宾中执行并经配置 DNS 服务器完成。
+- Guest DHCP requests must be legitimately issued over VirtIO/TAP.
+- DHCP responses must originate from clear LAN or controlled host DHCP services, and cannot be faked by the emulator.
+- DHCP should provide IP, prefix, default route, and DNS.
+- Domain resolution tests must execute in guest and complete via configured DNS servers.
 
-## 6. 验证顺序
+## 6. Verification Sequence
 
-1. 宿主确认 TAP 为 UP 且连接正确 bridge。
-2. 启动模拟器，Linux 识别 `eth0`。
-3. 来宾观察链路为 UP。
-4. 来宾执行 `dhclient eth0`。
-5. 检查来宾独立 IP、路由和 resolver。
-6. 来宾先验证网关，再验证 DNS，最后执行公网 `ping`。
-7. 同时从宿主计数器或抓包证明确有双向 TAP 流量。
+1. Host confirms TAP is UP and correctly connected to bridge.
+2. Launch emulator; Linux detects `eth0`.
+3. Guest observes link as UP.
+4. Guest executes `dhclient eth0`.
+5. Verify guest independent IP, route, and resolver.
+6. Guest validates gateway first, then DNS, and finally executes public `ping`.
+7. Simultaneously prove bidirectional TAP traffic from host counters or packet captures.
 
-## 7. 最终验收
+## 7. Final Acceptance
 
-来宾运行：
+Guest executes:
 
 ```text
 dhclient eth0
 ping -c 4 google.com
 ```
 
-必须收到 4 个 ICMP 响应且 0% 丢包。结果受外部公网和 ICMP 策略影响；若外部主机临时拒绝 ICMP，只能报告环境阻断并重选经用户确认的验收时间或目标，不能伪造结果或擅自降低标准。
+Must receive 4 ICMP responses with 0% packet loss. Results are affected by external internet and ICMP policies; if external hosts temporarily reject ICMP, report environment blockage and select user-confirmed acceptance times or targets, without faking results or lowering standards.
 
-## 8. 安全与清理
+## 8. Security and Cleanup
 
-- 不在仓库保存宿主真实密钥、VPN 配置或个人网络信息。
-- 抓包和日志默认置于 `artifacts/logs/` 并排除 Git。
-- 退出模拟器不自动删除共享 TAP/bridge；只有明确调用经确认的清理脚本才改变宿主网络。
-- 清理前确认目标名称和归属，禁止通配删除网络设备或防火墙规则。
+- Do not store host real keys, VPN configs, or personal network data in repository.
+- Packet captures and logs default to `artifacts/logs/` and are excluded from Git.
+- Exiting emulator does not automatically delete shared TAPs/bridges; host network changes only upon calling confirmed cleanup scripts explicitly.
+- Confirm target names and ownership prior to cleanup, prohibiting wildcard deletion of network devices or firewall rules.

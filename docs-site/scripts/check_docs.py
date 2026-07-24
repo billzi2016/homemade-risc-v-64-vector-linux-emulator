@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """检查文档站入口命名、相对 symlink 和仓库边界。"""
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ def check_language_tree(language: str, suffix: str) -> None:
 
     for entry in markdown_entries:
         name = entry.name
-        if language == "zh" and not name.endswith(suffix):
+        if language == "zh" and not name.endswith(suffix) and name != "index.md":
             fail(f"Chinese entry must end with .zh.md: {relative_to_repo(entry)}")
         if language == "en" and name.endswith(".zh.md"):
             fail(f"English entry must not use .zh.md suffix: {relative_to_repo(entry)}")
@@ -61,8 +61,8 @@ def check_language_tree(language: str, suffix: str) -> None:
 
 def check_language_pairs() -> None:
     zh_files = {
-        path.relative_to(DOCS_ROOT / "zh").with_name(path.name.removesuffix(".zh.md") + ".md")
-        for path in (DOCS_ROOT / "zh").rglob("*.zh.md")
+        path.relative_to(DOCS_ROOT / "zh").with_name(path.name.removesuffix(".zh.md") + (".md" if path.name.endswith(".zh.md") else ""))
+        for path in (DOCS_ROOT / "zh").rglob("*.md")
     }
     en_files = {path.relative_to(DOCS_ROOT / "en") for path in (DOCS_ROOT / "en").rglob("*.md")}
     missing_en = sorted(zh_files - en_files)

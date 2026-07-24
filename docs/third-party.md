@@ -1,25 +1,25 @@
-# 第三方依赖、下载与安装指南
+# Third-Party Dependencies, Downloads, and Installation Guide
 
-## 1. 文档目的
+## 1. Purpose
 
-本文解释构建和运行 `homemade-risc-v-64-vector-linux-emulator` 所涉及的第三方软件：它们分别解决什么问题、是否必须、应从哪里获取，以及为什么不能直接提交到本仓库。
+This document explains the third-party software involved in building and running `homemade-risc-v-64-vector-linux-emulator`: what problems they solve, whether they are mandatory, where to obtain them, and why they must not be directly committed to this repository.
 
-项目本体坚持从零实现 CPU、MMU、总线和虚拟设备，不使用 QEMU、Spike 等现成模拟器充当项目功能。第三方工具只用于编译源码、制作启动资源或提供来宾系统；OpenSBI、Linux 和 BusyBox 是模拟器所运行的软件，不是模拟器内部实现的一部分。
+The emulator project itself strictly insists on implementing the CPU, MMU, bus, and virtual peripherals from scratch, without using off-the-shelf emulators like QEMU or Spike to act as project functionality. Third-party tools are used solely to compile source code, generate boot resources, or provide the guest operating system. OpenSBI, Linux, and BusyBox are software executed by the emulator, not part of the emulator internal implementation.
 
-所有下载文件、外部源码和生成镜像都应保存在 `artifacts/` 下。该目录已被 `.gitignore` 排除，不得将大型二进制、第三方源码副本或本机网络配置提交到 Git。
+All downloaded files, external source code, and generated images should be saved under `artifacts/`. This directory is excluded by `.gitignore`; large binaries, copies of third-party source code, or host network configurations must not be committed to Git.
 
-## 2. 依赖关系总览
+## 2. Dependency Overview
 
 ```mermaid
 flowchart LR
-    Host[Linux / macOS 宿主机] --> Build[CMake + C++17 编译器]
-    Build --> Emulator[模拟器可执行文件]
+    Host[Host Linux / macOS] --> Build[CMake + C++17 Compiler]
+    Build --> Emulator[Emulator Executable]
 
-    Cross[RISC-V 交叉工具链] --> SBI[OpenSBI 固件]
-    Cross --> Kernel[Linux 内核]
+    Cross[RISC-V Cross Toolchain] --> SBI[OpenSBI Firmware]
+    Cross --> Kernel[Linux Kernel]
     RootfsTool[Buildroot / BusyBox / e2fsprogs] --> Rootfs[rootfs.ext4]
 
-    SBI --> Boot[完整启动资源]
+    SBI --> Boot[Complete Boot Resources]
     Kernel --> Boot
     Rootfs --> Boot
     Boot --> Emulator
@@ -27,34 +27,34 @@ flowchart LR
     Net[iproute2 + TUN/TAP] --> Emulator
 ```
 
-| 分类 | 第三方项目 | 是否必须 | 产生或提供的内容 |
+| Category | Third-Party Project | Mandatory? | Provided / Generated Artifacts |
 | --- | --- | --- | --- |
-| 本机构建 | CMake、GCC 或 Clang | 必须 | 编译模拟器及运行测试 |
-| 构建加速 | Ninja | 可选 | 更快地执行 CMake 生成的构建任务 |
-| 交叉编译 | RISC-V GNU Toolchain | 制作启动资源时必须 | `riscv64-linux-gnu-*` 编译器、链接器和二进制工具 |
-| 机器固件 | OpenSBI | 完整启动必须 | M-mode 固件 `opensbi.bin` |
-| 操作系统 | Linux Kernel | 完整启动必须 | RISC-V Linux 内核 `vmlinux.bin` |
-| 最小用户空间 | Buildroot、BusyBox | 完整启动必须 | Shell、基础命令、启动脚本和网络工具 |
-| 文件系统 | e2fsprogs | 制作 ext4 镜像时必须 | `mkfs.ext4`、`debugfs`、`e2fsck` |
-| 设备树 | Device Tree Compiler | 构建或检查 FDT 时必须 | `dtc`、`fdtdump`、`fdtget` |
-| 宿主网络 | iproute2、nftables | VirtIO 网络验收必须 | TAP、地址、路由、网桥或 NAT 配置 |
+| Host Build | CMake, GCC or Clang | Yes | Compiles emulator and runs tests |
+| Build Acceleration | Ninja | Optional | Executes CMake-generated build tasks faster |
+| Cross Compilation | RISC-V GNU Toolchain | Yes (for boot resources) | `riscv64-linux-gnu-*` compilers, linkers, and binary tools |
+| Machine Firmware | OpenSBI | Yes (for full boot) | M-mode firmware `opensbi.bin` |
+| Operating System | Linux Kernel | Yes (for full boot) | RISC-V Linux kernel `vmlinux.bin` |
+| Minimal Userspace | Buildroot, BusyBox | Yes (for full boot) | Shell, basic commands, startup scripts, and network tools |
+| Filesystem | e2fsprogs | Yes (for ext4 image) | `mkfs.ext4`, `debugfs`, `e2fsck` |
+| Device Tree | Device Tree Compiler | Yes (for FDT) | `dtc`, `fdtdump`, `fdtget` |
+| Host Networking | iproute2, nftables | Yes (for VirtIO Net test) | TAP, address, routing, bridge, or NAT configurations |
 
-## 3. 推荐宿主环境
+## 3. Recommended Host Environment
 
-项目支持两个宿主档位。macOS 负责真实构建、测试并以 `--net none` 启动到来宾 Shell；Linux 在相同启动能力上增加 `/dev/net/tun` TAP 网络终验。macOS 不需要安装或模拟 iproute2、nftables 与 Linux TAP。
+The project supports two host profiles. macOS handles real builds, tests, and boots to guest Shell with `--net none`; Linux adds `/dev/net/tun` TAP network final acceptance on top of the same boot capabilities. macOS does not need to install or emulate iproute2, nftables, or Linux TAP.
 
-推荐条件：
+Recommended specifications:
 
-- 64 位 Ubuntu 24.04 LTS 或同等级 Linux 发行版。
-- 支持 C++17 的 GCC 或 Clang。
-- CMake 3.20 或更高版本。
-- 至少 16 GiB 可用磁盘空间；从源码构建完整交叉工具链时建议预留更多空间。
-- 构建启动资源时建议至少 8 GiB RAM；模拟器运行内存还取决于来宾 RAM 配置。
-- 创建 TAP、网桥或 NAT 时具备 `CAP_NET_ADMIN` 或受控的 `sudo` 权限。
+- 64-bit Ubuntu 24.04 LTS or equivalent Linux distribution.
+- GCC or Clang supporting C++17.
+- CMake 3.20 or higher.
+- At least 16 GiB available disk space; reserve more space when building full cross-toolchains from source.
+- At least 8 GiB RAM recommended for building boot resources; emulator execution memory depends on guest RAM configuration.
+- `CAP_NET_ADMIN` or controlled `sudo` privileges when creating TAP, bridge, or NAT interfaces.
 
-## 4. Ubuntu/Debian 一次性安装
+## 4. One-Time Installation on Ubuntu/Debian
 
-下列软件包覆盖模拟器构建、Linux/OpenSBI 交叉编译、内核配置、设备树、ext4 镜像和 TAP 网络管理：
+The following packages cover emulator compilation, Linux/OpenSBI cross-compilation, kernel configuration, device trees, ext4 images, and TAP network management:
 
 ```bash
 sudo apt update
@@ -67,9 +67,9 @@ sudo apt install --no-install-recommends \
   iproute2 nftables
 ```
 
-发行版包的优点是安装简单并能获得安全更新。若发行版中的 CMake 低于 3.20，应改用 [CMake 官方下载页](https://cmake.org/download/) 提供的已签名发行包，不要从不明镜像站下载可执行文件。
+Distribution packages offer easy installation and security updates. If system CMake is below 3.20, use signed packages from the [official CMake download page](https://cmake.org/download/), rather than downloading executables from untrusted mirrors.
 
-验证关键工具：
+Verify key tools:
 
 ```bash
 cmake --version
@@ -80,15 +80,15 @@ mkfs.ext4 -V
 ip -Version
 ```
 
-### 4.1 macOS/Homebrew 基础安装
+### 4.1 Base Installation on macOS/Homebrew
 
-macOS 本地构建只安装当前需要的基础工具，不安装 Linux 网络组件：
+Local macOS builds install only currently required base tools, excluding Linux network components:
 
 ```bash
 brew install cmake ninja
 ```
 
-验证：
+Verify:
 
 ```bash
 brew --version
@@ -97,56 +97,56 @@ ninja --version
 c++ --version
 ```
 
-设备树、ext4 和 RISC-V 产物工具应在进入对应构建节点时先用 `brew info <formula>` 核对当前公式，再按锁定版本安装；文档不得预先假定某个未验证公式一定提供 Linux 交叉工具链。OpenSBI、Linux 和 rootfs 仍放在被忽略的 `artifacts/`，macOS 只消费这些真实来宾产物完成无网络启动。
+Device tree, ext4, and RISC-V target tools should be verified against `brew info <formula>` upon reaching corresponding build nodes; documentation must not assume unverified formulas provide RISC-V cross toolchains. OpenSBI, Linux, and rootfs remain in ignored `artifacts/`, and macOS consumes these real guest artifacts for non-networked boots.
 
-## 5. 各项第三方资源详解
+## 5. Detailed Breakdown of Third-Party Resources
 
 ### 5.1 CMake
 
-CMake 读取仓库根目录的 `CMakeLists.txt`，生成本地构建系统，并通过 CTest 统一运行测试。它不参与模拟器运行，也不会被链接进最终可执行文件。
+CMake reads `CMakeLists.txt` at the repository root, generates the local build system, and runs tests via CTest. It is not involved in running the emulator nor linked into the final executable.
 
-- 最低版本：3.20。
-- 官方下载：[cmake.org/download](https://cmake.org/download/)。
-- 许可证：BSD 3-Clause；具体文本以下载版本附带文件为准。
-- 安装首选：Linux 发行版包；只有版本不足时才使用 Kitware 官方包。
+- Minimum Version: 3.20.
+- Official Download: [cmake.org/download](https://cmake.org/download/).
+- License: BSD 3-Clause; specific text per downloaded package.
+- Preferred Installation: Linux distribution package; use official Kitware packages only if version is insufficient.
 
-### 5.2 GCC、Clang 与 Ninja
+### 5.2 GCC, Clang, and Ninja
 
-GCC 或 Clang 把项目的 C++17 源码编译为宿主机可执行文件。两者任选其一即可；不能把宿主编译器与 RISC-V 交叉编译器混为一谈。Ninja 只是可选的构建执行器，不影响模拟器语义。
+GCC or Clang compiles the project C++17 source code into host executables. Select either compiler; host compilers must not be confused with RISC-V cross-compilers. Ninja is an optional build executor and does not alter emulator semantics.
 
-- GCC 官方入口：[gcc.gnu.org](https://gcc.gnu.org/)。
-- LLVM/Clang 官方入口：[llvm.org](https://llvm.org/)。
-- Ninja 官方入口：[ninja-build.org](https://ninja-build.org/)。
-- 推荐通过发行版包管理器安装，以便获得与系统 C/C++ 运行库匹配的版本。
+- GCC Official Site: [gcc.gnu.org](https://gcc.gnu.org/).
+- LLVM/Clang Official Site: [llvm.org](https://llvm.org/).
+- Ninja Official Site: [ninja-build.org](https://ninja-build.org/).
+- Recommended installation via distribution package manager for matching system C/C++ runtime libraries.
 
 ### 5.3 RISC-V GNU Toolchain
 
-RISC-V GNU Toolchain 是交叉编译器集合。宿主机通常是 x86-64 或 AArch64，而它生成 RV64 机器码，用来构建 OpenSBI、Linux 和来宾程序。常用前缀为 `riscv64-linux-gnu-`，例如 `riscv64-linux-gnu-gcc`、`objcopy` 和 `readelf`。
+RISC-V GNU Toolchain is a collection of cross-compilers. The host machine is usually x86-64 or AArch64, while it generates RV64 machine code for OpenSBI, Linux, and guest applications. Common prefixes are `riscv64-linux-gnu-`, such as `riscv64-linux-gnu-gcc`, `objcopy`, and `readelf`.
 
-- 官方源码：[riscv-collab/riscv-gnu-toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain)。
-- 首选安装：Ubuntu/Debian 的 `gcc-riscv64-linux-gnu` 与 `binutils-riscv64-linux-gnu`。
-- 源码构建：仅当发行版工具链缺少所需 RVV 支持或目标 ABI 时使用；上游仓库包含子模块和大量源包，下载及构建会占用较多磁盘和时间。
-- 本项目目标 ABI：RV64 的 LP64D；最终编译参数必须与内核、OpenSBI及来宾用户空间保持一致。
+- Official Source: [riscv-collab/riscv-gnu-toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain).
+- Preferred Installation: Ubuntu/Debian `gcc-riscv64-linux-gnu` and `binutils-riscv64-linux-gnu`.
+- Source Build: Use only when distribution toolchains lack required RVV support or target ABI; upstream repository includes submodules and large source packages taking significant disk and build time.
+- Project Target ABI: RV64 LP64D; final build flags must remain consistent across kernel, OpenSBI, and guest userspace.
 
-若必须从源码构建，应克隆到被忽略的目录，而不是仓库源码目录：
+If building from source is mandatory, clone into ignored directories rather than repository source paths:
 
 ```bash
 git clone https://github.com/riscv-collab/riscv-gnu-toolchain \
   artifacts/downloads/riscv-gnu-toolchain
 ```
 
-完整配置参数应在兼容性基线确定后固定，不能每次随意更换 `--with-arch` 或 `--with-abi`。
+Full configuration parameters must be frozen after setting compatibility baselines, avoiding arbitrary changes to `--with-arch` or `--with-abi`.
 
 ### 5.4 OpenSBI
 
-OpenSBI 是运行在 M-mode 的开源 Supervisor Binary Interface 实现。它完成机器级初始化，为 S-mode Linux 提供定时器、IPI、系统复位等 SBI 服务，并依据委托寄存器把允许的异常和中断交给 Linux。它是验证 CSR、Trap 委托和特权返回逻辑的第一道真实工作负载。
+OpenSBI is an open-source Supervisor Binary Interface implementation running in M-mode. It handles machine-level initialization, provides SBI services (timer, IPI, system reset) to S-mode Linux, and forwards allowed exceptions/interrupts to Linux per delegation registers. It is the first real workload to verify CSRs, trap delegation, and privilege returns.
 
-- 官方仓库：[riscv-software-src/opensbi](https://github.com/riscv-software-src/opensbi)。
-- 官方发行版：[OpenSBI Releases](https://github.com/riscv-software-src/opensbi/releases)。
-- 固件类型说明：[OpenSBI firmware documentation](https://github.com/riscv-software-src/opensbi/blob/master/docs/firmware/fw.md)。
-- 许可证：BSD 2-Clause；同时检查发行包中的第三方声明。
+- Official Repository: [riscv-software-src/opensbi](https://github.com/riscv-software-src/opensbi).
+- Official Releases: [OpenSBI Releases](https://github.com/riscv-software-src/opensbi/releases).
+- Firmware Documentation: [OpenSBI firmware documentation](https://github.com/riscv-software-src/opensbi/blob/master/docs/firmware/fw.md).
+- License: BSD 2-Clause; check third-party notices in release packages.
 
-本项目需要与虚拟机内存布局匹配的固件，不能随便拿其他开发板的预编译二进制。推荐固定一个上游稳定 tag，从官方源码构建适配本项目启动协议的 `FW_JUMP` 或 `FW_DYNAMIC` 镜像，然后复制为：
+This project requires firmware matching our virtual machine memory layout; arbitrary precompiled binaries for other boards must not be used. Freeze an upstream stable tag, build `FW_JUMP` or `FW_DYNAMIC` images matching our boot protocol, and copy to:
 
 ```text
 artifacts/firmware/opensbi.bin
@@ -154,37 +154,37 @@ artifacts/firmware/opensbi.bin
 
 ### 5.5 Linux Kernel
 
-Linux Kernel 是运行在 S-mode 的来宾操作系统内核。它真实使用页表、原子指令、中断、UART、VirtIO-Blk 和 VirtIO-Net，是全系统功能是否正确的核心验收对象。
+Linux Kernel is the guest operating system kernel running in S-mode. It exercises page tables, atomic instructions, interrupts, UART, VirtIO-Blk, and VirtIO-Net, serving as the core acceptance object for full-system correctness.
 
-- 官方主页与签名下载：[kernel.org](https://www.kernel.org/)。
-- 活跃及长期维护版本：[Active kernel releases](https://www.kernel.org/releases.html)。
-- 官方源码归档：[kernel.org/pub/linux/kernel](https://www.kernel.org/pub/linux/kernel/)。
-- 许可证：GPL-2.0-only；以所选内核版本的 `COPYING` 为准。
+- Official Homepage & Signed Downloads: [kernel.org](https://www.kernel.org/).
+- Active & Longterm Releases: [Active kernel releases](https://www.kernel.org/releases.html).
+- Official Source Archives: [kernel.org/pub/linux/kernel](https://www.kernel.org/pub/linux/kernel/).
+- License: GPL-2.0-only; per `COPYING` in chosen kernel version.
 
-应选择稳定或长期维护版本，不使用 `-rc` 预发布版本作为默认验收基线。内核至少需要启用 RISC-V 64 位、SMP 配置与实际 Hart 数一致、串口 8250/16550、VirtIO MMIO、VirtIO Block、VirtIO Net、ext4、devtmpfs 和必要的 IPv4/DNS 支持。生成的原始内核镜像放在：
+Select stable or LTS releases; do not use `-rc` pre-releases as default acceptance baselines. Kernel requires enabling RISC-V 64-bit, SMP matching actual hart count, 8250/16550 serial, VirtIO MMIO, VirtIO Block, VirtIO Net, ext4, devtmpfs, and IPv4/DNS support. Generated raw kernel images are placed in:
 
 ```text
 artifacts/kernel/vmlinux.bin
 ```
 
-下载内核源码后应同时下载签名或校验文件进行验证。源码可以暂存在 `artifacts/downloads/`，但不得提交。
+Download signatures or checksums to verify downloaded source archives. Source code may be stored in `artifacts/downloads/`, but must not be committed.
 
-### 5.6 Buildroot 与 BusyBox
+### 5.6 Buildroot and BusyBox
 
-Linux 内核本身不包含 Shell、`init`、文件系统目录或常用命令。最小用户空间通常由 BusyBox 提供；Buildroot 则负责交叉编译 BusyBox、运行库和额外网络工具，并可生成可重复的 ext4 根文件系统。
+The Linux kernel does not include a Shell, `init`, filesystem directories, or user utilities. A minimal userspace is provided by BusyBox; Buildroot cross-compiles BusyBox, runtimes, and network tools while generating reproducible ext4 root filesystems.
 
-推荐以 Buildroot 作为唯一的 rootfs 生成链路，避免同时维护手写 initramfs、手写 ext4 和另一套发行版根文件系统。BusyBox 仍是 Buildroot 中的核心用户空间组件。
+Recommend Buildroot as the sole rootfs generation chain to avoid maintaining hand-crafted initramfs, hand-crafted ext4, and secondary distribution root filesystems simultaneously. BusyBox remains the core userspace component within Buildroot.
 
-- Buildroot 官方站点：[buildroot.org](https://buildroot.org/)。
-- Buildroot 下载：[buildroot.org/downloads](https://buildroot.org/downloads/)。
-- Buildroot 用户手册：[Buildroot manual](https://buildroot.org/downloads/manual/manual.html)。
-- BusyBox 官方站点：[busybox.net](https://busybox.net/)。
-- BusyBox 官方源码入口：[busybox.net/source.html](https://busybox.net/source.html)。
-- BusyBox 许可证：GPL-2.0；Buildroot 及其输出包含多个许可证，必须保存生成的许可证清单。
+- Buildroot Official Site: [buildroot.org](https://buildroot.org/).
+- Buildroot Downloads: [buildroot.org/downloads](https://buildroot.org/downloads/).
+- Buildroot Manual: [Buildroot manual](https://buildroot.org/downloads/manual/manual.html).
+- BusyBox Official Site: [busybox.net](https://busybox.net/).
+- BusyBox Source Entry: [busybox.net/source.html](https://busybox.net/source.html).
+- BusyBox License: GPL-2.0; Buildroot and output contain multiple licenses; save generated license manifests.
 
-rootfs 必须包含可用的 `init`、Shell、`/dev`、`/proc`、`/sys` 挂载逻辑、网络配置工具，以及 PRD 验收命令所需的 DHCP 客户端和 `ping`。若最小镜像使用 BusyBox `udhcpc`，还应额外提供兼容的 `dhclient` 命令或调整验收镜像配置，不能在验收时临时伪造命令。
+rootfs must contain working `init`, Shell, `/dev`, `/proc`, `/sys` mount logic, network tools, and DHCP client/`ping` required by PRD commands. If minimal images use BusyBox `udhcpc`, provide compatible `dhclient` commands or adjust acceptance image configs without faking commands at test time.
 
-最终镜像位置：
+Final Image Location:
 
 ```text
 artifacts/disk/rootfs.ext4
@@ -192,60 +192,60 @@ artifacts/disk/rootfs.ext4
 
 ### 5.7 Device Tree Compiler
 
-Device Tree Compiler 将文本 DTS 编译为 Linux/OpenSBI 可读取的二进制 DTB，也能反编译和检查生成结果。FDT 必须精确描述 CPU ISA、内存、CLINT、PLIC、UART 和两个 VirtIO MMIO 区域；错误的中断号或地址会造成 Linux 静默卡住。
+Device Tree Compiler compiles text DTS into binary DTB read by Linux/OpenSBI, and decompiles/inspects outputs. FDT must describe CPU ISA, memory, CLINT, PLIC, UART, and two VirtIO MMIO regions; wrong interrupt numbers or addresses will cause Linux to hang silently.
 
-- 官方源码：[kernel.org Device Tree Compiler](https://git.kernel.org/pub/scm/utils/dtc/dtc.git/)。
-- 官方归档：[kernel.org/pub/software/utils/dtc](https://www.kernel.org/pub/software/utils/dtc/)。
-- Ubuntu/Debian 包：`device-tree-compiler`。
+- Official Source: [kernel.org Device Tree Compiler](https://git.kernel.org/pub/scm/utils/dtc/dtc.git/).
+- Official Archives: [kernel.org/pub/software/utils/dtc](https://www.kernel.org/pub/software/utils/dtc/).
+- Ubuntu/Debian Package: `device-tree-compiler`.
 
 ### 5.8 e2fsprogs
 
-e2fsprogs 提供 `mkfs.ext4`、`e2fsck`、`resize2fs` 和 `debugfs`。它只用于在宿主机创建、检查或维护 `rootfs.ext4`；模拟器本身只看见 VirtIO 块请求，不解析 ext4 文件系统结构。
+e2fsprogs provides `mkfs.ext4`, `e2fsck`, `resize2fs`, and `debugfs`. Used only on host to create, check, or maintain `rootfs.ext4`; the emulator itself sees VirtIO block requests and does not parse ext4 filesystem structures directly.
 
-- 官方源码：[git.kernel.org e2fsprogs](https://git.kernel.org/pub/scm/fs/ext2/e2fsprogs.git/)。
-- 官方发布归档：[kernel.org e2fsprogs](https://www.kernel.org/pub/linux/kernel/people/tytso/e2fsprogs/)。
-- Ubuntu/Debian 包：`e2fsprogs`。
+- Official Source: [git.kernel.org e2fsprogs](https://git.kernel.org/pub/scm/fs/ext2/e2fsprogs.git/).
+- Official Release Archives: [kernel.org e2fsprogs](https://www.kernel.org/pub/linux/kernel/people/tytso/e2fsprogs/).
+- Ubuntu/Debian Package: `e2fsprogs`.
 
-制作镜像后必须运行 `e2fsck -fn` 做只读一致性检查。不要对唯一镜像直接执行未经确认的修复操作；应保留可重新生成镜像的配置和构建记录。
+Run `e2fsck -fn` read-only checks after image creation. Do not perform unconfirmed repairs on sole images; retain reproducible build configs and logs.
 
-### 5.9 iproute2、nftables 与 Linux TUN/TAP
+### 5.9 iproute2, nftables, and Linux TUN/TAP
 
-VirtIO-Net 后端打开 `/dev/net/tun` 并绑定 TAP。TAP 传递完整以太网帧，适合接入 Linux bridge 或 NAT；TUN 只传递 IP 包，不能替代本项目要求的 TAP 数据链路。
+VirtIO-Net backend opens `/dev/net/tun` and binds to TAP. TAP passes full Ethernet frames, suitable for Linux bridges or NAT; TUN passes IP packets only and cannot replace the TAP data link required by this project.
 
-- Linux TUN/TAP 官方说明：[Kernel TUN/TAP documentation](https://docs.kernel.org/networking/tuntap.html)。
-- iproute2 官方归档：[kernel.org iproute2](https://www.kernel.org/pub/linux/utils/net/iproute2/)。
-- nftables 官方项目：[netfilter.org/nftables](https://www.netfilter.org/projects/nftables/)。
-- Ubuntu/Debian 包：`iproute2` 与 `nftables`。
+- Linux TUN/TAP Documentation: [Kernel TUN/TAP documentation](https://docs.kernel.org/networking/tuntap.html).
+- iproute2 Official Archives: [kernel.org iproute2](https://www.kernel.org/pub/linux/utils/net/iproute2/).
+- nftables Official Project: [netfilter.org/nftables](https://www.netfilter.org/projects/nftables/).
+- Ubuntu/Debian Packages: `iproute2` and `nftables`.
 
-创建接口、网桥、路由或 NAT 会改变宿主机网络状态，必须由用户明确执行，并根据实际物理接口、防火墙和地址规划配置。本仓库不会在构建阶段自动修改宿主网络。
+Creating interfaces, bridges, routes, or NAT alters host network state; perform explicitly according to physical interfaces, firewalls, and subnets. This repository will not automatically alter host networking during build phases.
 
-## 6. 下载目录与产物目录
+## 6. Download and Artifact Directories
 
 ```text
 artifacts/
-├── downloads/       # 第三方源码压缩包或临时 clone
+├── downloads/       # Third-party source archives or temporary clones
 ├── firmware/
 │   └── opensbi.bin
 ├── kernel/
 │   └── vmlinux.bin
-├── rootfs/          # rootfs 暂存目录或 Buildroot 输出记录
+├── rootfs/          # Rootfs staging directory or Buildroot output logs
 ├── disk/
 │   └── rootfs.ext4
-└── logs/            # 启动及验收日志
+└── logs/            # Boot and acceptance logs
 ```
 
-文件来源和生成过程应记录版本 tag、下载 URL、SHA-256、构建配置、编译器版本及许可证。不能只保留一个来历不明的二进制文件。
+File sources and build processes must record version tags, download URLs, SHA-256 hashes, build configs, compiler versions, and licenses. Do not keep untraced binary files alone.
 
-## 7. 完整性与许可证规则
+## 7. Integrity and License Rules
 
-1. 只从本文列出的官方站点或发行版官方仓库下载。
-2. 优先选择带 tag 的稳定版本，拒绝把移动的 `master`/`main` 当作可复现基线。
-3. 对下载归档校验 SHA-256；上游提供签名时同时验证签名。
-4. 第三方许可证不因本项目采用 MIT 而改变。
-5. 不把 OpenSBI、Linux、BusyBox、Buildroot、工具链或 rootfs 二进制提交到本仓库。
-6. 不在仓库中保存 token、`sudo` 密码、主机接口名称、私钥或本机防火墙快照。
-7. 发布测试镜像前单独完成许可证审计；“仅供学习”不是忽略开源许可证义务的理由。
+1. Download only from official sites or official distribution repositories listed here.
+2. Prefer tagged stable releases; do not use moving `master`/`main` branches as reproducible baselines.
+3. Verify SHA-256 hashes for downloaded archives; verify signatures when provided upstream.
+4. Third-party licenses remain unchanged regardless of our MIT License.
+5. Do not commit OpenSBI, Linux, BusyBox, Buildroot, toolchains, or rootfs binaries to this repository.
+6. Do not store tokens, `sudo` passwords, host interface names, private keys, or firewall snapshots in the repository.
+7. Perform standalone license audits before releasing test images; "for learning only" is not an excuse to ignore open-source license obligations.
 
-## 8. 下一步
+## 8. Next Steps
 
-依赖安装完成后，按照 `docs/quickstart.md` 构建模拟器、放置启动资源并执行完整 Linux 启动流程。实际实现进度仍以 `specs/tasks.md` 为准。
+After completing dependency setup, follow `docs/quickstart.md` to build the emulator, place boot resources, and execute the Linux boot flow. Actual progress remains tracked in `specs/tasks.md`.

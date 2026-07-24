@@ -1,8 +1,8 @@
-# Linux 真实启动 Flow
+# Real Linux Boot Flow
 
-本文只记录真实 UART 流和来宾命令输出，用于证明 Linux 确实从 OpenSBI 启动、识别设备、挂载 ext4 rootfs 并进入 Shell。构建产物、SHA-256 和回归测试结果见 [docs/RESULT.md](docs/RESULT.md)。
+This document records only real UART streams and guest command outputs, proving Linux boots from OpenSBI, detects devices, mounts ext4 rootfs, and enters Shell. Build artifacts, SHA-256 hashes, and regression test results are documented in [RESULT.md](../docs/RESULT.md).
 
-## 1. 运行命令
+## 1. Execution Command
 
 ```sh
 ./build/riscv_vector_emulator \
@@ -12,30 +12,30 @@
   --net none
 ```
 
-## 2. 证据文件
+## 2. Evidence Files
 
-状态：OpenSBI 真实启动证据已生成；Linux、VirtIO-Blk、ext4 和 Shell 仍待完成。
+Status: OpenSBI real boot evidence generated; Linux, VirtIO-Blk, ext4, and Shell evidence pending.
 
-当前保存到：
+Currently saved to:
 
 - `artifacts/logs/linux-boot-uart.log`
 
-## 3. 启动 Flow
+## 3. Boot Flow
 
-状态：部分完成。
+Status: Partially Complete.
 
-| 阶段 | 需要证明的事实 | UART 证据 |
+| Stage | Fact to Prove | UART Evidence |
 | --- | --- | --- |
-| OpenSBI | 固件真实启动并识别 hart、平台、ISA、timebase 和 next stage | `OpenSBI v1.6`；`Platform Name : rvemu,riscv64-gcv-single-hart`；`Platform HART Count : 1`；`Platform Timer Device : aclint-mtimer @ 10000000Hz`；`Domain0 Next Address : 0x0000000080200000`；`Domain0 Next Arg1 : 0x0000000082200000`；`Domain0 Next Mode : S-mode` |
-| Linux entry | Linux kernel 从 OpenSBI next stage 进入 | 待填 |
-| FDT | Linux 识别 RAM、CPU ISA、Sv39、CLINT、PLIC 和 UART | 待填 |
-| VirtIO-Blk | Linux 识别 VirtIO MMIO transport 和块设备 | 待填 |
-| ext4 rootfs | Linux 以 `rootwait root=/dev/vda rootfstype=ext4` 挂载真实 ext4 根文件系统 | 待填 |
-| Shell | 进入真实来宾 Shell | 待填 |
+| OpenSBI | Firmware boots and identifies hart, platform, ISA, timebase, and next stage | `OpenSBI v1.6`; `Platform Name : rvemu,riscv64-gcv-single-hart`; `Platform HART Count : 1`; `Platform Timer Device : aclint-mtimer @ 10000000Hz`; `Domain0 Next Address : 0x0000000080200000`; `Domain0 Next Arg1 : 0x0000000082200000`; `Domain0 Next Mode : S-mode` |
+| Linux entry | Linux kernel enters from OpenSBI next stage | Pending |
+| FDT | Linux detects RAM, CPU ISA, Sv39, CLINT, PLIC, and UART | Pending |
+| VirtIO-Blk | Linux detects VirtIO MMIO transport and block device | Pending |
+| ext4 rootfs | Linux mounts real ext4 root filesystem via `rootwait root=/dev/vda rootfstype=ext4` | Pending |
+| Shell | Enters real guest interactive shell | Pending |
 
-## 4. 来宾命令输出
+## 4. Guest Command Output
 
-状态：待执行完成。
+Status: Pending execution.
 
 ```sh
 ls /
@@ -43,6 +43,6 @@ pwd
 cat /proc/cpuinfo
 ```
 
-## 5. macOS 网络说明
+## 5. macOS Networking Note
 
-macOS 本轮只验证 `--net none`。Linux TAP、`dhclient eth0`、DNS 和 `ping` 验收标记为 macOS 做不了，不使用宿主网络命令或伪日志替代。
+macOS only validates `--net none` in this phase. Linux TAP, `dhclient eth0`, DNS, and `ping` acceptance criteria are marked as unsupported on macOS and will not be faked using host network commands or fabricated logs.

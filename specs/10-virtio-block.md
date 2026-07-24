@@ -1,64 +1,64 @@
-# VirtIO-Blk 规格
+# VirtIO-Blk Specification
 
-## 1. 设备目标
+## 1. Device Objectives
 
-VirtIO-Blk 将来宾块请求映射到用户通过 `--disk` 指定的宿主镜像。镜像是外部产物，路径由 CLI 传入且使用仓库根目录相对路径示例，例如 `artifacts/disk/rootfs.ext4`。
+VirtIO-Blk maps guest block requests to the host disk image specified by the user via `--disk`. Disk images are external artifacts, passed via CLI using repository-relative path examples, such as `artifacts/disk/rootfs.ext4`.
 
-## 2. 基本参数
+## 2. Base Parameters
 
-- **BLK-REQ-001**：逻辑扇区固定为 512 字节。
-- **BLK-REQ-002**：capacity 以 512 字节扇区数公布，来自镜像完整大小向下取整。
-- **BLK-REQ-003**：镜像大小不是 512 的整数倍时必须在启动阶段拒绝或明确按冻结策略处理，不能无提示截断。
-- **BLK-REQ-004**：读写模式必须与公布的只读 feature 一致。
+- **BLK-REQ-001**: Logical sector size is fixed at 512 bytes.
+- **BLK-REQ-002**: Capacity is advertised in units of 512-byte sectors, derived by rounding down total image size.
+- **BLK-REQ-003**: When image size is not an integer multiple of 512, it must be rejected at boot or handled per frozen policy, without silent truncation.
+- **BLK-REQ-004**: Read-write mode must align with advertised read-only features.
 
-## 3. 请求链布局
+## 3. Request Chain Layout
 
-每个请求至少包含：
+Each request contains at least:
 
-1. 设备只读的请求头，含 type、reserved、sector。
-2. 一个或多个数据描述符，方向取决于请求类型。
-3. 最后一个长度至少 1 字节且设备可写的 status 描述符。
+1. A device read-only header containing type, reserved, and sector fields.
+2. One or more data descriptors, whose directions depend on request type.
+3. A final device-writable status descriptor of at least 1 byte in length.
 
-链结构、字段大小和小端序按 VirtIO 规范校验。状态描述符缺失、方向错误或链过短时不得越界写入。
+Chain structure, field sizes, and little-endian ordering are validated per VirtIO spec. Missing status descriptors, wrong directions, or truncated chains must not trigger out-of-bounds writes.
 
-## 4. 请求类型
+## 4. Request Types
 
-- **BLK-REQ-005**：至少支持 `VIRTIO_BLK_T_IN`，从磁盘读到来宾可写缓冲区。
-- **BLK-REQ-006**：至少支持 `VIRTIO_BLK_T_OUT`，从来宾只读缓冲区写入磁盘。
-- Flush、Get ID、Discard、Write Zeroes 只有在实现、测试并公布对应 feature 后才接受。
-- 未支持请求返回 `UNSUPP`，后端 I/O 或范围错误返回 `IOERR`。
+- **BLK-REQ-005**: Support at least `VIRTIO_BLK_T_IN`, reading from disk into guest-writable buffers.
+- **BLK-REQ-006**: Support at least `VIRTIO_BLK_T_OUT`, writing from guest read-only buffers to disk.
+- Flush, Get ID, Discard, and Write Zeroes are accepted only after implementing, testing, and advertising matching features.
+- Unsupported requests return `UNSUPP`; backend I/O or range errors return `IOERR`.
 
-## 5. 边界与偏移
+## 5. Boundaries and Offsets
 
-- `sector × 512` 和 `offset + total_data_len` 必须使用检查运算。
-- 请求不得超出镜像 capacity。
-- 多描述符数据按链顺序形成一个连续块请求。
-- 读请求的来宾缓冲总长度决定实际读取范围；短宿主读取视为错误，不能以未初始化数据补齐。
-- 写请求必须避免宿主部分写被错误报告为成功；失败策略和镜像一致性必须清晰诊断。
+- `sector × 512` and `offset + total_data_len` must use overflow-checked arithmetic.
+- Requests must not exceed image capacity.
+- Multi-descriptor data forms a single contiguous block request in chain order.
+- Total guest buffer length for read requests determines actual read range; short host reads are treated as errors, and cannot be padded with uninitialized data.
+- Write requests must avoid reporting partial host writes as successful; failure policies and image consistency require explicit diagnostics.
 
-## 6. 完成顺序
+## 6. Completion Sequence
 
-1. 完整验证描述符链和磁盘范围。
-2. 执行宿主 `pread/pwrite` 等不依赖共享文件偏移的操作。
-3. 写 status 字节。
-4. 写 used element，`len` 仅统计设备写入来宾的字节数，按规范处理。
-5. 发布 used idx。
-6. 触发 VirtIO 中断并经 PLIC 注入。
+1. Thoroughly validate descriptor chain and disk ranges.
+2. Execute host operations such as `pread/pwrite` independent of shared file offsets.
+3. Write status byte.
+4. Write used element; `len` counts only bytes written by device into guest per spec.
+5. Publish used idx.
+6. Assert VirtIO interrupt, injected via PLIC.
 
-失败也必须按适用规范正确完成请求；不能留下驱动永久等待，除非设备进入需要复位状态并明确通知。
+Failures must also complete requests correctly per applicable specs; drivers must not be left waiting permanently unless device enters reset-needed state with explicit notification.
 
-## 7. 宿主文件安全
+## 7. Host File Safety
 
-- 启动时验证文件类型、访问权限和大小。
-- 不允许自动创建用户未指定的磁盘镜像。
-- 不允许扩展镜像越过启动时公布 capacity。
-- 默认不调用会改变宿主全局状态的缓存策略。
-- 异常退出前已报告成功的写入必须满足冻结的持久性语义；若仅保证页缓存可见，文档必须明确。
+- Validate file type, access permissions, and size upon startup.
+- Automatically creating disk images un-specified by user is prohibited.
+- Expanding images beyond capacity advertised at boot is prohibited.
+- Default to not invoking cache policies that alter global host states.
+- Writes reported as successful prior to abnormal exit must satisfy frozen persistence semantics; if only page-cache visibility is guaranteed, documentation must clarify.
 
-## 8. 验收条件
+## 8. Acceptance Criteria
 
-- 真实 ext4 镜像可被 Linux 识别、挂载并持续读取。
-- 在允许写入的配置中，来宾创建文件后正常关机并重新启动仍可读取。
-- 覆盖首末扇区、多描述符、零长度、越界、只读和宿主短 I/O。
-- used length、status 与中断顺序符合规范。
-- 恶意描述符不能读写镜像范围之外或宿主其他文件。
+- Real ext4 images can be detected, mounted, and read continuously by Linux.
+- In writable configurations, guest-created files remain readable after normal shutdown and reboot.
+- Covers first/last sectors, multi-descriptors, zero-length, out-of-bounds, read-only, and short host I/O.
+- Used length, status, and interrupt order conform to spec.
+- Malicious descriptors cannot read or write outside image ranges or access other host files.

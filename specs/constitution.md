@@ -1,115 +1,115 @@
-# 项目宪法（Constitution）
+# Project Constitution
 
-## 序言
+## Preamble
 
-本宪法规定 `homemade-risc-v-64-vector-linux-emulator` 的不可妥协原则。它约束所有架构决策、代码实现、测试方法、文档变更和交付声明。速度、演示效果或局部便利不能成为违反规格的理由。
+This Constitution defines the non-negotiable principles governing `homemade-risc-v-64-vector-linux-emulator`. It constrains all architectural decisions, code implementations, testing methodologies, documentation changes, and delivery claims. Speed, demo presentation, or local convenience cannot serve as excuses to violate specifications.
 
-## 第一条：规格至上
+## Article I: Specification Supremacy
 
-1. 经过用户确认的规格是实现和验收的权威依据。
-2. 每项代码变更必须能够追踪到明确需求和任务。
-3. 规格缺失、冲突或存在歧义时，必须暂停对应实现并请求确认。
-4. 不得通过改变测试、降低标准或重新解释术语掩盖未实现功能。
-5. 需求变更必须先更新相关规格、影响分析和任务，再修改实现。
+1. Specifications confirmed by the user serve as the authoritative reference for implementation and acceptance.
+2. Every code change must trace to explicit requirements and tasks.
+3. When specifications are missing, conflicting, or ambiguous, pause matching implementation and request confirmation.
+4. Altering tests, lowering standards, or reinterpreting terms to mask unimplemented features is prohibited.
+5. Requirement changes require updating relevant specifications, impact analyses, and tasks prior to modifying implementations.
 
-## 第二条：真实性
+## Article II: Authenticity
 
-1. 禁止用 Mock、Stub、占位代码、固定输出或宿主机代执行冒充模拟器能力。
-2. 阶段性测试替身仅可用于隔离已实现模块，必须有明确边界，且不能作为系统验收证据。
-3. 未运行的命令、未观察到的现象和未通过的测试不得报告为成功。
-4. 不得伪造 OpenSBI Banner、Linux 日志、Shell、IP 地址、DNS 或 `ping` 结果。
-5. 最终验收必须使用真实来宾软件和真实设备链路。
+1. Using Mocks, Stubs, placeholder code, fixed outputs, or host execution on behalf of guest to fake emulator capabilities is prohibited.
+2. Milestone test doubles serve only to isolate implemented modules, maintaining explicit boundaries, and cannot serve as system acceptance evidence.
+3. Unexecuted commands, unobserved phenomena, and unpassed tests must not be reported as successful.
+4. Faking OpenSBI Banner, Linux logs, Shell, IP addresses, DNS, or `ping` results is prohibited.
+5. Final acceptance must utilize real guest software and real device links.
 
-## 第三条：完整的硬件语义
+## Article III: Complete Hardware Semantics
 
-1. CPU 状态、CSR、特权转换、异常和中断必须遵守所声明的 RISC-V 规范版本。
-2. 所有指令取指和数据访存必须经过统一的权限检查、地址转换和总线访问路径。
-3. MMU 必须实现 Sv39 页面、超级页、规范地址、权限、A/D 位和 TLB 失效语义。
-4. 原子指令必须具有真实可观察的原子与保留集语义，不能退化为普通读写组合。
-5. VirtIO 必须完成 feature 协商、队列验证、描述符处理、used ring 更新和中断通知。
+1. CPU state, CSRs, privilege transitions, exceptions, and interrupts must observe declared RISC-V specification versions.
+2. All instruction fetches and data accesses must pass through uniform permission check, address translation, and bus access paths.
+3. MMU must implement Sv39 pages, superpages, canonical addresses, permissions, A/D bits, and TLB invalidation semantics.
+4. Atomic instructions must possess real observable atomic and reservation set semantics, without degrading to normal read/write combinations.
+5. VirtIO must complete feature negotiation, queue validation, descriptor processing, used ring updates, and interrupt notifications.
 
-## 第四条：单一事实来源
+## Article IV: Single Source of Truth
 
-1. 同一硬件规则只能存在一个权威实现。
-2. 禁止为测试、启动或演示另外编写一套简化 CPU、MMU、总线或设备路径。
-3. 公共位域、常量、错误类型和访问接口必须集中维护。
-4. 所有设备 DMA 必须复用统一物理内存访问规则。
-5. 重复逻辑出现时，应提炼稳定抽象，而不是复制后分别修补。
+1. Identical hardware rules possess exactly one authoritative implementation.
+2. Writing secondary simplified CPU, MMU, bus, or device paths for testing, booting, or demos is prohibited.
+3. Shared bitfields, constants, error types, and access interfaces must be centralized.
+4. All device DMA must reuse uniform physical memory access rules.
+5. When duplicate logic emerges, extract stable abstractions rather than patching copies separately.
 
-## 第五条：SOLID 与清晰边界
+## Article V: SOLID and Clear Boundaries
 
-1. 每个模块只有一个主要变化原因。
-2. CPU 核心依赖抽象总线，不依赖具体 UART、磁盘或网卡实现。
-3. 设备通过定义明确的 MMIO 和中断接口协作。
-4. 接口应保持最小，调用方不得依赖无关方法。
-5. 外部资源通过可替换的受控接口注入，但替换性不得改变硬件语义。
+1. Every module maintains exactly one primary reason to change.
+2. CPU core depends on abstract bus, independent of specific UART, disk, or network card implementations.
+3. Devices collaborate via well-defined MMIO and interrupt interfaces.
+4. Interfaces remain minimal; callers must not depend on unrelated methods.
+5. External resources inject via replaceable controlled interfaces, but replaceability must not alter hardware semantics.
 
-## 第六条：可维护性优先
+## Article VI: Maintainability First
 
-1. 代码必须使用 C++17 或更高的明确标准版本，并避免庞大非必要依赖。
-2. 所有代码文件开头必须有中文意图注释。
-3. 对外函数、复杂状态转换、长难逻辑和标准关键点必须有准确中文注释。
-4. 命名必须表达硬件语义；禁止无解释的魔法数字和隐式状态。
-5. 错误必须携带足够上下文，同时不得把来宾可恢复错误误当成宿主进程崩溃。
+1. Code must adopt C++17 or higher explicit standard versions, avoiding large unnecessary dependencies.
+2. All code files must begin with Chinese intent comments.
+3. Exported functions, complex state transitions, difficult logic, and critical spec points require accurate Chinese comments.
+4. Naming must express hardware semantics; un-explained magic numbers and implicit states are prohibited.
+5. Errors must carry sufficient context, while avoiding treating guest recoverable errors as host process crashes.
 
-## 第七条：补丁式变更
+## Article VII: Patch-Based Modifications
 
-1. 文件修改必须使用 `apply_patch` 进行增量变更。
-2. 禁止整文件重写来掩盖差异或覆盖用户工作。
-3. 每次补丁只覆盖已批准范围，不夹带无关重构。
-4. 修改前说明、用户确认、修改后报告是必需流程。
-5. 仓库内所有项目文件引用必须使用从仓库根目录开始的相对路径，禁止把用户目录、工作区或其他机器相关绝对路径写入文档、配置、脚本或实现。
-6. `/dev/net/tun` 等由平台标准定义的系统接口可按其系统绝对路径描述，但必须与仓库文件路径明确区分，不得由此引入对某个用户工作目录的依赖。
+1. File modifications must use `apply_patch` for incremental changes.
+2. Re-writing full files to mask diffs or overwrite user work is prohibited.
+3. Each patch covers approved scope only, containing no unrelated refactoring.
+4. Explanation before modification, user confirmation, and report after modification constitute mandatory procedures.
+5. All project file references within repository must use relative paths starting from repository root; writing user directories, workspace, or machine-specific absolute paths into documentation, configs, scripts, or implementations is prohibited.
+6. System interfaces defined by platform standards like `/dev/net/tun` may be described by system absolute paths, but must be explicitly distinguished from repository file paths without introducing dependencies on user working directories.
 
-## 第七条之一：工作区隔离与宿主安全
+## Article VII-A: Workspace Isolation & Host Safety
 
-1. 默认所有读取、修改、生成、构建、测试和临时产物都必须限制在仓库根目录及其子目录内。
-2. 禁止修改、移动、删除或覆盖仓库之外的用户文件、应用数据和系统文件。
-3. 禁止擅自改变宿主机环境变量、Shell 配置、软件安装、系统服务、网络设备、路由、网桥、防火墙、DNS 和内核参数。
-4. 任何递归或可能破坏数据的操作都不得以用户主目录、文件系统根目录、未解析变量或宽泛通配符为目标。
-5. 若真实 TAP、网络配置、外部下载或远端仓库操作确实需要越过工作区边界，必须逐项说明精确目标、必要性、状态变化和恢复方式，并获得用户针对该操作的明确确认。
-6. 工作区外权限不得从“完成项目”“运行测试”或其他一般性授权中推定；没有明确授权时必须停止在安全边界内。
+1. By default, all reading, modifying, generating, building, testing, and temporary artifacts must be restricted to repository root directory and its subdirectories.
+2. Modifying, moving, deleting, or overwriting user files, application data, and system files outside repository is prohibited.
+3. Altering host environment variables, shell configs, software installations, system services, network devices, routing, bridges, firewalls, DNS, and kernel parameters without authorization is prohibited.
+4. Any recursive or data-destructive operations must not target user home directory, filesystem root directory, unresolved variables, or broad wildcards.
+5. If real TAP, network configuration, external downloads, or remote repository operations genuinely require crossing workspace boundaries, explain precise target, necessity, state changes, and restoration procedures item-by-item, obtaining explicit user confirmation for that operation.
+6. Permissions outside workspace cannot be inferred from "completing project", "running tests", or general authorizations; without explicit confirmation, stop at safety boundaries.
 
-## 第八条：真实且分层的验证
+## Article VIII: Real and Layered Verification
 
-1. 单元测试验证局部语义，集成测试验证真实模块组合，系统测试验证真实软件栈。
-2. 测试必须覆盖正常、边界、非法、权限和异常路径。
-3. 参考模型或标准测试套件可作为对照，但不得替代本模拟器实际执行。
-4. 最终验收必须依次观察 OpenSBI、Linux、Shell、DHCP 和公网 ICMP。
-5. 任何环境受限项必须保持未完成，不得通过跳过测试获得完成状态。
+1. Unit tests verify local semantics, integration tests verify real module combinations, and system tests verify real software stacks.
+2. Tests must cover normal, boundary, illegal, permission, and exception paths.
+3. Reference models or standard test suites serve as comparisons, but cannot replace actual emulator execution.
+4. Final acceptance must sequentially observe OpenSBI, Linux, Shell, DHCP, and public ICMP.
+5. Environmentally constrained items must remain incomplete; passing tests by skipping is prohibited.
 
-## 第九条：外部产物不入库
+## Article IX: External Artifacts Not Tracked
 
-1. OpenSBI、Linux 内核、rootfs、磁盘镜像、下载缓存和构建产物不得提交到 Git。
-2. 外部产物必须有版本、官方来源、许可证信息和加密校验值。
-3. 获取外部产物前需要用户确认，网络下载失败不得用来源不明文件替代。
-4. `.gitignore` 必须在实施阶段明确覆盖约定目录，但修改本身仍需单独确认。
+1. OpenSBI, Linux kernel, rootfs, disk images, download caches, and build outputs must not be committed to Git.
+2. External artifacts must possess version, official source, license information, and cryptographic checksums.
+3. Obtaining external artifacts requires user confirmation; network download failures cannot be substituted with unverified files.
+4. `.gitignore` must explicitly cover convention directories during implementation, though modifications require separate confirmation.
 
-## 第十条：诚实的任务状态
+## Article X: Honest Task Status
 
-1. `tasks.md` 是进度记录，不是愿望清单。
-2. 任务只有达到全部完成条件后才能勾选。
-3. 代码存在但未经要求的真实测试验证，任务仍是未完成。
-4. 部分完成必须记录剩余工作，不得按比例推断整项完成。
-5. 所有最终声明必须可由命令、日志、测试报告或人工观察复核。
+1. `tasks.md` is a progress tracker, not a wishlist.
+2. Tasks are checked off only after satisfying all completion criteria.
+3. Code existing without required real test verification leaves tasks incomplete.
+4. Partial completion must record remaining work, without inferring full completion proportionally.
+5. All final claims must be verifiable by commands, logs, test reports, or human observation.
 
-## 第十一条：Git 纪律
+## Article XI: Git Discipline
 
-1. 未经用户明确要求不得执行任何 Git 操作。
-2. Git 操作前必须用中文逐步说明目的和影响。
-3. Commit 信息使用中文，主题简明，正文解释原因和关键修改，总长度不超过 10 行。
-4. Commit 应保持逻辑完整且可审查，不混入无关变更。
-5. 禁止擅自回滚、覆盖或清理用户变更。
+1. Executing Git operations without explicit user requests is prohibited.
+2. Explain purpose and impact step-by-step in Chinese prior to Git operations.
+3. Commit messages use Chinese, with concise subject, body explaining reasons and key changes, total length not exceeding 10 lines.
+4. Commits maintain logical integrity and reviewability, without mixing unrelated changes.
+5. Rolling back, overwriting, or cleaning up user changes without authorization is prohibited.
 
-## 第十二条：修订规则
+## Article XII: Amendment Rules
 
-对本宪法的任何修改都必须：
+Any modification to this Constitution must:
 
-1. 说明修改原因和受影响的规格、任务及实现。
-2. 获得用户明确确认。
-3. 不得追溯性地把未合规实现改称为合规。
-4. 同步更新 `specs/README.md`、`specs/tasks.md` 或相关专题规格。
+1. Explain reason for change and affected specs, tasks, and implementations.
+2. Obtain explicit user confirmation.
+3. Not retroactively declare non-compliant implementations compliant.
+4. Synchronously update `specs/README.md`, `specs/tasks.md`, or relevant specialized specs.
 
-## 生效状态
+## Effective Status
 
-本宪法在用户确认并写入仓库后生效。它定义工程行为，不表示项目功能已经实现或验证。
+This Constitution takes effect upon user confirmation and committing to repository. It defines engineering behaviors, and does not imply project features are already implemented or verified.

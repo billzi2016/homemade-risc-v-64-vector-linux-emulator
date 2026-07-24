@@ -1,103 +1,103 @@
-# C++ 编码与中文注释规范
+# C++ Coding and Chinese Annotation Specification
 
-## 1. 语言和依赖
+## 1. Language and Dependencies
 
-- **CODE-REQ-001**：采用 C++17 或经用户确认的更高标准，全项目只选择一个标准版本。
-- **CODE-REQ-002**：默认使用标准库和必要 POSIX/Linux API，禁止引入 GUI 或大型非必要依赖。
-- **CODE-REQ-003**：构建启用严格告警，并将项目代码告警作为错误处理；第三方代码不得通过全局关闭告警影响项目。
-- **CODE-REQ-004**：避免宿主未定义行为，包括整数溢出、非法移位、未对齐指针解引用和别名违规。
+- **CODE-REQ-001**: Adopt C++17 or a higher standard confirmed by the user, selecting a single standard version for the entire project.
+- **CODE-REQ-002**: Default to standard libraries and necessary POSIX/Linux APIs, prohibiting introduction of GUI or heavy unnecessary dependencies.
+- **CODE-REQ-003**: Enable strict compiler warnings for builds, treating project code warnings as errors; third-party code must not affect project by globally disabling warnings.
+- **CODE-REQ-004**: Avoid host undefined behavior, including integer overflow, illegal shifts, unaligned pointer dereferences, and aliasing violations.
 
-## 2. 文件意图注释
+## 2. File Intent Comments
 
-每个 `.hpp`、`.cpp` 和后续脚本文件开头必须包含中文意图注释，至少说明：
+Every `.hpp`, `.cpp`, and subsequent script file must include top-level Chinese intent comments at the start, explaining at least:
 
 ```text
-文件职责：该文件唯一负责什么。
-边界：它不负责什么，避免职责扩张。
-主要依赖：依赖哪些稳定抽象。
-关键不变量：维护哪些必须始终成立的硬件/资源规则。
+File Responsibility: What this file is solely responsible for.
+Boundaries: What it is not responsible for, preventing scope creep.
+Key Dependencies: Which stable abstractions it depends on.
+Key Invariants: Which hardware/resource rules it maintains that must always hold true.
 ```
 
-不得写“工具类”“公共逻辑”等无法约束边界的空泛描述。
+Do not write vague descriptions like "utility class" or "common logic" that fail to constrain boundaries.
 
-## 3. 函数与类型注释
+## 3. Function and Type Comments
 
-对外类型、接口、函数和复杂私有函数必须用中文说明：
+Exported types, interfaces, functions, and complex private functions must explain in Chinese:
 
-- 调用目的和硬件语义。
-- 参数单位、地址空间、位宽、所有权和合法范围。
-- 返回值及错误类型。
-- 修改的架构状态、内存、设备或宿主资源。
-- 异常安全、原子性、线程/事件循环约束。
-- 与标准中易混淆行为的对应关系。
+- Call purpose and hardware semantics.
+- Parameter units, address spaces, bit widths, ownership, and legal ranges.
+- Return values and error types.
+- Modified architectural states, memory, devices, or host resources.
+- Exception safety, atomicity, thread/event-loop constraints.
+- Correspondence to potentially confusing behaviors in specifications.
 
-简单访问器可用一行准确注释；复杂页表漫游或描述符解析必须完整描述前置条件和失败后状态。
+Simple accessors may use a single accurate comment line; complex page table walks or descriptor parsing must fully describe preconditions and post-failure states.
 
-## 4. 关键逻辑注释
+## 4. Critical Logic Comments
 
-以下位置必须解释“为什么”：
+The following positions must explain "why":
 
-- 指令位域拼接、立即数符号扩展和保留编码判断。
-- CSR 别名、WARL、特权与中断栈变更。
-- Sv39 超级页合成、权限矩阵、A/D 原子更新和 TLB 刷新。
-- 原子指令保留集与失效时机。
-- 浮点舍入、NaN boxing 和异常标志。
-- RVV 寄存器分组、tail/mask、重叠和 `vstart`。
-- Virtqueue ring 回绕、描述符方向、提交顺序和中断抑制。
-- 终端恢复、TAP 非阻塞 I/O 和资源清理。
+- Instruction bitfield concatenation, immediate sign extension, and reserved encoding evaluation.
+- CSR aliases, WARL, privilege and interrupt stack changes.
+- Sv39 superpage synthesis, permission matrices, A/D atomic updates, and TLB flushes.
+- Atomic instruction reservation sets and invalidation timing.
+- Floating-point rounding, NaN boxing, and exception flags.
+- RVV register grouping, tail/mask, overlap, and `vstart`.
+- Virtqueue ring wraparounds, descriptor directions, submission order, and interrupt suppression.
+- Terminal restoration, TAP non-blocking I/O, and resource cleanup.
 
-注释不能只把表达式翻译成中文，也不能引用不存在的未来实现。
+Comments cannot merely translate code expressions into Chinese word-by-word, nor cite non-existent future implementations.
 
-## 5. 命名和类型
+## 5. Naming and Types
 
-- 类型和函数名表达架构概念，如 virtual address、physical address、access type、privilege mode。
-- 对 VA、PA、寄存器值、CSR 编号和设备偏移使用不同强类型或清晰封装，减少误传。
-- 地址加法、范围和大小统一使用检查工具，禁止散落手写溢出判断。
-- 固定宽度硬件值使用 `<cstdint>` 类型，宿主容器大小使用适当 size 类型并显式转换。
-- 常量集中在对应规范模块，以十六进制和语义名称表示，必要时注明标准章节。
+- Type and function names express architectural concepts, such as virtual address, physical address, access type, privilege mode.
+- Use distinct strong types or clean encapsulations for VA, PA, register values, CSR numbers, and device offsets, minimizing mis-passings.
+- Use check utilities for address additions, ranges, and sizes, prohibiting scattered hand-written overflow logic.
+- Fixed-width hardware values use `<cstdint>` types, while host container sizes use appropriate size types with explicit conversions.
+- Constants are centralized in corresponding specification modules, represented in hexadecimal and semantic names, noting specification sections when necessary.
 
-## 6. SOLID 约束
+## 6. SOLID Constraints
 
-- **单一职责**：译码、执行、地址翻译、物理分发和宿主 I/O 分离。
-- **开闭原则**：新增设备通过 MMIO 抽象注册，不修改 CPU 设备分支。
-- **里氏替换**：测试或平台后端替换不得改变接口承诺和硬件语义。
-- **接口隔离**：只读 DMA、可写 DMA、中断源和时钟接口保持最小。
-- **依赖倒置**：高层机器编排依赖抽象，具体 POSIX 后端位于边界层。
+- **Single Responsibility**: Separate decoding, execution, address translation, physical dispatch, and host I/O.
+- **Open/Closed**: Adding devices registers via MMIO abstractions without modifying CPU device branches.
+- **Liskov Substitution**: Replacing test or platform backends must not alter interface promises and hardware semantics.
+- **Interface Segregation**: Keep read-only DMA, writable DMA, interrupt source, and clock interfaces minimal.
+- **Dependency Inversion**: High-level machine orchestration depends on abstractions, placing specific POSIX backends at boundary layers.
 
-## 7. DRY 约束
+## 7. DRY Constraints
 
-以下内容必须单一来源：
+The following contents must originate from a single source of truth:
 
-- 地址图、设备中断 ID 和 FDT 节点数据。
-- CSR 编号、位域、权限和复位值。
-- cause 编码和 Trap 状态变更。
-- 总线范围/溢出检查。
-- Virtqueue 描述符遍历。
-- CLI 配置在机器和文档中的投影。
+- Address maps, device interrupt IDs, and FDT node data.
+- CSR numbers, bitfields, permissions, and reset values.
+- cause encodings and Trap state transitions.
+- Bus range/overflow checks.
+- Virtqueue descriptor traversals.
+- Projections of CLI configuration in machine and documentation.
 
-DRY 不等于抽象所有相似代码。只有语义和变化原因相同时才共享；不同标准行为不能因表面相似强行合并。
+DRY does not mean abstracting all similar code. Share code only when semantics and reasons for change are identical; differing spec behaviors must not be forcibly merged due to surface similarities.
 
-## 8. 状态与错误
+## 8. State and Errors
 
-- 架构状态变更尽量以可审查事务提交，异常前不留下非法半状态。
-- 使用结构化错误携带地址、访问类型、PC 和设备上下文。
-- 来宾错误通过 Trap/设备状态反馈，宿主错误通过受控结果传播。
-- 禁止在深层库代码直接 `exit`；由运行时统一清理后决定退出。
-- 资源使用 RAII，终端属性和文件描述符必须具备幂等恢复/关闭。
+- Commit architectural state changes via reviewable transactions where possible, leaving no illegal half-states prior to exceptions.
+- Use structured errors carrying address, access type, PC, and device context.
+- Guest errors feedback via Trap/device status; host errors propagate via controlled results.
+- Prohibit direct `exit` calls in deep library code; runtime cleans up uniformly before deciding to exit.
+- Use RAII for resources; terminal attributes and file descriptors must feature idempotent restoration/closure.
 
-## 9. 路径规则
+## 9. Path Rules
 
-- 仓库内文档、配置、脚本默认值和测试证据一律使用根目录相对路径。
-- 禁止写入开发者用户名、用户目录或工作区绝对路径。
-- 系统设备接口如 `/dev/net/tun` 必须显式标注为宿主平台路径。
-- 运行时可接受用户传入的绝对外部文件路径，但不得将其固化到源码或已提交配置。
+- Repository documentation, configs, script default values, and test evidence uniformly use relative paths from repository root.
+- Prohibit writing developer usernames, user directories, or workspace absolute paths.
+- System device interfaces such as `/dev/net/tun` must be explicitly noted as host platform paths.
+- Runtime may accept user-passed absolute external file paths, but must not fixate them into source code or committed configs.
 
-## 10. 代码审查清单
+## 10. Code Review Checklist
 
-- 是否追踪到需求和任务？
-- 是否只有一个权威实现路径？
-- 是否完整处理正常、边界和失败状态？
-- 是否存在未定义行为、溢出、越界或部分副作用？
-- 中文文件、函数和关键逻辑注释是否准确完整？
-- 测试是否执行生产路径且未用 Mock 冒充验收？
-- 是否夹带无关修改或机器绝对路径？
+- Is it traceable to requirements and tasks?
+- Is there exactly one authoritative implementation path?
+- Are normal, boundary, and failure states fully handled?
+- Does undefined behavior, overflow, out-of-bounds, or partial side effect exist?
+- Are Chinese file, function, and critical logic comments accurate and complete?
+- Do tests execute production paths without using Mocks to fake acceptance?
+- Are unrelated modifications or machine absolute paths included?

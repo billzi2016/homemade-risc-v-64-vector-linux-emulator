@@ -1,244 +1,244 @@
-# `homemade-risc-v-64-vector-linux-emulator` 文档站 GitHub Actions 部署 PRD
+# `homemade-risc-v-64-vector-linux-emulator` Documentation Site GitHub Actions Deployment PRD
 
-## 1. 文档目的
+## 1. Document Purpose
 
-本文件定义当前模拟器仓库的 MkDocs 文档站自动检查、构建和 GitHub Pages 部署要求。
+This document defines the automated check, build, and GitHub Pages deployment requirements for the current emulator repository documentation site using MkDocs.
 
-目标是在不触碰模拟器构建、Linux 产物或宿主网络的前提下，对双语 symlink 文档树执行严格验证，并把可复现静态站点部署到本仓库的 GitHub Pages。
+The goal is to strictly validate the bilingual symlink documentation tree without touching emulator builds, Linux artifacts, or host networking, and to deploy a reproducible static site to this repository's GitHub Pages.
 
-本 PRD 绑定 `billzi2016/homemade-risc-v-64-vector-linux-emulator`。工作流可以保持清晰可迁移，但触发路径、站点目录和 Pages 目标必须以本项目为准。
+This PRD is bound to `billzi2016/homemade-risc-v-64-vector-linux-emulator`. The workflow can remain clean and portable, but trigger paths, site directories, and Pages targets must adhere to this project.
 
-## 2. 建设目标
+## 2. Project Goals
 
-需要为目标仓库补充一套独立、标准、可维护的 GitHub Actions 工作流，满足以下目标：
+An independent, standard, and maintainable GitHub Actions workflow needs to be provided for the target repository to fulfill the following goals:
 
-- 支持在 GitHub 上自动执行构建与部署流程。
-- 支持静态文档站点的自动发布。
-- 部署到当前 public 仓库的 GitHub Pages。
-- 在构建前验证中文/英文入口命名、导航完整性和相对 symlink 安全性。
-- 使用 `docs-site/requirements.lock` 中锁定的依赖构建 `docs-site/mkdocs.yml`。
-- 工作流结构清晰，便于理解、维护和迁移。
-- 方案具备通用性，适合作为其他仓库的参考模板。
+- Support automated build and deployment execution on GitHub.
+- Support automated publishing of static documentation sites.
+- Deploy to the GitHub Pages of this public repository.
+- Validate Chinese/English entry naming, navigation completeness, and relative symlink safety prior to building.
+- Build `docs-site/mkdocs.yml` using locked dependencies in `docs-site/requirements.lock`.
+- Maintain a clean workflow structure that is easy to understand, maintain, and migrate.
+- Ensure the solution is general enough to serve as a reference template for other repositories.
 
-## 3. 适用范围
+## 3. Scope
 
-本 PRD 仅覆盖以下场景：
+This PRD covers only the following scenarios:
 
-- `README.md`、`AGENTS.md`、`specs/**` 或 `docs-site/**` 变化后的文档构建。
-- 文档 PR 的严格构建验证。
-- `main` 分支文档变更后的 GitHub Pages 部署。
-- 人工 `workflow_dispatch` 的重建和补发。
+- Documentation builds after changes to `README.md`, `AGENTS.md`, `specs/**`, or `docs-site/**`.
+- Strict build validation for documentation PRs.
+- GitHub Pages deployment after documentation changes on the `main` branch.
+- Manual `workflow_dispatch` rebuilds and re-deployments.
 
-本 PRD 不运行模拟器、不下载 OpenSBI/Linux/rootfs、不创建 TAP、不执行项目发布，也不把文档部署权限用于代码或 Release 写入。
+This PRD does not run the emulator, download OpenSBI/Linux/rootfs, create TAPs, execute project releases, nor use documentation deployment credentials for code or release writes.
 
-## 4. 总体要求
+## 4. General Requirements
 
-### 4.1 独立性
+### 4.1 Independence
 
-- GitHub Actions 部署方案应独立定义。
-- 自动化流程应聚焦文档站点构建与部署，不应混入无关业务流程。
-- 工作流职责应单一明确，避免一个文件承担过多不相关任务。
-- 工作流文件固定为 `.github/workflows/docs-pages.yml`；除该平台必需文件外，配置、依赖和校验脚本都收敛在 `docs-site/`。
+- The GitHub Actions deployment solution should be independently defined.
+- Automated workflows should focus on documentation site building and deployment, without mixing in unrelated business logic.
+- Workflow responsibilities should be single and clear, avoiding a single file carrying excessive unrelated tasks.
+- The workflow file is fixed at `.github/workflows/docs-pages.yml`; except for platform-required files, configs, dependencies, and validation scripts are consolidated under `docs-site/`.
 
-### 4.2 通用性
+### 4.2 Portability
 
-- 工作流必须明确使用 `docs-site/`、项目权威 Markdown 和 GitHub Pages 环境。
-- 通用步骤可复用，但不得以通用性为由使用宽泛 `push` 触发或跳过本项目 symlink 检查。
+- The workflow must explicitly use `docs-site/`, project authoritative Markdown files, and the GitHub Pages environment.
+- Common steps may be reused, but portability must not be used as an excuse for broad `push` triggers or skipping project symlink checks.
 
-### 4.3 稳定性
+### 4.3 Stability
 
-- 应优先采用 GitHub 官方或社区稳定的 Action。
-- 应尽量减少不必要的自定义脚本。
-- 工作流应在常规仓库权限模型下可运行。
+- Prefer stable official or community GitHub Actions.
+- Minimize unnecessary custom scripts.
+- The workflow should be runnable under standard repository permission models.
 
-## 5. 工作流职责要求
+## 5. Workflow Responsibilities
 
-自动化工作流至少应覆盖以下职责：
+Automated workflows must cover at least the following responsibilities:
 
-- 在代码变更后自动触发。
-- 支持手动触发。
-- 检出仓库代码。
-- 准备运行环境。
-- 安装文档构建依赖。
-- 验证所有文档 symlink 是相对链接、目标存在且解析后仍位于仓库内。
-- 验证 `docs-site/docs/zh/` 只包含 `.zh.md` Markdown 入口，`docs-site/docs/en/` 只包含 `.en.md` Markdown 入口。
-- 执行文档站点构建。
-- 上传构建产物。
-- 将静态站点部署到目标托管平台。
+- Trigger automatically upon code changes.
+- Support manual triggers.
+- Checkout repository code.
+- Prepare execution environment.
+- Install documentation build dependencies.
+- Validate that all documentation symlinks are relative links, targets exist, and resolved paths remain within the repository.
+- Validate that `docs-site/docs/zh/` contains only `.zh.md` Markdown entries, and `docs-site/docs/en/` contains only `.en.md` Markdown entries.
+- Execute documentation site build.
+- Upload build artifacts.
+- Deploy static site to target hosting platform.
 
-## 6. 触发策略要求
+## 6. Trigger Strategy Requirements
 
-### 6.1 自动触发
+### 6.1 Automated Triggers
 
-- 工作流应支持在主分支更新后自动执行。
-- 不应对主分支上的所有 `push` 默认全量触发。
-- 必须优先限制为仅在文档相关内容发生变化时触发，以减少无效运行。
-- 应使用 `paths` 或等价机制，将触发范围限制在文档源码、文档配置、文档部署工作流以及少量明确指定的文档入口文件。
-- 触发路径设计应体现文档工程边界清晰的原则。
-- 自动部署触发范围固定包含 `README.md`、`AGENTS.md`、`specs/**`、`docs-site/**` 和 `.github/workflows/docs-pages.yml`。
-- Pull Request 可以执行验证构建，但不得部署 Pages；只有 `main` 的受控 push 或人工触发可以部署。
+- Workflow should support automatic execution after main branch updates.
+- Should not trigger by default on all `push` events on the main branch.
+- Must restrict triggers to documentation-related content changes to minimize wasteful runs.
+- Should use `paths` or equivalent mechanisms to restrict triggers to documentation source code, configs, deployment workflows, and designated entry files.
+- Trigger path design should reflect clean documentation engineering boundaries.
+- Automatic deployment trigger paths are fixed to include `README.md`, `AGENTS.md`, `specs/**`, `docs-site/**`, and `.github/workflows/docs-pages.yml`.
+- Pull Requests can run validation builds, but must not deploy Pages; only controlled pushes to `main` or manual triggers can deploy.
 
-### 6.2 手动触发
+### 6.2 Manual Triggers
 
-- 工作流应支持 `workflow_dispatch`。
-- 手动触发能力用于调试、补发部署和人工验证。
+- Workflow should support `workflow_dispatch`.
+- Manual triggers are used for debugging, re-deployments, and manual verification.
 
-### 6.3 触发控制
+### 6.3 Concurrency Control
 
-- 应考虑并发控制，避免重复部署互相覆盖。
-- 若采用并发组，应保证行为可预测、语义清晰。
-- Pages 部署使用单一并发组；新提交可以取消尚未开始部署的旧构建，但不得中断已经进入不可安全取消阶段的发布。
+- Concurrency control should be implemented to prevent redundant deployments from overwriting each other.
+- Concurrency groups should ensure predictable behavior and clear semantics.
+- Pages deployment uses a single concurrency group; new commits can cancel pending builds, but must not abort deployments that have entered non-cancellable release stages.
 
-## 7. 构建要求
+## 7. Build Requirements
 
-### 7.1 运行环境
+### 7.1 Execution Environment
 
-- 应使用稳定、主流的运行环境版本。
-- 环境准备步骤应清晰可读。
-- 不应为了小幅优化而引入显著复杂度。
-- 使用 GitHub 托管的稳定 Linux runner，确保仓库内相对 symlink 按 Linux 语义检出和解析。
+- Use stable, mainstream runner OS versions.
+- Environment preparation steps should be clean and readable.
+- Do not introduce significant complexity for minor optimizations.
+- Use GitHub-hosted stable Linux runners to ensure relative symlinks are checked out and resolved according to Linux semantics.
 
-### 7.2 依赖安装
+### 7.2 Dependency Installation
 
-- 依赖安装方式应明确、稳定。
-- 应使用文档工程自身的依赖清单，而不是依赖仓库外部隐式环境。
-- 依赖来源和安装步骤应便于维护者理解。
-- Python、MkDocs、Material 和 i18n 插件版本必须锁定，禁止每次 CI 隐式安装不受控最新版本。
+- Dependency installation methods should be explicit and stable.
+- Use the documentation project's own dependency lockfile, rather than relying on host implicit environments.
+- Dependency sources and steps should be maintainer-friendly.
+- Python, MkDocs, Material theme, and i18n plugin versions must be locked; do not implicitly install uncontrolled latest versions on each CI run.
 
-### 7.3 构建执行
+### 7.3 Build Execution
 
-- 构建命令应直接、清晰、可复现。
-- 构建失败时应能明确暴露问题，而不是静默跳过。
-- 如构建工具支持严格模式，应优先考虑启用，以尽早发现文档问题。
-- 固定构建入口为从仓库根目录执行 `mkdocs build --strict --config-file docs-site/mkdocs.yml`。
-- 构建前必须运行项目自有 symlink/导航检查；检查失败不得继续上传产物。
+- Build commands should be direct, clear, and reproducible.
+- Build failures must clearly expose issues rather than skipping silently.
+- Enable strict mode if supported by build tools to catch documentation defects early.
+- Fixed build entry point: execute `mkdocs build --strict --config-file docs-site/mkdocs.yml` from the repository root.
+- Run project symlink/navigation checks before building; failed checks must not proceed to artifact upload.
 
-## 8. 部署要求
+## 8. Deployment Requirements
 
-### 8.1 部署目标
+### 8.1 Target Platform
 
-- 固定支持当前仓库的 GitHub Pages。
-- 若后续切换到其他静态托管平台，整体流程应尽量容易迁移。
+- Statically support GitHub Pages for current repository.
+- Ensure the overall workflow is easily portable if switching to other static hosting platforms in the future.
 
-### 8.2 产物处理
+### 8.2 Artifact Handling
 
-- 构建产物应与源码职责分离。
-- 应通过标准化步骤上传和发布产物。
-- 不应把部署逻辑与文档源码组织方式过度耦合。
-- 只上传 MkDocs 生成的静态 `site/` 目录，不上传源码、构建缓存、Linux 镜像或仓库其他文件。
+- Separate build artifacts from source responsibilities.
+- Upload and publish artifacts using standardized steps.
+- Do not tightly couple deployment logic with documentation source organization.
+- Upload only MkDocs-generated static `site/` directory; do not upload source code, build caches, Linux images, or other repository files.
 
-### 8.3 权限要求
+### 8.3 Permission Requirements
 
-- 工作流权限应遵循最小必要原则。
-- 只授予构建与部署所需权限。
-- 不应配置明显超出文档部署场景的高权限能力。
-- 构建使用 `contents: read`；部署仅增加 `pages: write` 与 `id-token: write`。不得授予 `contents: write`、`packages: write` 或仓库管理权限。
-- Pages 部署 Job 必须绑定 GitHub `github-pages` environment，并暴露最终页面 URL。
+- Workflow permissions should follow the principle of least privilege.
+- Grant only permissions necessary for build and deployment.
+- Do not configure high-privilege capabilities exceeding documentation deployment needs.
+- Build uses `contents: read`; deployment adds only `pages: write` and `id-token: write`. Do not grant `contents: write`, `packages: write`, or repository admin rights.
+- Pages deployment job must bind to the GitHub `github-pages` environment and expose final site URL.
 
-### 8.4 Action 供应链约束
+### 8.4 Action Supply Chain Constraints
 
-- 优先使用 GitHub 官方 checkout、Pages 配置、artifact 上传和 Pages 部署 Action。
-- Action 必须锁定经审查的稳定主版本或完整 commit SHA；版本升级属于需验证的独立变更。
-- 禁止从未审查的第三方 Action 执行仓库写入或部署。
+- Prefer official GitHub checkout, Pages configuration, artifact upload, and Pages deployment Actions.
+- Actions must lock reviewed stable major versions or full commit SHAs; version upgrades are independent changes requiring verification.
+- Writing to repository or deploying from unreviewed third-party Actions is strictly prohibited.
 
-## 9. 可维护性要求
+## 9. Maintainability Requirements
 
-### 9.1 可读性
+### 9.1 Readability
 
-- 工作流文件命名应清晰。
-- Job 与 Step 命名应语义明确。
-- 维护者应能快速看懂每一步的职责。
+- Workflow files should have clear naming.
+- Job and Step names should have explicit semantics.
+- Maintainers should quickly understand each step's responsibility.
 
-### 9.2 可迁移性
+### 9.2 Portability
 
-- 工作流应清楚体现当前仓库的文档边界；迁移时必须显式修改仓库名、触发路径和导航校验，不假装零配置通用。
+- Workflows should clearly reflect current repository documentation boundaries; explicit modifications to repo name, trigger paths, and navigation checks are required when migrating.
 
-### 9.3 可扩展性
+### 9.3 Extensibility
 
-- 允许未来增加预检查、链接校验、格式校验或多版本部署能力。
-- 但本次不要求一次性堆叠复杂 CI/CD 能力。
+- Allow future additions of pre-checks, link checking, formatting checks, or multi-version deployment capabilities.
+- Do not stack complex CI/CD features in a single pass.
 
-## 10. 非功能要求
+## 10. Non-Functional Requirements
 
-### 10.1 简洁性
+### 10.1 Simplicity
 
-- 方案应尽量简单直接。
-- 不要为了“看起来完整”而引入过多无关步骤。
+- Solutions should be direct and simple.
+- Do not introduce excessive unrelated steps just to look complete.
 
-### 10.2 一致性
+### 10.2 Consistency
 
-- 工作流命名风格、步骤组织方式和注释风格应统一。
-- 自动化方案应与文档工程结构相匹配。
+- Workflow naming, step organization, and commenting styles should be uniform.
+- Automation solutions should match the documentation engineering structure.
 
-### 10.3 可靠性
+### 10.3 Reliability
 
-- 对常见文档发布场景应具有稳定表现。
-- 尽量避免脆弱的临时脚本或隐式依赖。
+- Maintain stable performance for common documentation release scenarios.
+- Avoid fragile temporary scripts or implicit dependencies.
 
-## 11. 交付物要求
+## 11. Deliverable Requirements
 
-执行该 PRD 时，至少应交付以下内容：
+When implementing this PRD, deliver at least:
 
-- GitHub Actions 工作流文件
-- 清晰的构建步骤定义
-- 清晰的部署步骤定义
-- 与文档工程相匹配的触发规则
-- 必要的权限配置
-- symlink、语言后缀和严格构建检查
-- GitHub Pages environment 与部署 URL 输出
-- 简要说明文件或注释
+- GitHub Actions workflow file
+- Clear build step definitions
+- Clear deployment step definitions
+- Trigger rules matching the documentation project
+- Necessary permission configurations
+- Symlink, language suffix, and strict build checks
+- GitHub Pages environment and deployment URL output
+- Brief explanatory documentation or comments
 
-## 12. 验收标准
+## 12. Acceptance Criteria
 
-满足以下条件时，视为该任务完成：
+Task is complete when all of the following conditions are met:
 
-1. 仓库中存在独立的 GitHub Actions 工作流文件。
-2. 工作流可在主分支相关变更后自动触发。
-3. 工作流支持手动触发。
-4. 工作流能完成代码检出、环境准备、依赖安装与构建。
-5. 工作流能完成静态产物上传与部署。
-6. 部署目标优先兼容 GitHub Pages。
-7. 工作流结构清晰，便于维护者阅读与修改。
-8. 工作流具备迁移到其他仓库复用的价值。
-9. Pull Request 只验证不部署，`main` 文档变更才触发部署。
-10. 任何失效、绝对、循环或越过仓库根目录的 symlink 都会使构建失败。
-11. GitHub Pages 显示顶部语言切换、左侧导航，中文和英文 URL 可稳定访问。
-12. 工作流没有模拟器运行、外部镜像下载或宿主网络修改步骤。
+1. Repository contains an independent GitHub Actions workflow file.
+2. Workflow triggers automatically on relevant main branch changes.
+3. Workflow supports manual triggering.
+4. Workflow completes checkout, environment setup, dependency installation, and build.
+5. Workflow completes static artifact upload and deployment.
+6. Deployment target natively supports GitHub Pages.
+7. Workflow structure is clean and easy for maintainers to read and modify.
+8. Workflow possesses value for reuse in other repositories.
+9. Pull Requests run verification only without deploying; only `main` documentation changes trigger deployment.
+10. Any broken, absolute, cyclic, or out-of-repo symlinks fail the build.
+11. GitHub Pages displays top language switch, left navigation drawer, and stable URLs for both Chinese and English.
+12. Workflow contains no emulator runs, external image downloads, or host network modifications.
 
-## 13. 实施约束
+## 13. Implementation Constraints
 
-执行者在实现时应遵守以下约束：
+Implementers must observe the following constraints:
 
-- 不要把项目文档部署写成与当前目录和安全规则脱节的通用占位脚本。
-- 不要把与文档无关的 CI/CD 任务强行塞入同一工作流。
-- 不要将工作流配置为任意代码变更都会触发部署。
-- 不要省略手动触发能力。
-- 不要省略最基本的构建与部署链路。
-- 不要引入明显超出需求范围的高复杂度设计。
-- 不要跳过 symlink 校验，不要跟随仓库外链接，不要复制权威 Markdown 到构建目录冒充修复。
+- Do not write documentation deployment scripts as generic placeholders detached from directory layout and security rules.
+- Do not force unrelated CI/CD tasks into the same workflow.
+- Do not trigger deployment on arbitrary code changes.
+- Do not omit manual trigger capabilities.
+- Do not omit basic build and deployment chains.
+- Do not introduce overly complex designs exceeding requirements.
+- Do not skip symlink checks, follow links outside repo, or copy authoritative Markdown into build directory to fake fixes.
 
-## 14. 对执行者的明确指令
+## 14. Explicit Instructions for Implementers
 
-请基于本 PRD，为目标仓库设计并实现一套 GitHub Actions 自动构建与部署方案。实现要求如下：
+Based on this PRD, design and implement a GitHub Actions build and deployment solution for the target repository:
 
-- 聚焦静态文档站点构建与部署
-- 支持主分支自动触发
-- 支持手动触发
-- 优先兼容 GitHub Pages
-- 使用 `docs-site/` 的锁定依赖和严格构建入口
-- 验证 `zh/`、`en/` 目录下的 `.zh.md/.en.md` 与相对 symlink
-- 使用最小 Pages 权限，PR 不部署
-- 使用清晰、稳定、可维护的工作流结构
-- 尽量减少项目特化逻辑
-- 输出结果应具备复用价值
+- Focus on static documentation site build and deployment
+- Support main branch automatic triggers
+- Support manual triggers
+- Prefer compatibility with GitHub Pages
+- Use locked dependencies and strict build entry point under `docs-site/`
+- Validate `.zh.md/.en.md` under `zh/`, `en/` and relative symlinks
+- Use minimal Pages permissions; PRs do not deploy
+- Use clean, stable, and maintainable workflow structure
+- Minimize project-specific hacks
+- Ensure output deliverables hold value for reuse
 
-## 15. 期望结果
+## 15. Expected Outcome
 
-最终应得到一套服务当前模拟器文档站、严格验证双语 symlink、最小权限部署 GitHub Pages且适合长期维护的自动化方案。
+The final deliverable should be an automated solution serving the current emulator documentation site, strictly validating bilingual symlinks, deploying to GitHub Pages under least privilege, and suitable for long-term maintenance.
 
-该方案应满足以下目的：
+The solution satisfies the following purposes:
 
-- 当前仓库可直接接入自动部署
-- 未来其他仓库可复用同类实现
-- 其他 AI 可基于同一标准继续生成或修改工作流
-- 团队成员能够快速理解并维护
+- Current repository can directly attach to auto-deployment
+- Future repositories can reuse similar implementations
+- Other AI agents can continue generating or modifying workflows based on the same standard
+- Team members can quickly understand and maintain it

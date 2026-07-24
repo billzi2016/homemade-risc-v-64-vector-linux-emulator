@@ -1,71 +1,71 @@
-# `homemade-risc-v-64-vector-linux-emulator` MkDocs 双语文档站点 PRD
+# `homemade-risc-v-64-vector-linux-emulator` MkDocs Bilingual Documentation Site PRD
 
-## 1. 文档目的
+## 1. Document Purpose
 
-本文件定义 `homemade-risc-v-64-vector-linux-emulator` 的 MkDocs 文档站点建设要求，是后续实现、审查和验收文档站点的权威依据。
+This document defines the MkDocs documentation site construction requirements for `homemade-risc-v-64-vector-linux-emulator`, serving as the authoritative reference for subsequent implementation, review, and acceptance of the documentation site.
 
-目标是把仓库根目录和 `specs/` 中的权威工程文档，以相对符号链接接入一个结构一致、支持中英双语、可自动部署的文档站点，同时避免复制内容形成多套事实来源。
+The goal is to connect authoritative engineering documentation in the repository root and `specs/` into a consistently structured, bilingual, auto-deployable documentation site via relative symbolic links, while avoiding duplicating content to create multiple sources of truth.
 
-本 PRD 仅面向当前 RISC-V 全系统模拟器项目。其他仓库可以参考其结构，但不得以“通用性”为理由削弱本项目的导航、规格追踪或 symlink 约束。
+This PRD specifically targets the current RISC-V full-system emulator project. Other repositories may reference its structure, but cannot weaken navigation, specification traceability, or symlink constraints of this project under the guise of "genericity".
 
-## 2. 建设目标
+## 2. Construction Objectives
 
-需要建设一套独立的文档站点方案，满足以下要求：
+Construct an independent documentation site solution satisfying the following requirements:
 
-- 使用 `MkDocs` 作为文档站点框架。
-- 使用 `i18n` 方案支持中英双语。
-- 文档站点独立放置在 `docs-site/` 目录下。
-- 文档入口按 `docs-site/docs/zh/` 和 `docs-site/docs/en/` 分别组织。
-- 中文入口文件名使用 `.zh.md` 后缀，英文入口文件名使用 `.en.md` 后缀。
-- 站点入口 Markdown 必须使用相对 symlink 指向仓库中的权威文档，不复制正文。
-- 导航结构在中英文之间尽量保持一致。
-- 页面顶部提供明确的“简体中文 / English”语言切换入口。
-- 左侧目录按模拟器架构、CPU、ISA、RVV、MMU、总线、设备、VirtIO、引导、测试和任务组织。
-- 提供可用于自动构建和部署的 GitHub Actions 工作流。
-- 整体结构应具备通用性，便于迁移到其他仓库复用。
+- Use `MkDocs` as the documentation site framework.
+- Use `i18n` solutions to support bilingual Chinese and English.
+- Place documentation site independently under `docs-site/` directory.
+- Organize documentation entry points separately under `docs-site/docs/zh/` and `docs-site/docs/en/`.
+- Chinese entry filenames use `.zh.md` suffix, while English entry filenames use `.en.md` suffix.
+- Site entry Markdown must use relative symlinks pointing to authoritative documentation in the repository without copying body text.
+- Maintain consistent navigation structures between Chinese and English.
+- Provide explicit "简体中文 / English" language switcher at page top.
+- Organize left sidebar by emulator architecture, CPU, ISA, RVV, MMU, bus, devices, VirtIO, boot, testing, and tasks.
+- Provide GitHub Actions workflow for automated building and deployment.
+- Overall structure should possess genericity suitable for migration to other repositories.
 
-## 3. 适用范围
+## 3. Applicable Scope
 
-本 PRD 适用于以下本项目场景：
+This PRD applies to the following project scenarios:
 
-- 发布项目概览、免责声明和使用说明。
-- 发布项目宪法、Agent 操作规则与可勾选任务清单。
-- 发布 RV64GCV、Sv39、MMIO、VirtIO 和 Linux 引导规格。
-- 为后续真实实现补充模块设计、维护说明和验证证据。
-- 向中文和英文读者提供结构对应的文档入口。
+- Publishing project overview, disclaimers, and user guides.
+- Publishing project constitution, Agent operational rules, and checkable task lists.
+- Publishing RV64GCV, Sv39, MMIO, VirtIO, and Linux boot specifications.
+- Supplementing module designs, maintenance guides, and verification evidence for subsequent real implementations.
+- Providing corresponding documentation entry points for Chinese and English readers.
 
-本 PRD 不负责模拟器代码实现，也不允许文档站点构建流程修改宿主网络、下载 Linux 镜像或改变来宾运行状态。
+This PRD does not cover emulator code implementations, nor does it permit documentation site build flows from modifying host networks, downloading Linux images, or altering guest running states.
 
-## 4. 总体要求
+## 4. Overall Requirements
 
-### 4.1 工程独立性
+### 4.1 Engineering Independence
 
-- 文档站点必须作为独立工程存在于 `docs-site/` 中。
-- 文档相关配置、页面、资源和构建逻辑应尽量收敛在该目录内。
-- 不应把文档站点实现分散到仓库多个无关位置。
-- 应尽量减少对主项目目录结构的侵入。
-- GitHub Pages 工作流因平台约束必须位于 `.github/workflows/`，这是唯一允许放在 `docs-site/` 外的站点工程文件。
+- Documentation site must exist as an independent project within `docs-site/`.
+- Documentation-related configurations, pages, assets, and build logic should converge in this directory as much as possible.
+- Avoid scattering documentation site implementations across unrelated repository locations.
+- Minimize intrusion into main project directory structures.
+- GitHub Pages workflow must reside in `.github/workflows/` due to platform constraints; this is the sole permitted site project file outside `docs-site/`.
 
-### 4.2 双语一致性
+### 4.2 Bilingual Consistency
 
-- 必须同时支持中文和英文。
-- 中文和英文文档应采用平行结构组织。
-- 相同主题的页面在中英文中应尽量一一对应。
-- 导航、栏目、层级和命名语义应保持一致。
-- 不允许只完成单语结构后再以临时补丁方式拼接另一种语言。
-- 中文文档是当前权威基线；英文页面必须来自真实英文权威文档，禁止把中文 symlink 放进 `en/` 后声称完成翻译。
-- 某个英文主题尚未翻译时，应在任务中保持未完成，并从英文导航中明确缺失，不得生成空白页或机器占位文本。
+- Support both Chinese and English simultaneously.
+- Organize Chinese and English documentation in parallel structures.
+- Pages covering identical topics should correspond one-to-one between Chinese and English.
+- Navigation, categories, hierarchies, and naming semantics must remain consistent.
+- Completing single-language structures first and patching another language temporarily is prohibited.
+- Chinese documentation is current authoritative baseline; English pages must originate from real English authoritative documents, prohibiting placing Chinese symlinks into `en/` claiming completion.
+- When an English topic is un-translated, keep it incomplete in tasks and clarify absence in English navigation, avoiding generating blank pages or machine placeholder text.
 
-### 4.3 技术统一性
+### 4.3 Technical Uniformity
 
-- 文档框架统一使用 `MkDocs`。
-- 多语言实现统一采用 `i18n` 方式。
-- 方案应优先选择成熟、主流、可维护的插件与配置方式。
-- 避免引入与核心目标无关的复杂工程化定制。
-- 主题采用维护活跃且支持顶部语言切换、左侧导航、搜索和响应式布局的 MkDocs Material。
-- i18n 采用与所锁定 MkDocs/Material 版本兼容的成熟插件，依赖必须在 `docs-site/requirements.lock` 中精确锁定。
+- Documentation framework uniformly uses `MkDocs`.
+- Multilingual implementations uniformly adopt `i18n` methods.
+- Solutions should prefer mature, mainstream, maintainable plugins and configuration methods.
+- Avoid introducing complex engineering customizations unrelated to core goals.
+- Theme adopts actively maintained MkDocs Material supporting top language switching, left sidebar, search, and responsive layout.
+- i18n adopts mature plugins compatible with locked MkDocs/Material versions, with dependencies strictly locked in `docs-site/requirements.lock`.
 
-### 4.5 固定目录结构
+### 4.5 Fixed Directory Structure
 
 ```text
 docs-site/
@@ -76,230 +76,230 @@ docs-site/
 │   ├── mkdocs_prd.zh.md
 │   └── github_action_prd.zh.md
 ├── docs/
-│   ├── zh/                 # 只保存指向中文权威文档的相对 symlink
-│   └── en/                 # 只保存指向英文权威文档的相对 symlink
+│   ├── zh/                 # Stores relative symlinks pointing to Chinese authoritative documentation
+│   └── en/                 # Stores relative symlinks pointing to English authoritative documentation
 ├── overrides/
 └── assets/
 ```
 
-`site/` 是本地构建产物，必须被 Git 忽略。任何 symlink 的解析目标都必须仍在仓库根目录内，禁止链接到用户目录或宿主机其他位置。
+`site/` is a local build artifact and must be ignored by Git. Resolution targets of any symlink must remain inside the repository root, prohibiting linking to user directories or other host locations.
 
-### 4.4 自动化要求
+### 4.4 Automation Requirements
 
-- 应提供标准的自动化构建与部署流程。
-- 自动化流程应适用于 GitHub 仓库。
-- 至少支持通过 GitHub Actions 完成文档构建和静态站点部署。
-- 部署目标优先兼容 GitHub Pages。
+- Provide standard automated build and deployment procedures.
+- Automation procedures should apply to GitHub repositories.
+- Support documentation build and static site deployment via GitHub Actions at minimum.
+- Deployment targets prioritize compatibility with GitHub Pages.
 
-## 5. 推荐信息架构原则
+## 5. Recommended Information Architecture Principles
 
-左侧导航固定按以下信息架构组织：
+Left sidebar navigation is fixed per the following information architecture:
 
-- 首页：项目定位、免责声明、当前实现状态和规格入口。
-- 项目治理：`AGENTS.md`、项目宪法、标准基线、项目树和任务清单。
-- 总体架构：产品总览、模块边界和实施路线图。
-- CPU 与 ISA：寄存器、特权态、CSR、标量指令和 Trap。
-- 向量引擎：RVV 1.0 状态、指令和异常重启。
-- 内存系统：物理总线、RAM/ROM、Sv39、TLB 和原子 A/D 更新。
-- 外设：CLINT、PLIC、UART、VirtIO 公共层、块设备和网卡。
-- 系统集成：OpenSBI、Linux、CLI、宿主 TAP 和生命周期。
-- 质量保证：测试、编码规范、产物策略和真实验收。
-- 文档站 PRD：本文件与 GitHub Actions PRD。
+- Home: Project positioning, disclaimers, current implementation status, and specification entries.
+- Project Governance: `AGENTS.md`, project constitution, standards baseline, project tree, and task checklist.
+- Overall Architecture: Product overview, module boundaries, and implementation roadmap.
+- CPU & ISA: Registers, privilege modes, CSRs, scalar instructions, and Traps.
+- Vector Engine: RVV 1.0 state, instructions, and exception restarts.
+- Memory System: Physical bus, RAM/ROM, Sv39, TLB, and atomic A/D updates.
+- Peripherals: CLINT, PLIC, UART, VirtIO common layer, block device, and network card.
+- System Integration: OpenSBI, Linux, CLI, host TAP, and lifecycle.
+- Quality Assurance: Testing, coding standards, artifact policy, and real acceptance.
+- Site PRDs: This document and GitHub Actions PRD.
 
-说明：
+Notes:
 
-- 导航反映权威规格语义，而不是机械照搬文件目录。
-- 新模块必须在对应分类下补充，不得另建相互竞争的导航体系。
-- 不允许用占位页面冒充未完成内容；缺失页面保持未完成任务状态。
+- Navigation reflects authoritative specification semantics, rather than mechanically copying file directories.
+- New modules must be added under corresponding categories without creating competing navigation systems.
+- Faking uncompleted content with placeholder pages is prohibited; missing pages maintain incomplete task status.
 
-## 6. 内容组织要求
+## 6. Content Organization Requirements
 
-### 6.1 语言分层
+### 6.1 Language Layering
 
-- 站点入口按语言拆分，但正文权威来源仍位于站点目录之外的既有文档位置。
-- 中文和英文分别拥有独立的内容入口。
-- 每种语言均应具备独立首页。
-- 每种语言均应具备对应的导航结构。
-- `docs-site/docs/zh/` 与 `docs-site/docs/en/` 下的 Markdown 必须是相对 symlink，不得复制源文件。
+- Site entry points split by language, but body text authoritative sources remain at existing documentation paths outside site directory.
+- Chinese and English possess independent content entries.
+- Every language possesses an independent homepage.
+- Every language possesses a corresponding navigation structure.
+- Markdown files under `docs-site/docs/zh/` and `docs-site/docs/en/` must be relative symlinks, prohibiting copying source files.
 
-### 6.2 页面命名原则
+### 6.2 Page Naming Principles
 
-- 页面命名应清晰、稳定、可预测。
-- 同一主题的中文和英文页面应保持语义对应。
-- 命名应优先表达文档用途，而不是使用随意缩写。
-- 中文入口以 `.zh.md` 结尾，英文入口以 `.en.md` 结尾。
-- symlink 名称变化必须同步更新 MkDocs 导航和链接检查。
+- Page naming should be clear, stable, and predictable.
+- Chinese and English pages for identical topics should maintain semantic correspondence.
+- Naming should express document purpose first, avoiding arbitrary abbreviations.
+- Chinese entries end with `.zh.md`, while English entries end with `.en.md`.
+- Symlink name changes must update MkDocs navigation and link checks synchronously.
 
-### 6.3 导航原则
+### 6.3 Navigation Principles
 
-- 导航应反映内容结构，而不是仅反映文件存放位置。
-- 首页、入门、用户指南、专题内容、项目说明、PRD 内容等应有清晰分组。
-- 导航层级不宜过深。
-- 中英文导航结构应尽量镜像一致。
+- Navigation should reflect content structures, rather than file storage locations alone.
+- Homepage, getting started, user guides, specialized topics, project explanations, and PRD contents should have clear groupings.
+- Navigation hierarchies should not be excessively deep.
+- Chinese and English navigation structures should remain mirrored.
 
-### 6.4 缺失内容与扩展
+### 6.4 Missing Content and Expansion
 
-- 不允许用占位页、空翻译或自动生成的无审查文本冒充完成。
-- 某语言页面缺失时，必须在 `specs/tasks.md` 的文档站任务中保持未勾选。
-- 后续扩展优先补充既有分类，不频繁重构稳定 URL。
+- Faking completion with placeholder pages, empty translations, or un-reviewed auto-generated text is prohibited.
+- When a language page is missing, it must remain unchecked in documentation site tasks in `specs/tasks.md`.
+- Subsequent expansions prioritize supplementing existing categories without frequently refactoring stable URLs.
 
-### 6.5 Symlink 完整性
+### 6.5 Symlink Integrity
 
-- 所有链接必须使用从 symlink 所在目录计算的相对目标。
-- 禁止绝对 symlink，禁止目标解析到仓库外，禁止循环和失效链接。
-- 源文档重命名时必须在同一变更中更新 symlink、导航和交叉引用。
-- 本地构建和 CI 必须在 MkDocs 启动前验证全部 symlink。
+- All links must use relative targets calculated from symlink directory.
+- Absolute symlinks, targets resolving outside repository, circular links, and broken links are prohibited.
+- When source documents are renamed, symlinks, navigation, and cross-references must update in the same change.
+- Local builds and CI must validate all symlinks before launching MkDocs.
 
-## 7. 配置要求
+## 7. Configuration Requirements
 
-### 7.1 MkDocs 配置
+### 7.1 MkDocs Configuration
 
-实现方案中应包含完整的 MkDocs 配置，至少应覆盖：
+Implementation plan must contain full MkDocs configuration, covering at least:
 
-- 站点基础信息
-- 仓库 URL 与 GitHub Pages `site_url`
-- 主题配置
-- 导航配置
-- 多语言配置
-- Markdown 扩展配置
-- 插件配置
-- 静态资源配置
+- Site basic information
+- Repository URL and GitHub Pages `site_url`
+- Theme configuration
+- Navigation configuration
+- Multilingual configuration
+- Markdown extension configuration
+- Plugin configuration
+- Static asset configuration
 
-### 7.2 i18n 配置
+### 7.2 i18n Configuration
 
-多语言方案必须满足以下要求：
+Multilingual plans must satisfy the following:
 
-- 明确声明支持的语言集合。
-- 明确默认语言。
-- 明确不同语言页面的映射关系或组织方式。
-- 能支持中文与英文切换。
-- 能支持未来继续扩展更多语言，而无需推翻现有结构。
-- 默认语言为简体中文，英文为第二语言；顶部语言选择器必须在对应页面间切换。
+- Explicitly declare supported language sets.
+- Explicitly declare default language.
+- Explicitly declare page mapping relationships or organization for different languages.
+- Support switching between Chinese and English.
+- Support expanding more languages in the future without overturning existing structures.
+- Default language is Simplified Chinese, with English as secondary language; top language selector must switch between corresponding pages.
 
-### 7.3 可读性要求
+### 7.3 Readability Requirements
 
-- 配置文件应结构清晰，分段合理。
-- 命名和注释应便于维护者理解。
-- 不应把关键逻辑隐藏在难以追踪的脚本拼装中。
+- Configuration files should possess clear structures and reasonable sectioning.
+- Naming and comments should facilitate maintainer understanding.
+- Avoid hiding core logic in hard-to-trace script assemblies.
 
-## 8. 自动化与部署要求
+## 8. Automation and Deployment Requirements
 
 ### 8.1 GitHub Actions
 
-必须提供文档站点自动化工作流，至少包括：
+Must provide documentation site automation workflow, including at least:
 
-- 检出仓库代码
-- 安装构建依赖
-- 构建 MkDocs 站点
-- 部署生成后的静态文件
+- Checkout repository code
+- Install build dependencies
+- Build MkDocs site
+- Deploy generated static files
 
-### 8.2 工作流质量要求
+### 8.2 Workflow Quality Requirements
 
-- 工作流应尽量简单、稳定、可维护。
-- 命名应清晰，便于团队成员理解用途。
-- 不应为了追求复杂能力而显著增加维护成本。
-- 应优先采用 GitHub 官方或社区稳定方案。
+- Workflows should be simple, stable, and maintainable.
+- Naming should be clear for team members to understand purpose.
+- Avoid significantly increasing maintenance costs for complex capabilities.
+- Prefer official GitHub or community stable solutions.
 
-### 8.3 部署目标
+### 8.3 Deployment Targets
 
-- 优先面向 GitHub Pages。
-- 若后续迁移到其他静态托管平台，结构上也应尽量兼容。
-- 部署方案应尽量减少与业务运行环境的耦合。
+- Prioritize targeting GitHub Pages.
+- If migrating to other static hosting platforms later, structure should remain compatible.
+- Deployment plans should minimize coupling with operational execution environments.
 
-## 9. 非功能要求
+## 9. Non-Functional Requirements
 
-### 9.1 通用性
+### 9.1 Genericity
 
-- 配置应服务当前模拟器项目的真实信息架构。
-- 公共构建逻辑可以保持简洁可迁移，但不得因此删除项目专有导航和规格追踪。
+- Configurations should serve real information architecture of current emulator project.
+- Public build logic can remain concise and portable, but must not delete project-specific navigation and specification tracking.
 
-### 9.2 可维护性
+### 9.2 Maintainability
 
-- 新成员应能快速理解文档工程组织方式。
-- 后续新增页面时，不应频繁改动核心结构。
-- 中英文内容维护方式应清晰明确。
+- New team members should quickly understand documentation project organization.
+- Adding new pages later should not frequently alter core structures.
+- Chinese and English content maintenance methods should be clear.
 
-### 9.3 一致性
+### 9.3 Consistency
 
-- 中英文结构一致。
-- 页面风格一致。
-- 配置风格一致。
-- 自动化流程命名与职责一致。
+- Consistent Chinese and English structures.
+- Consistent page styles.
+- Consistent configuration styles.
+- Consistent automation process naming and responsibilities.
 
-### 9.4 可扩展性
+### 9.4 Extensibility
 
-- 允许未来增加新栏目。
-- 允许未来增加更多语言。
-- 允许未来增强主题、搜索、SEO、版本化等能力。
-- 但本次实现不要求一次性覆盖所有高级功能。
+- Permit adding new sections in the future.
+- Permit adding more languages in the future.
+- Permit enhancing theme, search, SEO, versioning capabilities in the future.
+- But current implementation does not require covering all advanced features at once.
 
-## 10. 交付物要求
+## 10. Deliverables Requirements
 
-执行该 PRD 时，至少应交付以下内容：
+When executing this PRD, deliver at least the following:
 
-- `docs-site/` 文档工程目录
-- MkDocs 主配置文件
-- 支持 i18n 的多语言配置
-- 中文文档入口页
-- 英文文档入口页
-- 指向现有权威 Markdown 的相对 symlink 页面
-- 中文 `.zh.md` 与英文 `.en.md` 命名规则
-- 静态资源目录
-- GitHub Actions 工作流文件
-- 简要维护说明
+- `docs-site/` documentation project directory
+- MkDocs main configuration file
+- i18n-supporting multilingual configuration
+- Chinese documentation homepage
+- English documentation homepage
+- Relative symlink pages pointing to existing authoritative Markdown files
+- Chinese `.zh.md` and English `.en.md` naming rules
+- Static assets directory
+- GitHub Actions workflow file
+- Brief maintenance guide
 
-## 11. 验收标准
+## 11. Acceptance Criteria
 
-满足以下条件时，视为该任务完成：
+Satisfying the following conditions marks task completion:
 
-1. 仓库中存在独立的 `docs-site/` 文档站点工程。
-2. 文档站点基于 MkDocs 构建。
-3. 文档站点支持中文与英文两种语言。
-4. 多语言实现基于 i18n 方案，而非手工复制拼装。
-5. 中英文首页均来自真实权威文档，可作为独立入口使用。
-6. 中英文导航结构基本一致。
-7. 站点可通过 GitHub Actions 自动构建。
-8. 站点可通过 GitHub Actions 自动部署到 GitHub Pages 或兼容静态托管目标。
-9. 目录、配置和内容组织方式具备复用价值。
-10. 其他 AI 或开发者可基于该结构继续扩展，而无需重新设计底层方案。
-11. 所有站点 Markdown 入口均为仓库内相对 symlink，无复制正文、绝对链接、失效目标或越界目标。
-12. 顶部语言切换和左侧项目导航在桌面与移动布局均可使用。
+1. Independent `docs-site/` documentation site project exists in repository.
+2. Documentation site is built on MkDocs.
+3. Documentation site supports both Chinese and English languages.
+4. Multilingual implementation relies on i18n solutions, rather than manual copy-paste assembly.
+5. Chinese and English homepages originate from real authoritative documents, usable as independent entries.
+6. Chinese and English navigation structures remain basically consistent.
+7. Site can be built automatically via GitHub Actions.
+8. Site can be deployed automatically to GitHub Pages or compatible static hosting targets via GitHub Actions.
+9. Directory, configuration, and content organization possess reusable value.
+10. Other AIs or developers can expand based on this structure without redesigning underlying plans.
+11. All site Markdown entries are relative symlinks within repository, with no copied body text, absolute links, broken targets, or out-of-bounds targets.
+12. Top language switcher and left project navigation are usable in desktop and mobile layouts.
 
-## 12. 实施约束
+## 12. Implementation Constraints
 
-执行者在实现时应遵守以下约束：
+Executors must observe the following constraints during implementation:
 
-- 不要把项目专有规格简化成与当前仓库无关的通用占位模板。
-- 不要复制 `README.md`、`AGENTS.md` 或 `specs/` 正文到站点目录。
-- 不要省略双语结构设计。
-- 不要只完成页面文件而缺少自动化部署能力。
-- 不要把目录结构设计成依赖执行者个人习惯才能理解。
-- 不要引入明显超出需求范围的复杂系统。
+- Do not simplify project-specific specs into generic placeholder templates unrelated to current repository.
+- Do not copy body text of `README.md`, `AGENTS.md`, or `specs/` into site directory.
+- Do not omit bilingual structure designs.
+- Do not complete page files while lacking automated deployment capabilities.
+- Do not design directory structures relying on executor personal habits to understand.
+- Do not introduce complex systems exceeding requirement scope.
 
-## 13. 对执行者的明确指令
+## 13. Explicit Directives for Executor
 
-请基于本 PRD，为目标仓库设计并实现一套标准化文档站点方案。实现要求如下：
+Based on this PRD, design and implement a standardized documentation site solution for the target repository. Requirements:
 
-- 使用 `MkDocs`
-- 使用 `i18n` 支持中英双语
-- 所有文档站点相关内容放置于 `docs-site/`
-- 使用相对 symlink 接入项目权威 Markdown
-- 中文入口使用 `.zh.md`，英文入口使用 `.en.md`
-- 顶部提供语言切换，左侧提供完整项目目录
-- 输出结构清晰、可维护、可迁移
-- 提供基础导航和占位页面
-- 提供 GitHub Actions 自动构建与部署流程
-- 优先兼容 GitHub Pages
-- 尽量保持实现简单、稳定、通用
+- Use `MkDocs`
+- Use `i18n` to support Chinese and English
+- Place all documentation site related contents under `docs-site/`
+- Connect project authoritative Markdown via relative symlinks
+- Use `.zh.md` for Chinese entries and `.en.md` for English entries
+- Provide top language switcher and full left project menu
+- Output clear, maintainable, portable structures
+- Provide basic navigation and placeholder pages
+- Provide GitHub Actions auto build and deployment flows
+- Prioritize compatibility with GitHub Pages
+- Keep implementation simple, stable, generic
 
-## 14. 期望结果
+## 14. Expected Outcome
 
-最终应得到一套服务本项目、支持中英双语、以 symlink 保持单一事实来源、可自动部署且适合长期维护的 MkDocs 文档站点。
+Final result is a MkDocs documentation site serving this project, supporting bilingual Chinese/English, maintaining single source of truth via symlinks, auto-deployable, and suitable for long-term maintenance.
 
-该骨架应满足以下目的：
+This skeleton satisfies:
 
-- 当前仓库可直接使用
-- 未来可持续扩展
-- 可作为其他仓库的模板
-- 可作为其他 AI 的统一执行输入
-- 尽量减少不同执行者之间的结果偏差
+- Directly usable by current repository
+- Continuously expandable in the future
+- Template for other repositories
+- Unified execution input for other AIs
+- Minimizing result deviations among different executors

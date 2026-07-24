@@ -1,58 +1,58 @@
-# UART 16550A 与终端规格
+# UART 16550A & Terminal Specification
 
-## 1. 设备定位
+## 1. Device Positioning
 
-UART 是来宾固件、内核和 Shell 的唯一字符控制台。设备 MMIO 地址为 `0x10000000..0x100000FF`，中断源 ID 必须与 FDT 和 PLIC 配置一致。
+UART is the sole character console for guest firmware, kernel, and Shell. Device MMIO address is `0x10000000..0x100000FF`, and its interrupt source ID must align with FDT and PLIC configuration.
 
-## 2. 寄存器模型
+## 2. Register Model
 
-- **UART-REQ-001**：偏移 0 在 DLAB=0 时，读为 RBR、写为 THR。
-- **UART-REQ-002**：偏移 5 为 LSR，至少正确维护 Data Ready、THR Empty、Transmitter Empty。
-- **UART-REQ-003**：为兼容 Linux 8250 驱动，还必须实现 IER、IIR/FCR、LCR、MCR、DLL/DLM 以及目标驱动实际探测的必要行为。
-- **UART-REQ-004**：寄存器宽度、复位值、只读/写副作用和 DLAB 复用必须明确符合 16550A 兼容语义。
+- **UART-REQ-001**: Offset 0 reads as RBR and writes as THR when DLAB=0.
+- **UART-REQ-002**: Offset 5 is LSR, maintaining at least Data Ready, THR Empty, and Transmitter Empty flags correctly.
+- **UART-REQ-003**: To compatibility with Linux 8250 driver, IER, IIR/FCR, LCR, MCR, DLL/DLM, and necessary behaviors probed by target drivers must be implemented.
+- **UART-REQ-004**: Register widths, reset values, read/write side effects, and DLAB multiplexing must explicitly conform to 16550A compatible semantics.
 
-只实现 THR/RBR/LSR 可能不足以通过 Linux 驱动探测，因此实际寄存器最小集必须由真实内核启动验证决定，不能用虚假设备树配置绕过驱动。
+Implementing only THR/RBR/LSR may be insufficient to pass Linux driver probing, so actual minimal register set must be determined by real kernel boot verification, rather than bypassing drivers via fake device tree configs.
 
-## 3. 发送路径
+## 3. Transmit Path
 
-1. 来宾写 THR 字节。
-2. UART 将字节写入有界发送缓冲或直接交给非阻塞宿主终端后端。
-3. 只有成功接受字节后才更新 THRE/TEMT。
-4. IER 允许且发送条件满足时，更新 UART 中断原因并驱动 PLIC 中断线。
+1. Guest writes THR byte.
+2. UART writes byte into bounded transmit buffer or hands directly to non-blocking host terminal backend.
+3. Updates THRE/TEMT only after successfully accepting byte.
+4. Updates UART interrupt cause and drives PLIC interrupt line when IER allows and transmit conditions are met.
 
-宿主短写、`EINTR` 和暂时不可写必须被正确处理，不得静默丢字符或阻塞整个 CPU 无期限等待。
+Host short writes, `EINTR`, and temporary un-writability must be handled correctly, without silently dropping characters or blocking CPU indefinitely.
 
-## 4. 接收路径
+## 4. Receive Path
 
-1. 事件循环非阻塞读取宿主标准输入。
-2. 输入字节进入有界接收 FIFO。
-3. FIFO 非空时 LSR.DR 置位；来宾读 RBR 消耗一个字节。
-4. FIFO 状态变化更新 IIR 和接收中断线。
-5. FIFO 满时按确定策略报告 overrun，不允许覆盖未读取字符而无状态记录。
+1. Event loop performs non-blocking reads from host standard input.
+2. Input bytes enter bounded receive FIFO.
+3. When FIFO is non-empty, LSR.DR is set; guest reading RBR consumes one byte.
+4. FIFO state changes update IIR and receive interrupt line.
+5. When FIFO is full, reports overrun per deterministic policy, without overwriting unread characters silently.
 
-## 5. 中断行为
+## 5. Interrupt Behaviors
 
-- IER 独立控制接收可用和发送空中断。
-- IIR 返回当前最高优先级原因及“无中断”状态。
-- 当导致中断的条件被清除后必须撤销 UART 到 PLIC 的电平。
-- 读取 IIR、RBR 或 LSR 的副作用必须与寄存器定义一致。
+- IER independently controls receive data available and transmit empty interrupts.
+- IIR returns current highest-priority cause and "no interrupt pending" status.
+- Deasserts UART-to-PLIC level when conditions causing interrupt are cleared.
+- Side effects of reading IIR, RBR, or LSR must align with register definitions.
 
-## 6. 宿主终端 Raw 模式
+## 6. Host Terminal Raw Mode
 
-- **UART-REQ-005**：仅当标准输入是可用 TTY 时切换 Raw 模式；非 TTY 情况采用明确错误或管道模式策略。
-- 保存原始 `termios` 后再修改，禁用宿主回显、规范行缓冲和宿主信号字符处理。
-- `Ctrl+C` 等控制字节必须传给来宾，不能默认终止模拟器。
-- 必须提供不依赖终端控制字符的受控退出机制，具体组合或外部信号在 CLI 规格冻结。
-- 所有正常退出、启动失败、宿主信号和异常路径都必须幂等恢复原始终端属性。
+- **UART-REQ-005**: Switches to Raw mode only when standard input is a valid TTY; non-TTY cases adopt explicit error or pipe mode policies.
+- Saves original `termios` before modification, disabling host echo, canonical line buffering, and host signal character processing.
+- Control bytes such as `Ctrl+C` must pass to guest rather than default-terminating emulator.
+- Must provide a controlled exit mechanism independent of terminal control characters, with specific combinations or external signals frozen in CLI spec.
+- All normal exit, boot failure, host signal, and exception paths must idempotently restore original terminal attributes.
 
-## 7. 生命周期安全
+## 7. Lifecycle Safety
 
-终端配置顺序为：校验全部启动资源、保存属性、安装恢复保护、切换 Raw、启动机器。析构/清理必须可重复调用。若切换失败，不得留下部分修改状态。
+Terminal configuration sequence: validate all boot resources, save attributes, install restoration hooks, switch to Raw, launch machine. Destructors/cleanup must be repeatably callable. Partial modification states must not remain if switching fails.
 
-## 8. 验收条件
+## 8. Acceptance Criteria
 
-- 真实 OpenSBI/Linux 输出无丢字节、乱序或宿主重复回显。
-- Shell 可逐字接收普通字符、回车、退格及 `Ctrl+C`。
-- UART 驱动中断和轮询模式均能工作。
-- 启动错误、正常退出和外部终止后宿主终端属性恢复。
-- 大量连续输出和输入 FIFO 溢出路径有真实压力测试。
+- Real OpenSBI/Linux output shows no dropped bytes, out-of-order characters, or host duplicate echo.
+- Shell receives normal characters, carriage return, backspace, and `Ctrl+C` character-by-character.
+- UART driver works under both interrupt and polling modes.
+- Host terminal attributes are restored after boot errors, normal exits, and external terminations.
+- High-volume continuous output and input FIFO overflow paths undergo real stress testing.

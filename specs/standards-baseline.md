@@ -1,52 +1,52 @@
-# 标准版本基线
+# Standard Version Baseline
 
-## 1. 目的
+## 1. Purpose
 
-本文锁定项目实现时引用的正式标准，防止从不同版本拼接编码、CSR、页表或设备语义。实现中的标准注释和测试必须引用本文版本；升级标准必须先做影响分析并获得用户确认。
+This document freezes the formal standards referenced during project implementation, preventing mixing of encodings, CSRs, page tables, or device semantics from different versions. Standard annotations in code and tests must cite versions in this document; upgrading standards requires an impact analysis and prior user confirmation.
 
-## 2. RISC-V 非特权 ISA
+## 2. RISC-V Unprivileged ISA
 
-采用 RISC-V International 的 [Unprivileged ISA 20260120 官方发布版](https://docs.riscv.org/reference/isa/unpriv/unpriv-index.html)，并锁定以下已批准模块：
+Adopts RISC-V International [Unprivileged ISA 20260120 Official Release](https://docs.riscv.org/reference/isa/unpriv/unpriv-index.html), locking the following ratified modules:
 
-| 模块 | 版本 | 项目用途 |
+| Module | Version | Project Purpose |
 | --- | --- | --- |
-| RV64I | 2.1 | 64 位基础整数指令 |
-| Zicsr | 2.0 | CSR 指令 |
+| RV64I | 2.1 | 64-bit base integer instructions |
+| Zicsr | 2.0 | CSR instructions |
 | Zifencei | 2.0 | `FENCE.I` |
-| M | 2.0 | 整数乘除 |
-| A | 2.1 | LR/SC 与 AMO |
-| F | 2.2 | 单精度浮点 |
-| D | 2.2 | 双精度浮点 |
-| C | 2.0 | 压缩指令 |
-| V | 1.0 | 基础向量扩展 |
+| M | 2.0 | Integer multiply/divide |
+| A | 2.1 | LR/SC and AMO |
+| F | 2.2 | Single-precision floating-point |
+| D | 2.2 | Double-precision floating-point |
+| C | 2.0 | Compressed instructions |
+| V | 1.0 | Base vector extension |
 
-不在本表中的可选扩展默认不声明、不译码。若 Linux 或 OpenSBI 的冻结配置需要额外扩展，必须先更新本文和对应任务。
+Optional extensions omitted from this table default to un-declared and un-decoded. If locked configurations of Linux or OpenSBI require extra extensions, update this document and corresponding tasks first.
 
-## 3. RISC-V 特权架构
+## 3. RISC-V Privileged Architecture
 
-采用 RISC-V International 的 [Privileged ISA 20260120 官方发布版](https://docs.riscv.org/reference/isa/priv/priv-index.html)，Machine ISA 与 Supervisor ISA 均以 1.13 的已批准语义为准。
+Adopts RISC-V International [Privileged ISA 20260120 Official Release](https://docs.riscv.org/reference/isa/priv/priv-index.html), with Machine ISA and Supervisor ISA both observing ratified 1.13 semantics.
 
-首版实现 M/S/U、Sv39 和 PRD 所需中断/CSR，不实现 Hypervisor 扩展。A/D 位选择硬件更新路径；是否正式声明 `Svadu`、PMP 范围以及其他监督级扩展，必须在 CPU/MMU 模块开始前单独冻结，不能仅凭部分行为宣称支持。
+Initial release implements M/S/U, Sv39, and interrupts/CSRs required by PRD, omitting Hypervisor extension. A/D bits select hardware update paths; whether to formally declare `Svadu`, PMP scopes, and other Supervisor extensions must be frozen separately before starting CPU/MMU modules, rather than claiming support based solely on partial behaviors.
 
 ## 4. RVV
 
-向量语义采用官方 [`V` Standard Extension 1.0](https://docs.riscv.org/reference/isa/unpriv/v-st-ext)。硬件参数固定为 `VLEN=256`、`ELEN=64`、`vlenb=32`，包含 32 个向量寄存器。
+Vector semantics adopt official [`V` Standard Extension 1.0](https://docs.riscv.org/reference/isa/unpriv/v-st-ext). Hardware parameters are fixed at `VLEN=256`, `ELEN=64`, `vlenb=32`, containing 32 vector registers.
 
 ## 5. VirtIO
 
-采用 OASIS 的 [Virtual I/O Device (VIRTIO) Version 1.2](https://docs.oasis-open.org/virtio/virtio/v1.2/virtio-v1.2.html)。项目使用 modern MMIO transport、Version 1 合规设备模型和 split virtqueue；不混用 legacy transport。可选 feature 只有在实现与测试完成后才公布。
+Adopts OASIS [Virtual I/O Device (VIRTIO) Version 1.2](https://docs.oasis-open.org/virtio/virtio/v1.2/virtio-v1.2.html). Project uses modern MMIO transport, Version 1 compliant device model, and split virtqueue; omitting legacy transports. Optional features are advertised only after completing implementation and testing.
 
-## 6. 外部软件版本状态
+## 6. External Software Version Status
 
-OpenSBI、Linux LTS、交叉工具链和最小 rootfs 的精确版本仍属于外部产物决策，当前未冻结，也未下载。它们必须在引导模块开始前从官方来源选择、记录许可证与 SHA-256，并由用户确认。因此 `SDD-004` 当前不能标记完成。
+Precise versions of OpenSBI, Linux LTS, cross toolchain, and minimal rootfs belong to external artifact decisions, currently un-frozen and un-downloaded. They must be selected from official sources, recording licenses and SHA-256 checksums, and confirmed by user prior to starting boot modules. Thus `SDD-004` cannot be marked complete currently.
 
-## 7. 本模块适用条款
+## 7. Applicable Clauses for This Module
 
-物理总线与 RAM/ROM 模块直接遵循：
+Physical bus and RAM/ROM modules directly observe:
 
-- RV64 的 64 位物理访问值表示和小端内存字节序。
-- 只允许 8、16、32、64 位显式访问宽度。
-- 物理范围使用半开区间并对所有加法做溢出检查。
-- 原子 compare-exchange 是总线正式事务，为后续 A 扩展与 PTE A/D 更新提供唯一基础能力。
+- 64-bit physical access value representation and little-endian memory byte order of RV64.
+- Explicit access widths of 8, 16, 32, 64 bits only.
+- Physical ranges using half-open intervals with overflow checks on all additions.
+- Atomic compare-exchange as formal bus transaction, providing sole base capability for subsequent A extension and PTE A/D updates.
 
-本文仅冻结标准，不表示任何对应 ISA 或设备模块已经实现。
+This document freezes standards only, and does not imply any matching ISA or device module is implemented.

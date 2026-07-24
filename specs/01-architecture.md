@@ -1,14 +1,14 @@
-# 总体架构规格
+# Overall Architecture Specification
 
-## 1. 架构原则
+## 1. Architectural Principles
 
-- **ARCH-REQ-001**：系统必须采用解释执行的单一 CPU 主循环，不得存在用于演示或测试的第二套简化执行器。
-- **ARCH-REQ-002**：虚拟地址访问、物理总线访问和宿主资源访问必须分层，禁止跨层绕过。
-- **ARCH-REQ-003**：CPU、MMU、总线、设备和宿主后端必须通过职责清晰的接口协作。
-- **ARCH-REQ-004**：所有可观察状态变化必须由确定的指令、设备事件或宿主输入驱动。
-- **ARCH-REQ-005**：首版机器模型按单 Hart 定义；设计不得阻止未来扩展，但不得为了未来能力增加未经验证的多套逻辑。
+- **ARCH-REQ-001**: The system must utilize an interpreted single CPU main loop, and must not maintain a secondary simplified executor for demonstration or testing.
+- **ARCH-REQ-002**: Virtual address access, physical bus access, and host resource access must be layered, prohibiting cross-layer bypasses.
+- **ARCH-REQ-003**: CPU, MMU, bus, devices, and host backends must collaborate through clearly specified interfaces.
+- **ARCH-REQ-004**: All observable state changes must be driven by deterministic instructions, device events, or host input.
+- **ARCH-REQ-005**: Initial machine model is defined as single-hart; design must not prevent future extension, but must not introduce unverified multiple logic sets for future capabilities.
 
-## 2. 逻辑组件
+## 2. Logical Components
 
 ```mermaid
 flowchart LR
@@ -28,59 +28,59 @@ flowchart LR
     Backends --> VirtIO
 ```
 
-`Machine` 只负责组合和生命周期。CPU 不得知道 TAP 或磁盘文件；VirtIO 设备不得直接修改 CPU 私有 CSR，而应通过中断控制器接口表达中断线状态。
+`Machine` handles only assembly and lifecycle. CPU must not know about TAP or disk files; VirtIO devices must not directly mutate CPU-private CSRs, but should express interrupt line state through interrupt controller interfaces.
 
-## 3. 内存访问分层
+## 3. Memory Access Layering
 
-### 3.1 来宾虚拟访问
+### 3.1 Guest Virtual Access
 
-CPU 发起取指、加载、存储或原子访问时，提交虚拟地址、访问类型、宽度、当前特权级和必要状态。MMU 决定直通或 Sv39 翻译，并返回物理地址或精确异常。
+When CPU initiates instruction fetch, load, store, or atomic access, it submits virtual address, access type, width, current privilege mode, and necessary state. MMU determines passthrough or Sv39 translation, returning physical address or precise exception.
 
-### 3.2 页表物理访问
+### 3.2 Page Table Physical Access
 
-页表漫游读取/更新 PTE 时使用物理总线，不得再次进入虚拟地址翻译。PTE 更新必须保证来宾可观察的原子性，并通过统一 RAM/总线规则检查物理访问错误。
+Page table walk reads/updates of PTEs use the physical bus and must not re-enter virtual address translation. PTE updates must guarantee guest-observable atomicity and check physical access errors via uniform RAM/bus rules.
 
-### 3.3 设备 DMA 访问
+### 3.3 Device DMA Access
 
-VirtIO 描述符中的地址按 transport 规定解释为来宾物理地址。设备必须使用受控 DMA 物理内存接口，执行溢出、范围、可写性和描述符方向检查。
+Addresses in VirtIO descriptors are interpreted as guest physical addresses per transport rules. Devices must use controlled DMA physical memory interfaces, executing overflow, bounds, writability, and descriptor direction checks.
 
-## 4. 单步执行事务
+## 4. Single-Step Execution Transaction
 
-一次 CPU 步进按以下逻辑顺序进行：
+A single CPU step follows this logical sequence:
 
-1. 在指令边界检查可接收中断。
-2. 使用取指访问类型读取第一个 16 位半字。
-3. 根据低两位判断指令长度；32 位指令再读取后续半字。
-4. 译码并执行，所有异常以结构化 Trap 结果返回。
-5. 指令成功时提交架构状态；同步异常时不得提交不允许的部分副作用。
-6. 推进设备时间并处理可用的宿主非阻塞事件。
-7. 汇总 CLINT/PLIC 信号到 CSR pending 位，进入下一指令边界。
+1. Check receivable interrupts at instruction boundaries.
+2. Read the first 16-bit halfword using instruction fetch access type.
+3. Determine instruction length by lower two bits; 32-bit instructions fetch subsequent halfwords.
+4. Decode and execute, with all exceptions returned as structured Trap results.
+5. Commit architectural state upon instruction success; synchronous exceptions must not commit disallowed partial side effects.
+6. Advance device time and process available host non-blocking events.
+7. Aggregate CLINT/PLIC signals into CSR pending bits, entering next instruction boundary.
 
-精确的中断采样点必须保持一致，不能因设备类型或调试模式改变。
+Precise interrupt sampling points must remain consistent and must not alter due to device type or debug mode.
 
-## 5. 时间模型
+## 5. Time Model
 
-- **ARCH-REQ-006**：CLINT 时间必须采用规格定义的单调来源，不能因宿主墙上时间回拨而倒退。
-- **ARCH-REQ-007**：执行确定性测试时可使用明确配置的虚拟时钟，但系统验收必须验证真实事件循环。
-- **ARCH-REQ-008**：CPU 指令计数和 `mtime` 频率必须分离，FDT 中的 `timebase-frequency` 必须与实现一致。
+- **ARCH-REQ-006**: CLINT time must use a spec-defined monotonic source, and must not regress due to host wall-clock fallbacks.
+- **ARCH-REQ-007**: Deterministic test execution may use explicitly configured virtual clocks, but system acceptance must verify real event loops.
+- **ARCH-REQ-008**: CPU instruction count and `mtime` frequency must be separated, and `timebase-frequency` in FDT must align with implementation.
 
-PRD 中“每条指令 tick”描述确定了同步点，不等同于规定 `mtime` 每条指令固定加一。具体换算必须在实现前冻结，保证 Linux 时间行为合理。
+The PRD "tick per instruction" description establishes synchronization points, not a requirement that `mtime` strictly increments by one per instruction. Specific conversions must be frozen before implementation to ensure reasonable Linux time behavior.
 
-## 6. 错误边界
+## 6. Error Boundaries
 
-- 来宾非法指令、页错误和访问错误必须作为来宾 Trap，不应直接终止宿主进程。
-- 无法打开 BIOS、磁盘、TAP 或终端配置失败属于宿主错误，应产生清晰诊断并安全退出。
-- 内部不变量破坏属于模拟器缺陷，应报告状态上下文，恢复终端后非零退出。
-- 不得将“返回零”作为所有未实现 MMIO 或 CSR 的通用行为。
+- Guest illegal instructions, page faults, and access faults must act as guest Traps, and should not directly terminate host process.
+- Inability to open BIOS, disk, TAP, or terminal configuration failures are host errors, producing clear diagnostics and exiting safely.
+- Internal invariant breakage is an emulator defect, reporting state context and exiting non-zero after terminal restoration.
+- Returning zero must not serve as a universal fallback for all unimplemented MMIO or CSRs.
 
-## 7. 并发模型
+## 7. Concurrency Model
 
-首版采用单主循环维护架构状态，避免 CPU 与设备线程同时修改来宾内存和中断状态。若 TAP 输入使用辅助线程，该线程只能将不可变数据包送入有界线程安全队列；队列消费、DMA 和中断更新仍在主循环串行提交。
+The initial release uses a single main loop maintaining architectural state, avoiding CPU and device threads mutating guest memory and interrupt state simultaneously. If TAP input utilizes a helper thread, that thread may only push immutable packets into a bounded thread-safe queue; queue consumption, DMA, and interrupt updates remain serially committed in the main loop.
 
-## 8. 验收条件
+## 8. Acceptance Criteria
 
-- 组件依赖符合 `project-tree.md`，无 CPU 到具体宿主后端的依赖。
-- 所有取指和数据访问经过同一 MMU/总线路径。
-- 所有 VirtIO DMA 经过唯一受控物理访问接口。
-- 同一输入和虚拟时间配置下，纯 CPU/内存测试可重复。
-- 来宾 Trap 不会破坏宿主资源清理流程。
+- Component dependencies conform to `project-tree.md`, with no CPU dependencies on specific host backends.
+- All instruction fetches and data accesses pass through the same MMU/bus path.
+- All VirtIO DMA passes through the sole controlled physical access interface.
+- Pure CPU/memory tests are reproducible under identical input and virtual time configurations.
+- Guest Traps do not destroy host resource cleanup procedures.

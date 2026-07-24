@@ -1,8 +1,8 @@
-# Linux 真实启动验收结果
+# Real Linux Boot Acceptance Results
 
-本文只记录实际执行过的结果。未执行或失败的项目必须明确写出，不提前标记成功。
+This document records only results that have actually been executed. Unexecuted or failed items must be explicitly stated and will not be marked as successful prematurely.
 
-## 1. 当前产物
+## 1. Current Artifacts
 
 ```text
 09f48fb16f858a16e7cd507fbb3a0fa0c9b430c1d50f8dec2130598a7f42ddea  artifacts/firmware/fw_jump.bin
@@ -11,7 +11,7 @@ b8c86f9096057191bb7659e749772933347d25fd193cc43c2baab2f2afc113e6  artifacts/disk
 88d1ea033ef988082f0910bc263ee07d5ba58136789155f5c0718f9c6939b6ac  artifacts/buildroot.config
 ```
 
-文件类型检查：
+File type verification:
 
 ```text
 artifacts/firmware/fw_jump.bin: data
@@ -20,20 +20,20 @@ artifacts/disk/rootfs.ext4:     Linux rev 1.0 ext4 filesystem data, volume name 
 artifacts/buildroot.config:     ASCII text
 ```
 
-## 2. 已完成验证
+## 2. Completed Verification
 
-- Buildroot `2026.05.1` 在 Docker Linux 容器中完成真实构建。
-- `artifacts/disk/rootfs.ext4` 是真实 ext4 文件系统，不是 initramfs 冒充。
-- 常规项目构建通过。
-- 常规 CTest：`26/26` 通过。
-- ASan/UBSan 构建通过。
-- ASan/UBSan CTest：`26/26` 通过。
+- Buildroot `2026.05.1` successfully built in a real Docker Linux container.
+- `artifacts/disk/rootfs.ext4` is a real ext4 filesystem, not an initramfs imposter.
+- Standard project build passed.
+- Standard CTest: `26/26` passed.
+- ASan/UBSan build passed.
+- ASan/UBSan CTest: `26/26` passed.
 
-## 3. 真实启动验证
+## 3. Real Boot Verification
 
-状态：已完成 OpenSBI 真实 banner 验证；Linux 到 Shell 尚未完成。
+Status: Completed real OpenSBI banner verification; Linux to Shell remains pending.
 
-待执行命令：
+Command to execute:
 
 ```sh
 ./build/riscv_vector_emulator \
@@ -43,22 +43,22 @@ artifacts/buildroot.config:     ASCII text
   --net none
 ```
 
-已保存证据：
+Saved Evidence:
 
-- `artifacts/logs/linux-boot-uart.log`：`BOOT_SECONDS=35` 窗口，包含真实 `OpenSBI v1.6` banner。
-- OpenSBI 识别 `rvemu,riscv64-gcv-single-hart`、hart 0、`aclint-mtimer @ 10000000Hz`、`uart8250`。
-- OpenSBI next stage：`Domain0 Next Address=0x80200000`、`Domain0 Next Arg1=0x82200000`、`Domain0 Next Mode=S-mode`。
-- OpenSBI 委托状态：`MIDELEG=0x0000000000000222`、`MEDELEG=0x000000000000b109`。
+- `artifacts/logs/linux-boot-uart.log`: `BOOT_SECONDS=35` window containing real `OpenSBI v1.6` banner.
+- OpenSBI identifies `rvemu,riscv64-gcv-single-hart`, hart 0, `aclint-mtimer @ 10000000Hz`, `uart8250`.
+- OpenSBI next stage: `Domain0 Next Address=0x80200000`, `Domain0 Next Arg1=0x82200000`, `Domain0 Next Mode=S-mode`.
+- OpenSBI delegation status: `MIDELEG=0x0000000000000222`, `MEDELEG=0x000000000000b109`.
 
-待保存证据：
+Pending Evidence:
 
-- Linux kernel 启动到 init 前后的完整日志。
-- VirtIO-Blk 探测日志。
-- ext4 rootfs 挂载日志。
-- 来宾 Shell 中 `ls /`、`pwd`、`cat /proc/cpuinfo` 的实际输出。
+- Complete Linux kernel boot logs up to and after init.
+- VirtIO-Blk probe logs.
+- ext4 rootfs mount logs.
+- Actual output of `ls /`, `pwd`, `cat /proc/cpuinfo` in guest Shell.
 
-## 4. macOS 网络验收
+## 4. macOS Networking Acceptance
 
-状态：macOS 做不了，不执行、不打勾。
+Status: Unsupported on macOS; unexecuted and unchecked.
 
-原因：macOS 没有 Linux TAP `/dev/net/tun` 链路；当前项目也没有 macOS tuntap/utun 后端补丁。不得使用宿主 DNS、宿主 ping 或伪造日志替代来宾 `eth0` 验收。
+Reason: macOS lacks the Linux TAP `/dev/net/tun` link; the current project does not include macOS tuntap/utun backend patches. Host DNS, host ping, or fabricated logs must not be used to fake guest `eth0` acceptance.

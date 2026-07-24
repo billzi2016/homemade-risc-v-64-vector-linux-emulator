@@ -21,6 +21,7 @@ plugins:
   - search
   - i18n:
       docs_structure: folder
+      fallback_to_default: true
       languages:
         - locale: zh
           name: 简体中文
@@ -28,7 +29,6 @@ plugins:
           build: true
           site_name: RISC-V 64 Vector Linux Emulator
           nav_translations:
-            Home: 首页
             Governance: 项目治理
             Architecture: 总体架构
             CPU and ISA: CPU 与 ISA
@@ -38,10 +38,143 @@ plugins:
             System Integration: 系统集成
             Quality: 质量保证
             Docs Site: 文档站
+            Home: 首页
+          nav:
+            - 首页: index.md
+            - 项目概览:
+                - project/README.zh.md
+                - project/LINUX_BOOT_FLOW.zh.md
+                - docs/RESULT.zh.md
+                - docs/quickstart.zh.md
+            - 项目治理:
+                - project/AGENTS.zh.md
+                - specs/README.zh.md
+                - specs/constitution.zh.md
+                - specs/standards-baseline.zh.md
+                - specs/project-tree.zh.md
+                - specs/tasks.zh.md
+            - 总体架构:
+                - specs/00-product-overview.zh.md
+                - specs/01-architecture.zh.md
+                - specs/19-implementation-roadmap.zh.md
+            - CPU 与 ISA:
+                - specs/02-cpu-privilege-csr.zh.md
+                - specs/03-instruction-set.zh.md
+                - specs/15-error-trap-handling.zh.md
+            - 向量引擎:
+                - specs/04-vector-extension-rvv.zh.md
+            - 内存系统:
+                - specs/05-memory-mmu-sv39.zh.md
+                - specs/06-bus-mmio.zh.md
+            - 外设设备:
+                - specs/07-interrupt-clint-plic.zh.md
+                - specs/08-uart-console.zh.md
+                - specs/09-virtio-common.zh.md
+                - specs/10-virtio-block.zh.md
+                - specs/11-virtio-network.zh.md
+            - 系统集成:
+                - specs/12-boot-firmware-linux.zh.md
+                - specs/13-cli-runtime.zh.md
+                - specs/14-host-network-setup.zh.md
+                - docs/linux-runbook.zh.md
+            - 质量保证与测试:
+                - specs/16-testing-verification.zh.md
+                - specs/17-coding-standards.zh.md
+                - specs/18-dependency-artifact-policy.zh.md
+                - docs/third-party.zh.md
+                - tests/act4/README.zh.md
+            - 文档站点:
+                - docs-site/mkdocs_prd.zh.md
+                - docs-site/github_action_prd.zh.md
         - locale: en
           name: English
           build: true
           site_name: RISC-V 64 Vector Linux Emulator
+          nav:
+            - Home: index.md
+            - Overview:
+                - project/README.md
+                - project/LINUX_BOOT_FLOW.md
+                - docs/RESULT.md
+                - docs/quickstart.md
+            - Governance:
+                - project/AGENTS.md
+                - specs/README.md
+                - specs/constitution.md
+                - specs/standards-baseline.md
+                - specs/project-tree.md
+                - specs/tasks.md
+            - Architecture:
+                - specs/00-product-overview.md
+                - specs/01-architecture.md
+                - specs/19-implementation-roadmap.md
+            - CPU and ISA:
+                - specs/02-cpu-privilege-csr.md
+                - specs/03-instruction-set.md
+                - specs/15-error-trap-handling.md
+            - Vector Engine:
+                - specs/04-vector-extension-rvv.md
+            - Memory System:
+                - specs/05-memory-mmu-sv39.md
+                - specs/06-bus-mmio.md
+            - Devices:
+                - specs/07-interrupt-clint-plic.md
+                - specs/08-uart-console.md
+                - specs/09-virtio-common.md
+                - specs/10-virtio-block.md
+                - specs/11-virtio-network.md
+            - System Integration:
+                - specs/12-boot-firmware-linux.md
+                - specs/13-cli-runtime.md
+                - specs/14-host-network-setup.md
+                - docs/linux-runbook.md
+            - Quality and Testing:
+                - specs/16-testing-verification.md
+                - specs/17-coding-standards.md
+                - specs/18-dependency-artifact-policy.md
+                - docs/third-party.md
+                - tests/act4/README.md
+            - Docs Site:
+                - docs-site/mkdocs_prd.md
+                - docs-site/github_action_prd.md
+            - Governance:
+                - project/AGENTS.md
+                - specs/constitution.md
+                - specs/standards-baseline.md
+                - specs/project-tree.md
+                - specs/tasks.md
+            - Architecture:
+                - specs/00-product-overview.md
+                - specs/01-architecture.md
+                - specs/19-implementation-roadmap.md
+            - CPU and ISA:
+                - specs/02-cpu-privilege-csr.md
+                - specs/03-instruction-set.md
+                - specs/15-error-trap-handling.md
+            - Vector Engine:
+                - specs/04-vector-extension-rvv.md
+            - Memory System:
+                - specs/05-memory-mmu-sv39.md
+                - specs/06-bus-mmio.md
+            - Devices:
+                - specs/07-interrupt-clint-plic.md
+                - specs/08-uart-console.md
+                - specs/09-virtio-common.md
+                - specs/10-virtio-block.md
+                - specs/11-virtio-network.md
+            - System Integration:
+                - specs/12-boot-firmware-linux.md
+                - specs/13-cli-runtime.md
+                - specs/14-host-network-setup.md
+                - docs/linux-runbook.md
+            - Quality:
+                - specs/16-testing-verification.md
+                - specs/17-coding-standards.md
+                - specs/18-dependency-artifact-policy.md
+                - docs/third-party.md
+            - Docs Site:
+                - docs-site/mkdocs_prd.md
+                - docs-site/github_action_prd.md
 
 markdown_extensions:
   - admonition
@@ -58,46 +191,6 @@ markdown_extensions:
       alternate_style: true
 
 nav:
-  - Home:
-      - project/README.md
-      - project/LINUX_BOOT_FLOW.md
-      - docs/RESULT.md
-      - docs/quickstart.md
-  - Governance:
-      - project/AGENTS.md
-      - specs/constitution.md
-      - specs/standards-baseline.md
-      - specs/project-tree.md
-      - specs/tasks.md
-  - Architecture:
-      - specs/00-product-overview.md
-      - specs/01-architecture.md
-      - specs/19-implementation-roadmap.md
-  - CPU and ISA:
-      - specs/02-cpu-privilege-csr.md
-      - specs/03-instruction-set.md
-      - specs/15-error-trap-handling.md
-  - Vector Engine:
-      - specs/04-vector-extension-rvv.md
-  - Memory System:
-      - specs/05-memory-mmu-sv39.md
-      - specs/06-bus-mmio.md
-  - Devices:
-      - specs/07-interrupt-clint-plic.md
-      - specs/08-uart-console.md
-      - specs/09-virtio-common.md
-      - specs/10-virtio-block.md
-      - specs/11-virtio-network.md
-  - System Integration:
-      - specs/12-boot-firmware-linux.md
-      - specs/13-cli-runtime.md
-      - specs/14-host-network-setup.md
-      - docs/linux-runbook.md
-  - Quality:
-      - specs/16-testing-verification.md
-      - specs/17-coding-standards.md
-      - specs/18-dependency-artifact-policy.md
-      - docs/third-party.md
-  - Docs Site:
-      - docs-site/mkdocs_prd.md
-      - docs-site/github_action_prd.md
+  - index.zh.md
+
+

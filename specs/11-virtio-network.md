@@ -1,66 +1,66 @@
-# VirtIO-Net 与 TAP 规格
+# VirtIO-Net & TAP Specification
 
-## 1. 链路边界
+## 1. Link Boundary
 
-来宾侧呈现 VirtIO-Net，宿主侧绑定用户指定的 TAP 接口名，例如 `tap0`。`/dev/net/tun` 是 Linux 宿主系统接口，不是仓库路径。最终验收必须使用真实 TAP、网桥或 NAT 链路。
+Guest side presents VirtIO-Net, while host side binds user-specified TAP interface name, such as `tap0`. `/dev/net/tun` is a Linux host system interface, not a repository path. Final acceptance must utilize real TAP, bridge, or NAT links.
 
-## 2. 设备配置
+## 2. Device Configuration
 
-- **NET-REQ-001**：公布稳定、合法且本地管理的 MAC 地址；可配置策略必须写入 FDT/设备配置一致来源。
-- **NET-REQ-002**：至少提供 RX queue 0 和 TX queue 1，队列顺序符合 VirtIO-Net 规范。
-- **NET-REQ-003**：只公布已实现的 checksum、GSO、mergeable buffer、MAC/status 等 feature。
-- **NET-REQ-004**：VirtIO net header 长度由协商 feature 决定，支持范围内正确处理 10 或 12 字节布局。
+- **NET-REQ-001**: Advertise stable, legal, and locally managed MAC addresses; configurable policies must write to FDT/device config consistent source.
+- **NET-REQ-002**: Provide at least RX queue 0 and TX queue 1, with queue order matching VirtIO-Net spec.
+- **NET-REQ-003**: Advertise implemented checksum, GSO, mergeable buffer, MAC/status features only.
+- **NET-REQ-004**: VirtIO net header length is determined by negotiated features, correctly handling 10 or 12 byte layouts within supported scope.
 
-首版可以不提供硬件 offload，但此时不能公布相关 feature，发送到 TAP 的帧必须已经是有效以太网帧。
+Initial release may omit hardware offload, provided matching features are not advertised, and frames sent to TAP are valid Ethernet frames.
 
-## 3. TAP 初始化
+## 3. TAP Initialization
 
-1. 打开 Linux `/dev/net/tun`。
-2. 使用 `TUNSETIFF` 请求 `IFF_TAP | IFF_NO_PI` 并绑定精确接口名。
-3. 验证返回名称与配置一致。
-4. 设置非阻塞和 close-on-exec。
-5. 不擅自创建、删除或重新配置宿主网桥；所需配置由经确认脚本完成。
+1. Open Linux `/dev/net/tun`.
+2. Request `IFF_TAP | IFF_NO_PI` via `TUNSETIFF` and bind exact interface name.
+3. Verify returned name matches configuration.
+4. Set non-blocking and close-on-exec flags.
+5. Do not create, delete, or reconfigure host bridges without authorization; required setup is completed via confirmed scripts.
 
-权限不足、接口不存在或类型错误必须在切换终端 Raw 模式前报告并退出。
+Insufficient permissions, missing interfaces, or wrong types must be reported and cause exit before switching terminal to Raw mode.
 
-## 4. TX：来宾到宿主
+## 4. TX: Guest to Host
 
-- **NET-REQ-005**：从 TX available ring 获取描述符链。
-- 按协商长度解析并验证 VirtIO net header。
-- 收集后续只读描述符形成单个以太网帧。
-- 若未协商 offload，拒绝含未支持 offload 请求的头，而不是错误转发。
-- 将不含 VirtIO header 的完整以太网帧写入 TAP。
-- 处理非阻塞暂时不可写、`EINTR` 和短写；一个 TAP write 应保持单帧语义。
-- 成功或规范允许的错误处理后更新 used ring 并通知来宾。
+- **NET-REQ-005**: Obtain descriptor chain from TX available ring.
+- Parse and validate VirtIO net header per negotiated length.
+- Gather subsequent read-only descriptors into a single Ethernet frame.
+- If offload is unnegotiated, reject headers requesting unsupported offloads rather than forwarding incorrectly.
+- Write full Ethernet frame without VirtIO header to TAP.
+- Handle non-blocking temporary un-writability, `EINTR`, and short writes; a single TAP write retains single-frame semantics.
+- Update used ring and notify guest after success or spec-permitted error handling.
 
-## 5. RX：宿主到来宾
+## 5. RX: Host to Guest
 
-- **NET-REQ-006**：事件循环检测 TAP 可读后，一次读取一个完整以太网帧。
-- 在有可用 RX 描述符前不得覆盖来宾内存；缺少缓冲时采用有界排队或明确丢包计数策略。
-- 构造与协商 feature 一致的 VirtIO net header。
-- 将 header 和帧按描述符容量顺序写入设备可写缓冲区。
-- 未协商 mergeable buffers 时，一个包必须能装入单个可用链，否则不允许部分交付。
-- 完成 used ring 后置中断状态，并通过 PLIC 通知。
+- **NET-REQ-006**: After event loop detects TAP readability, read one full Ethernet frame per pass.
+- Do not overwrite guest memory before available RX descriptors exist; adopt bounded queuing or explicit drop policies when buffers are lacking.
+- Construct VirtIO net header consistent with negotiated features.
+- Write header and frame into device-writable buffers in descriptor capacity order.
+- When mergeable buffers are unnegotiated, a packet must fit in a single available chain, prohibiting partial delivery.
+- Set interrupt status after completing used ring, notifying via PLIC.
 
-## 6. 帧和资源限制
+## 6. Frame and Resource Limits
 
-- 定义最大帧长度，至少覆盖标准 MTU 1500 的以太网帧。
-- 对 runt、超长帧和宿主异常读取有明确丢弃与计数。
-- 所有包缓冲和待发送队列有硬上限，防止来宾或宿主流量耗尽内存。
-- 来宾描述符总长度求和必须检查溢出。
-- 设备复位时清空未完成队列并撤销中断，不能在新一代队列上提交旧包。
+- Define maximum frame length, covering at least standard MTU 1500 Ethernet frames.
+- Maintain explicit drop and count logs for runt, oversized, and abnormal host read frames.
+- All packet buffers and pending TX queues have hard caps to prevent guest or host traffic from exhausting memory.
+- Total descriptor length sums across guest descriptors must check for overflow.
+- Device reset clears uncompleted queues and deasserts interrupts, avoiding submitting old packets on new generation queues.
 
-## 7. 事件循环与公平性
+## 7. Event Loop and Fairness
 
-CPU、TAP RX、UART 和 VirtIO 队列必须在同一事件循环中获得有界处理机会。持续网络流量不能饿死 CPU，CPU 忙循环也不能无限期阻塞 TAP。可使用 `poll/ppoll/epoll`，但实际选择需保证终端与 TAP 均为非阻塞。
+CPU, TAP RX, UART, and VirtIO queues must obtain bounded processing opportunities in the same event loop. Sustained network traffic must not starve CPU, nor may CPU busy loops block TAP indefinitely. May use `poll/ppoll/epoll`, but actual choice must guarantee non-blocking operations for both terminal and TAP.
 
-## 8. 网络可观察性
+## 8. Network Observability
 
-诊断可记录包计数、字节数、丢包原因和队列错误，但默认不得打印完整用户数据。任何抓包功能必须显式启用，并将输出放在被忽略的相对路径如 `artifacts/logs/`。
+Diagnostics may record packet counts, byte counts, drop causes, and queue errors, but default settings must not print full user data. Any packet capture functionality must be explicitly enabled, placing output under ignored relative paths such as `artifacts/logs/`.
 
-## 9. 验收条件
+## 9. Acceptance Criteria
 
-- Linux 识别设备为 `eth0`，MAC 和链路状态正确。
-- 验证 ARP、DHCP、IPv4、DNS 和 ICMP 的双向真实包流。
-- 验证 RX 缓冲不足、TX 背压、短 I/O、队列复位和持续流量。
-- 最终由来宾执行 `dhclient eth0` 和 `ping -c 4 google.com`，不能由宿主代执行。
+- Linux detects device as `eth0`, with correct MAC and link status.
+- Verifies bidirectional real packet flow for ARP, DHCP, IPv4, DNS, and ICMP.
+- Verifies RX buffer insufficiency, TX backpressure, short I/O, queue reset, and sustained traffic.
+- Final execution of `dhclient eth0` and `ping -c 4 google.com` must be run by guest, rather than host execution on behalf of guest.

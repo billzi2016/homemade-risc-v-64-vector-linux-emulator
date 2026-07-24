@@ -1,14 +1,14 @@
-# 物理总线与 MMIO 规格
+# Physical Bus & MMIO Specification
 
-## 1. 单一物理访问入口
+## 1. Sole Physical Access Entry
 
-- **BUS-REQ-001**：所有 CPU 翻译后访问、页表漫游、Boot 装载和设备 DMA 必须通过受控物理总线或其明确的初始化接口。
-- **BUS-REQ-002**：运行期不得通过裸 RAM 指针绕过边界、只读和设备分发规则。
-- **BUS-REQ-003**：总线支持 8、16、32、64 位小端访问，并明确区分读、写、取指、原子和 DMA 来源。
+- **BUS-REQ-001**: All CPU translated accesses, page table walks, Boot loading, and device DMA must pass through controlled physical bus or its explicit initialization interfaces.
+- **BUS-REQ-002**: Runtime code must not bypass bounds, read-only, and device routing rules via raw RAM pointers.
+- **BUS-REQ-003**: Bus supports 8, 16, 32, 64-bit little-endian accesses, explicitly distinguishing read, write, fetch, atomic, and DMA origins.
 
-## 2. 固定地址图
+## 2. Fixed Address Map
 
-| 区域 | 起始地址 | 结束地址（含） | 大小/说明 |
+| Region | Start Address | End Address (Inclusive) | Size / Notes |
 | --- | ---: | ---: | --- |
 | Boot ROM | `0x00001000` | `0x0000BFFF` | 44 KiB |
 | CLINT | `0x02000000` | `0x0200BFFF` | 48 KiB |
@@ -16,58 +16,58 @@
 | UART 16550A | `0x10000000` | `0x100000FF` | 256 B |
 | VirtIO-Blk MMIO | `0x10001000` | `0x10001FFF` | 4 KiB |
 | VirtIO-Net MMIO | `0x10002000` | `0x10002FFF` | 4 KiB |
-| RAM | `0x80000000` | `0x80000000 + ram_size - 1` | 默认建议 1 GiB |
+| RAM | `0x80000000` | `0x80000000 + ram_size - 1` | Default recommended 1 GiB |
 
-所有区间为闭区间且不得重叠。`base + size` 计算必须检查 64 位溢出。
+All regions are closed intervals and must not overlap. `base + size` calculation must check 64-bit overflow.
 
 ## 3. Boot ROM
 
-- 运行前可通过受控装载接口写入复位跳板和 FDT。
-- 机器开始执行后，来宾写入必须产生存储访问错误。
-- ROM 未初始化区域的确定值策略必须固定并测试。
-- 指令取指允许，但仍检查范围和访问宽度。
+- Writable via controlled loading interfaces prior to execution to populate reset trampoline and FDT.
+- Guest writes after machine starts execution must generate store access faults.
+- Uninitialized ROM region value strategy must be frozen and tested.
+- Instruction fetch is permitted, but still undergoes range and access width checks.
 
 ## 4. RAM
 
-- 容量由配置确定，默认值在 CLI 规格冻结。
-- 分配失败必须在启动前清晰退出，不能降级成较小 RAM 而不告知。
-- RAM 初始内容采用确定的零初始化策略，镜像装载区按原字节覆盖。
-- 读写必须检查整个 `[address, address+size)` 都在 RAM 内。
-- 任何跨 RAM/MMIO 边界的单次访问不得拆分产生部分副作用。
+- Capacity is determined by configuration, with default frozen in CLI spec.
+- Allocation failures must exit cleanly before startup, without silently degrading to smaller RAM without notice.
+- RAM initial contents adopt deterministic zero-initialization strategy, with image load regions overwritten per original bytes.
+- Reads/writes must check the entire `[address, address+size)` resides within RAM.
+- Any single access straddling RAM/MMIO boundaries must not be split into partial side effects.
 
-## 5. MMIO 分发
+## 5. MMIO Dispatch
 
-- **BUS-REQ-004**：设备注册时检测地址重叠并拒绝启动。
-- **BUS-REQ-005**：未映射地址产生 instruction/load/store access fault，而不是返回零或忽略写入。
-- **BUS-REQ-006**：设备必须自行声明允许宽度和对齐；不合法访问产生访问错误。
-- **BUS-REQ-007**：MMIO 访问不得误用普通 RAM 原子逻辑；设备支持的原子语义必须显式定义。
+- **BUS-REQ-004**: Device registration detects address overlaps and rejects startup.
+- **BUS-REQ-005**: Unmapped addresses generate instruction/load/store access faults, rather than returning zero or ignoring writes.
+- **BUS-REQ-006**: Devices must declare permitted widths and alignments; illegal accesses generate access faults.
+- **BUS-REQ-007**: MMIO accesses must not misuse normal RAM atomic logic; device-supported atomic semantics must be explicitly defined.
 
-## 6. 访问结果
+## 6. Access Results
 
-总线返回结构化结果，至少区分：成功、未映射、越界、只读、宽度不支持、对齐错误和后端 I/O 故障。上层根据来源映射为来宾 Trap 或宿主致命错误，不能丢失物理地址与设备信息。
+Bus returns structured results, distinguishing at least: success, unmapped, out of bounds, read-only, unsupported width, alignment error, and backend I/O fault. Upper layers map results to guest Traps or host fatal errors based on origin, without losing physical address and device information.
 
-## 7. DMA 安全
+## 7. DMA Safety
 
-VirtIO DMA 接口必须：
+VirtIO DMA interfaces must:
 
-- 只接受来宾物理地址。
-- 检查加法溢出和完整范围。
-- 默认只允许 RAM，不允许设备通过描述符访问 MMIO 或 ROM。
-- 区分设备读来宾缓冲区与设备写来宾缓冲区。
-- 处理跨 RAM 边界失败时不产生部分 used ring 完成，除非设备规范明确规定错误完成。
+- Accept guest physical addresses only.
+- Check addition overflow and full range.
+- Default to allowing RAM only, disallowing devices from accessing MMIO or ROM via descriptors.
+- Distinguish device-read guest buffers from device-write guest buffers.
+- Handle failure across RAM boundaries without generating partial used ring completions, unless device specs explicitly specify error completions.
 
-## 8. 原子事务
+## 8. Atomic Transactions
 
-总线必须为 A/D PTE 更新和 AMO 提供单一原子读改写抽象。首版串行主循环可以作为原子性的执行基础，但接口和状态提交点必须防止设备事件插入普通读写之间。
+Bus must provide a single atomic read-modify-write abstraction for A/D PTE updates and AMOs. Initial serial main loop serves as execution foundation for atomicity, but interfaces and state commit points must prevent device events from inserting between normal reads/writes.
 
-- **BUS-REQ-008**：LR 的读取与保留建立必须是一个事务，并返回只可由后续 SC 消费的不透明 token。
-- **BUS-REQ-009**：SC 必须在一个事务内消费 token、检查地址与宽度并条件写入；失败不得改变目标内存。
-- **BUS-REQ-010**：所有成功的普通存储、原子更新和 DMA 写入都必须经过同一重叠检查，使受影响的保留失效；失败或只读访问不得伪造内存变化。
-- **BUS-REQ-011**：首版单 Hart 保留范围固定为 LR 操作数的精确自然对齐字节范围；未来增加 Hart 时必须扩展为按 Hart 隔离的监视器，不能共享一个 token。
+- **BUS-REQ-008**: Read and reservation establishment of LR must be one transaction, returning an opaque token consumed only by subsequent SC.
+- **BUS-REQ-009**: SC must consume token, check address and width, and conditionally write within one transaction; failures must not alter target memory.
+- **BUS-REQ-010**: All successful normal stores, atomic updates, and DMA writes must pass through identical overlap checks, invalidating affected reservations; failures or read-only accesses must not fake memory changes.
+- **BUS-REQ-011**: Initial single-hart reservation range is fixed to the exact naturally aligned byte range of LR operand; adding harts in future requires extending to per-hart isolated monitors, rather than sharing a single token.
 
-## 9. 验收条件
+## 9. Acceptance Criteria
 
-- 地址图逐边界测试：首地址、末地址、前一字节、后一字节和跨界访问。
-- 测试所有宽度、小端序、只读 ROM 和未映射访问。
-- 测试设备注册重叠、RAM 尺寸溢出和 DMA 指向非法区域。
-- 证明 CPU、MMU 页表访问和 VirtIO DMA 不存在旁路。
+- Address map boundary tests: start address, end address, previous byte, next byte, and boundary-straddling accesses.
+- Tests covering all widths, little-endian order, read-only ROM, and unmapped accesses.
+- Tests covering device registration overlap, RAM size overflow, and DMA pointing to illegal regions.
+- Proves absence of bypasses across CPU, MMU page table accesses, and VirtIO DMA.

@@ -1,152 +1,152 @@
-# 实施路线图
+# Implementation Roadmap
 
-## 1. 路线原则
+## 1. Roadmap Principles
 
-路线图只定义依赖和阶段门，不授权修改代码、执行命令、下载或 Git 操作。每个阶段开始前仍需按 `AGENTS.md` 说明并取得确认。不能为了尽快看到 Linux 日志绕过前置语义。
+The roadmap defines only dependencies and stage gates, and does not authorize code modifications, command execution, downloads, or Git operations. Before starting each stage, explanations and user confirmation per `AGENTS.md` are still required. Bypassing prerequisite semantics to observe Linux boot logs sooner is prohibited.
 
-## 2. 阶段依赖
+## 2. Stage Dependencies
 
 ```mermaid
 flowchart TD
-    S0[阶段 0<br/>规格与标准冻结] --> S1[阶段 1<br/>工程骨架]
-    S1 --> S2[阶段 2<br/>RAM / ROM / Bus]
-    S2 --> S3[阶段 3<br/>RV64I CPU]
-    S3 --> S4[阶段 4<br/>CSR / 特权 / Trap]
-    S4 --> S5[阶段 5<br/>M / A / F / D / C]
-    S4 --> S6[阶段 6<br/>Sv39 / TLB]
-    S5 --> S7[阶段 7<br/>RVV 1.0]
+    S0[Stage 0<br/>Specs & Standards Freeze] --> S1[Stage 1<br/>Engineering Skeleton]
+    S1 --> S2[Stage 2<br/>RAM / ROM / Bus]
+    S2 --> S3[Stage 3<br/>RV64I CPU]
+    S3 --> S4[Stage 4<br/>CSR / Privilege / Trap]
+    S4 --> S5[Stage 5<br/>M / A / F / D / C]
+    S4 --> S6[Stage 6<br/>Sv39 / TLB]
+    S5 --> S7[Stage 7<br/>RVV 1.0]
     S6 --> S7
-    S4 --> S8[阶段 8<br/>CLINT / PLIC / UART]
-    S2 --> S9[阶段 9<br/>VirtIO 公共层 / Blk]
+    S4 --> S8[Stage 8<br/>CLINT / PLIC / UART]
+    S2 --> S9[Stage 9<br/>VirtIO Common / Blk]
     S8 --> S9
-    S9 --> S10[阶段 10<br/>VirtIO-Net / TAP]
-    S7 --> S11[阶段 11<br/>OpenSBI / Linux 引导]
+    S9 --> S10[Stage 10<br/>VirtIO-Net / TAP]
+    S7 --> S11[Stage 11<br/>OpenSBI / Linux Boot]
     S8 --> S11
     S9 --> S11
-    S10 --> S12[阶段 12<br/>真实网络最终验收]
+    S10 --> S12[Stage 12<br/>Real Network Final Acceptance]
     S11 --> S12
 ```
 
-并行箭头仅表示技术依赖允许，不授权使用多 Agent 或并行修改共享文件。
+Parallel arrows indicate technical dependency allowance only, and do not authorize using multiple Agents or parallel modifications of shared files.
 
-## 3. 阶段 0：规格与标准冻结
+## 3. Stage 0: Specs & Standards Freeze
 
-### 交付物
+### Deliverables
 
-- 用户确认全部 `specs/` 文档。
-- 冻结 RISC-V、RVV、VirtIO 标准版本。
-- 冻结单 Hart、计时模型、标量非对齐策略和 PMP 范围。
-- 冻结 OpenSBI、Linux LTS、rootfs 和工具链版本。
-- 完成需求—任务—测试追踪矩阵。
+- User confirms all `specs/` documents.
+- Freeze RISC-V, RVV, and VirtIO standard versions.
+- Freeze single hart, timing model, scalar unaligned access policy, and PMP scope.
+- Freeze OpenSBI, Linux LTS, rootfs, and toolchain versions.
+- Complete requirement-task-test traceability matrix.
 
-### 退出条件
+### Exit Conditions
 
-没有影响架构的未决问题；`SDD-001..004` 均有确认和证据。
+No unresolved architecture-impacting issues; `SDD-001..004` all have confirmations and evidence.
 
-## 4. 阶段 1：工程骨架
+## 4. Stage 1: Engineering Skeleton
 
-建立 C++ 构建、模块接口、错误类型、测试入口和外部产物忽略策略。此阶段不放入假 CPU 或打印式固件演示。
+Establish C++ build system, module interfaces, error types, test entries, and external artifact ignore policies. This stage puts no fake CPU or banner-printing firmware demos in place.
 
-### 退出条件
+### Exit Conditions
 
-严格告警构建通过；目录与 `project-tree.md` 一致；所有新增代码满足中文注释规范；测试框架运行真实空测试清单但不声称硬件功能完成。
+Strict warning build passes; directory layout matches `project-tree.md`; all added code meets Chinese annotation standards; test framework runs real empty test lists without claiming hardware features complete.
 
-## 5. 阶段 2：物理内存与总线
+## 5. Stage 2: Physical Memory & Bus
 
-先完成 RAM、ROM、MMIO 注册、结构化总线错误和 DMA 边界，再允许 CPU 或设备依赖它。
+Complete RAM, ROM, MMIO registration, structured bus errors, and DMA boundaries first before CPU or devices are allowed to depend on them.
 
-### 退出条件
+### Exit Conditions
 
-地址图所有边界、宽度、只读、未映射、溢出和原子事务测试通过，无旁路入口。
+All address map boundaries, widths, read-only, unmapped, overflow, and atomic transaction tests pass, with no bypass entries.
 
-## 6. 阶段 3：RV64I CPU
+## 6. Stage 3: RV64I CPU
 
-建立唯一取指/译码/执行路径，完成 RV64I 和基本同步异常。使用真实编码测试，不建立仅供测试的第二译码器。
+Establish sole fetch/decode/execute path, completing RV64I and basic synchronous exceptions. Test using real encodings without building a secondary decoder for testing.
 
-### 退出条件
+### Exit Conditions
 
-RV64I 指令族、16/32 位长度识别基础、PC 与精确异常测试通过。
+RV64I instruction family, 16/32-bit length identification foundation, PC, and precise exception tests pass.
 
-## 7. 阶段 4：CSR、特权与 Trap
+## 7. Stage 4: CSR, Privilege & Trap
 
-实现 CSR 表、别名、M/S/U、委托、中断选择、Trap 入口及 xRET。
+Implement CSR tables, aliases, M/S/U, delegation, interrupt selection, Trap entry, and xRET.
 
-### 退出条件
+### Exit Conditions
 
-从三种特权级发起的异常/中断往返正确，状态字段无分叉，非法 CSR 访问精确。
+Exception/interrupt round trips originating from all three privilege levels work correctly, status fields do not fork, and illegal CSR accesses are precise.
 
-## 8. 阶段 5：M/A/F/D/C
+## 8. Stage 5: M/A/F/D/C
 
-按正式扩展逐一实现并通过对应一致性测试。只有某扩展完整时才在 `misa` 和 FDT 中公布。
+Implement standard extensions one by one and pass matching conformance tests. Extensions are advertised in `misa` and FDT only when fully complete.
 
-### 退出条件
+### Exit Conditions
 
-除零、溢出、LR/SC 失效、AMO 原子、舍入/NaN、全部合法压缩编码均有证据。
+Divide-by-zero, overflow, LR/SC invalidations, AMO atomicity, rounding/NaN, and all legal compressed encodings have logged evidence.
 
-## 9. 阶段 6：Sv39 与 TLB
+## 9. Stage 6: Sv39 & TLB
 
-实现页表漫游、超级页、权限、A/D、TLB 与 `SFENCE.VMA`，接入取指和数据访问的唯一入口。
+Implement page table walks, superpages, permissions, A/D, TLB, and `SFENCE.VMA`, attaching to the sole entry point for instruction fetch and data access.
 
-### 退出条件
+### Exit Conditions
 
-所有页面尺寸和权限矩阵通过；TLB 不改变架构结果；页错误 cause/tval 精确。
+All page sizes and permission matrices pass; TLB does not alter architectural results; page fault cause/tval are precise.
 
-## 10. 阶段 7：RVV 1.0
+## 10. Stage 7: RVV 1.0
 
-按 `04-vector-extension-rvv.md` 完成状态、配置、整数、浮点、掩码和访存，不通过宿主 SIMD 绕过元素语义。
+Complete state, config, integer, floating-point, mask, and memory access per `04-vector-extension-rvv.md`, without bypassing element semantics via host SIMD.
 
-### 退出条件
+### Exit Conditions
 
-声明范围全部实现并通过 RVV 一致性、mask/tail、重叠、跨页和异常重启测试。
+Declared scope is fully implemented, passing RVV conformance, mask/tail, overlap, page-crossing, and exception restart tests.
 
-## 11. 阶段 8：CLINT、PLIC 与 UART
+## 11. Stage 8: CLINT, PLIC & UART
 
-实现真实 MMIO 状态、中断线路和终端后端，为 OpenSBI/Linux 提供计时与控制台。
+Implement real MMIO state, interrupt lines, and terminal backend, providing timing and console for OpenSBI/Linux.
 
-### 退出条件
+### Exit Conditions
 
-定时器、软件/外部中断和真实终端字节交互稳定；所有退出路径恢复终端。
+Timer, software/external interrupts, and real terminal byte interactions are stable; all exit paths restore terminal.
 
-## 12. 阶段 9：VirtIO 公共层与块设备
+## 12. Stage 9: VirtIO Common Layer & Block Device
 
-先完成可复用 transport/virtqueue，再接块后端。不得为网卡复制队列解析。
+Complete reusable transport/virtqueue first before connecting block backend. Do not duplicate queue parsing for network cards.
 
-### 退出条件
+### Exit Conditions
 
-恶意描述符安全测试通过；真实 ext4 镜像可由完整 VirtIO-Blk 请求稳定读取和写入。
+Malicious descriptor safety tests pass; real ext4 images read and write stably via complete VirtIO-Blk requests.
 
-## 13. 阶段 10：VirtIO-Net 与 TAP
+## 13. Stage 10: VirtIO-Net & TAP
 
-在公共 VirtIO 层接入 RX/TX，完成非阻塞 TAP、背压、包边界和 PLIC 中断。
+Attach RX/TX at the common VirtIO layer, completing non-blocking TAP, backpressure, packet boundaries, and PLIC interrupts.
 
-### 退出条件
+### Exit Conditions
 
-隔离真实 TAP 测试中 ARP、IPv4 和双向包流通过，资源与宿主网络安全清理。
+Isolated real TAP tests for ARP, IPv4, and bidirectional packet flows pass; resources and host networks clean up safely.
 
-## 14. 阶段 11：OpenSBI、Linux 与 rootfs
+## 14. Stage 11: OpenSBI, Linux & rootfs
 
-按外部产物策略获取/构建真实软件，生成 FDT，逐门验证固件、内核、块设备和 Shell。
+Obtain/build real software per external artifact policy, generate FDT, and gate-by-gate verify firmware, kernel, block device, and Shell.
 
-### 退出条件
+### Exit Conditions
 
-OpenSBI Banner、Linux 无 panic 启动、ext4 根挂载和交互式 Shell 均有完整日志证据。
+OpenSBI Banner, Linux panic-free boot, ext4 root mount, and interactive Shell all have complete log evidence.
 
-## 15. 阶段 12：最终网络验收
+## 15. Stage 12: Real Network Final Acceptance
 
-经用户确认准备宿主 TAP/bridge/NAT，在来宾中执行 DHCP、DNS 和 ICMP。
+Prepare host TAP/bridge/NAT upon user confirmation, executing DHCP, DNS, and ICMP in guest.
 
-### 退出条件
+### Exit Conditions
 
-`dhclient eth0` 成功，`ping -c 4 google.com` 获得 4 个响应且 0% 丢包；完整记录可复核且无 Mock、代执行或伪造。
+`dhclient eth0` succeeds, `ping -c 4 google.com` receives 4 replies with 0% packet loss; complete logs are verifiable without Mocks, host execution on behalf of guest, or faking.
 
-## 16. 偏差处理
+## 16. Deviation Handling
 
-任何阶段发现上游语义错误时：
+When upstream semantic errors are discovered at any stage:
 
-1. 停止下游扩展。
-2. 记录受影响需求、任务和测试。
-3. 向用户说明修正规格或实现的方案与影响。
-4. 获得确认后用补丁修复唯一权威路径。
-5. 重跑所有受影响的真实测试。
+1. Stop downstream extensions.
+2. Record affected requirements, tasks, and tests.
+3. Explain plans and impacts for correcting spec or implementation to user.
+4. Repair sole authoritative path via patch upon confirmation.
+5. Re-run all affected real tests.
 
-禁止新增旁路逻辑维持表面进度。
+Adding bypass logic to maintain superficial progress is prohibited.

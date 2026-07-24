@@ -1,6 +1,6 @@
 # Linux 真实启动 Flow
 
-本文只记录真实 UART 流和来宾命令输出，用于证明 Linux 确实从 OpenSBI 启动、识别设备、挂载 ext4 rootfs 并进入 Shell。构建产物、SHA-256 和回归测试结果见 [docs/RESULT.md](docs/RESULT.md)。
+本文只记录真实 UART 流和来宾命令输出，用于证明 Linux 确实从 OpenSBI 启动、识别设备、挂载 ext4 rootfs 并进入 Shell。构建产物、SHA-256 和回归完整的工具日志、镜像文件类型及测试状态见 [RESULT.zh.md](../docs/RESULT.zh.md)。
 
 ## 1. 运行命令
 

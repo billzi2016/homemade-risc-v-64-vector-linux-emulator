@@ -1,139 +1,139 @@
-# Agent 项目操作规则
+# Agent Project Operation Rules
 
-## 1. 适用范围
+## 1. Scope
 
-本文件适用于本仓库中的所有 Agent、自动化助手和后续维护会话。任何人在读取、设计、修改、测试或交付本项目时，都必须先阅读本文件以及 `specs/constitution.md`。
+This document applies to all Agents, automated assistants, and maintenance sessions in this repository. Anyone reading, designing, modifying, testing, or delivering code in this project must first read this document and `specs/constitution.md`.
 
-本项目采用规格驱动开发（Specification-Driven Development，SDD）。规格不是参考建议，而是实现、测试和验收的约束来源。
+This project adopts Specification-Driven Development (SDD). Specifications are not suggestions; they are the sole source of truth and constraints for implementation, testing, and acceptance.
 
-## 2. 规则优先级
+## 2. Rule Priority
 
-出现冲突时，按照以下顺序处理：
+When conflicts arise, handle them in the following order of priority:
 
-1. 用户在当前会话中的明确指令。
-2. `specs/constitution.md` 中的项目宪法。
-3. `specs/` 下经过确认的专题规格。
-4. `specs/tasks.md` 中的任务顺序和完成条件。
-5. 当前实现、历史代码及工具默认行为。
+1. Explicit instructions given by the user in the current session.
+2. The Project Constitution in `specs/constitution.md`.
+3. Confirmed specialized specifications under `specs/`.
+4. Task sequence and completion conditions in `specs/tasks.md`.
+5. Current implementation, historical code, and tool default behaviors.
 
-低优先级内容不得覆盖高优先级要求。若冲突无法消解，必须停止操作并向用户说明，不得自行猜测。
+Lower-priority content must never override higher-priority requirements. If a conflict cannot be resolved, stop operations immediately and ask the user for clarification; do not make assumptions.
 
-## 3. 操作前确认
+## 3. Pre-Operation Confirmation
 
-- 不得擅自修改任何文件。
-- 修改前必须用中文说明修改目的、涉及文件、修改内容和预期效果，并等待用户明确确认。
-- 用户对已说明且范围明确的模块回复“ok”“继续”“做”或同义明确指令时，视为对该模块后续写入、真实测试、任务证据和已约定 Git 提交的连续授权；必须直接执行，不得再次请求相同确认，也不得发送“准备开始”“继续执行”等无实际操作、无新信息的消息。
-- `sandbox_mode = "read-only"` 与 `approval_policy = "on-request"` 为用户已配置的执行环境约束；它们不构成对已确认模块的重复确认理由。除真正新增权限、破坏性操作、规格冲突或缺失关键依赖外，必须连续完成当前模块，禁止询问“是否继续”。
-- 执行任何命令前必须说明用途。测试、构建、运行、生成文件、安装依赖、下载产物等操作必须获得用户确认。
-- 若完成当前已批准模块所必需的编译器、格式化器、测试工具、库、系统接口或其他依赖缺失，必须立即停止在安装步骤之前，用中文说明缺失项、必要性、推荐安装方式和安装后的确认命令；由用户自行决定并执行安装。未经用户针对该项安装的明确授权，禁止擅自安装，也不得以未声明的降级方案、替代工具或跳过检查掩盖缺失。
-- 不确定需求、边界、标准语义或破坏性影响时，必须先询问用户。
-- 未经明确要求，不得执行任何 Git 操作。
-- 不得回滚、覆盖或清理用户已有修改。
+- Do not modify any files without authorization.
+- Before modifying any file, explain in Chinese the purpose of the modification, the affected files, the intended changes, and expected effects, and wait for explicit user confirmation.
+- When the user responds with "ok", "continue", "do it", or equivalent clear instructions to an explained and scope-bound module, it is treated as a continuous authorization for subsequent writes, real testing, task evidence logging, and agreed Git commits for that module; execute directly without requesting identical confirmation or sending empty status updates like "getting started" or "continuing" without actual actions or new information.
+- `sandbox_mode = "read-only"` and `approval_policy = "on-request"` are environment constraints configured by the user; they do not constitute reasons to request redundant verbal confirmations for confirmed modules. Unless encountering genuinely new permission requests, destructive actions, specification conflicts, or missing critical dependencies, complete the current module continuously without asking "whether to continue".
+- Explain the purpose of any command before executing it. Operations such as testing, building, running, generating files, installing dependencies, or downloading artifacts must receive user confirmation.
+- If missing compilers, formatters, test tools, libraries, system interfaces, or other dependencies required to complete the approved module are discovered, stop immediately before installation steps. Explain in Chinese the missing items, necessity, recommended installation methods, and post-installation verification commands; let the user decide and perform installation. Installing unauthorized items or masking missing dependencies with unapproved fallback solutions, alternative tools, or skipped checks is strictly forbidden.
+- When requirement details, boundaries, standard semantics, or destructive impacts are uncertain, ask the user first.
+- Do not perform any Git operations unless explicitly requested by the user.
+- Do not rollback, overwrite, or clean up existing changes made by the user.
 
-## 3.1 工作区安全边界
+## 3.1 Workspace Security Boundaries
 
-- 默认将所有读取、修改、生成、构建和测试严格限制在仓库根目录及其子目录内。
-- 禁止修改、移动、删除或覆盖仓库外的任何用户文件、应用数据和系统文件。
-- 禁止擅自修改宿主机软件安装、环境变量、Shell 配置、系统服务、网络设备、路由、网桥、防火墙、DNS 或内核参数。
-- 命令必须设置仓库根目录为工作目录；不得使用用户主目录、文件系统根目录或未解析的变量作为递归操作目标。
-- 任务确需访问仓库外资源、标准系统接口或外部服务时，必须先解析精确目标，用中文说明必要性、影响和恢复方式，并等待用户对该项操作明确确认。
-- GitHub 远端创建、联网下载、依赖安装、TAP/网桥配置等均属于仓库边界之外的独立操作，不能从普通文档或代码任务中推定授权。
+- Restrict all reading, modifying, generating, building, and testing strictly to the repository root directory and its subdirectories by default.
+- Modifying, moving, deleting, or overwriting user files, application data, or system files outside the repository is strictly forbidden.
+- Modifying host software installations, environment variables, shell configurations, system services, network devices, routing, bridges, firewalls, DNS, or kernel parameters without explicit authorization is strictly forbidden.
+- Commands must set the repository root directory as their working directory; do not use the user home directory, root filesystem directory, or unresolved variables as targets for recursive operations.
+- When a task genuinely requires accessing resources outside the repository, standard system interfaces, or external services, parse the exact targets first, explain in Chinese the necessity, impact, and restoration procedure, and wait for explicit confirmation from the user for that operation.
+- Remote operations on GitHub, network downloads, dependency installations, TAP/bridge configurations, etc., are all independent operations outside the repository boundary and cannot be presumed authorized from normal documentation or code tasks.
 
-## 4. 规格驱动流程
+## 4. Specification-Driven Process
 
-每项实现必须遵循以下顺序：
+Every implementation step must follow this sequence:
 
-1. 找到对应规格和任务编号。
-2. 检查前置任务是否完成。
-3. 明确标准依据、输入、输出、错误路径和验收条件。
-4. 向用户说明拟修改范围并等待确认。
-5. 使用补丁进行最小且完整的增量修改。
-6. 经用户确认后执行与风险相称的真实测试。
-7. 记录实际结果，满足完成定义后才能勾选任务。
+1. Locate the corresponding specification and task number.
+2. Verify that prerequisite tasks are completed.
+3. Clarify standard references, inputs, outputs, error paths, and acceptance criteria.
+4. Explain the intended modification scope to the user and wait for confirmation.
+5. Use patches for minimal and complete incremental modifications.
+6. Execute real tests commensurate with risk after user confirmation.
+7. Record actual test results and check off tasks only when completion criteria are fully met.
 
-发现规格遗漏或冲突时，先修正规格并取得确认，再修改实现。不得让代码事实反向掩盖规格缺陷。
+If specification omissions or conflicts are discovered, update and confirm the specification first before altering the implementation. Code facts must never mask specification defects in reverse.
 
-### 4.1 规格审查与纠错
+### 4.1 Specification Review and Error Correction
 
-- PRD、专题规格和任务清单是实现基线，但编写规格时可能尚未覆盖后续发现的标准细节、硬件约束、协议边界与可验证性问题；Agent 不得把“照原文实现”当作忽略已知规格缺陷的理由。
-- 开始模块设计以及发现实现困难、测试冲突或标准歧义时，必须重新核对适用的官方架构规范、协议规范和项目总体目标，判断问题来自实现、测试还是规格本身，不能默认其中任意一方必然正确。
-- 若规格存在事实错误、内部矛盾、关键遗漏、无法验证的验收条件，或与正式标准不一致，必须先向用户说明问题、依据、影响范围和拟修订内容，取得确认后使用补丁同步修订 PRD、专题规格、任务依赖及验收标准，再继续实现。
-- 规格修订必须提高准确性、完整性和可验证性，不得为了迁就现有代码、减少工作量或让测试通过而删除正确要求、缩小必要范围、降低标准或改写完成定义。
-- 若原规格符合正式标准且工程上可以实现，只是实现复杂、耗时或当前代码尚不具备基础能力，则不得将其宣称为“不合理”；应保留原要求，并按依赖关系补齐真实实现。
-- 不得默默偏离规格。任何经确认的规格变更都必须保留可审阅的文档差异，并同步说明它对架构、代码、测试、任务状态和最终验收的影响。
+- PRDs, specialized specs, and task lists serve as implementation baselines, but they may not cover all standard details, hardware constraints, protocol boundaries, and testability issues discovered later; Agents must not use "implementing verbatim" as an excuse to ignore known specification defects.
+- At the start of module design or when facing implementation bottlenecks, test conflicts, or standard ambiguities, re-verify applicable official architecture specs, protocol specs, and overall project goals to determine whether the issue stems from code, tests, or the specification itself; never default to assuming any single part is inherently correct.
+- If a specification contains factual errors, internal contradictions, key omissions, unverifiable acceptance criteria, or inconsistencies with official standards, explain the issue, evidence, impact scope, and proposed spec revisions to the user first. Upon confirmation, update PRDs, specs, task dependencies, and acceptance standards via patch before continuing implementation.
+- Specification revisions must improve accuracy, completeness, and testability; deleting valid requirements, narrowing necessary scopes, lowering standards, or rewriting completion definitions to accommodate existing code, reduce effort, or pass tests is strictly prohibited.
+- If the original specification aligns with official standards and is feasible, but is complex, time-consuming, or currently missing foundation code, do not declare it "unreasonable"; retain the requirement and build out real implementations per dependency relationships.
+- Do not silently deviate from specifications. Any confirmed specification change must retain reviewable document diffs and explain its impact on architecture, code, testing, task status, and final acceptance.
 
-### 4.2 完整模块批次
+### 4.2 Complete Module Batches
 
-- 每个模块开工前，必须一次列明计划新增、修改和删除的全部文件，并说明每个文件的职责及预期结果；没有删除文件时也要明确说明。
-- 在规格和全局架构已经限定边界的前提下，应以职责完整、可独立验证的模块作为实现批次。允许一个补丁同时新增或修改多个相关文件，不得为了形式上的渐进过程把一个完整模块人为拆成大量零碎写入。
-- 批次范围必须覆盖该模块的生产实现、真实测试、构建接线和必要文档，不得只完成容易部分，把关键语义以占位接口留给未定义的以后。
-- 写入前应完整检查模块依赖、错误路径、边界和验收条件；Agent 的处理能力不能成为省略设计审查的理由，也不能成为扩大已批准范围的理由。
-- 一个模块只有在严格构建、对应功能测试、回归测试和适用的动态检查全部通过后，才可以创建该模块的 Git commit。一个完整模块原则上对应一个可独立审阅和回退的 commit。
+- Before starting each module, list all planned additions, modifications, and deletions in a single batch, describing each file responsibility and expected outcome; explicitly state if no files are being deleted.
+- Within boundaries defined by specifications and global architecture, treat modules with complete responsibilities and independent testability as implementation batches. A patch may add or modify multiple related files at once; do not artificially split a complete module into numerous piecemeal writes merely for formal incremental steps.
+- Batch scope must cover production code, real tests, build wiring, and necessary documentation for that module; do not finish only easy parts while leaving key semantics as undefined placeholder stubs.
+- Thoroughly inspect module dependencies, error paths, boundaries, and acceptance criteria before writing; Agent processing capacity must not justify skipping design reviews or expanding approved scopes.
+- A module can only receive a Git commit after passing strict compilation, corresponding functional tests, regression tests, and applicable dynamic checks. A complete module generally corresponds to one independently reviewable and revertible commit.
 
-## 5. 禁止走捷径与伪造
+## 5. Prohibition of Shortcuts and Fabrication
 
-- 禁止使用 Mock、Stub、空实现、固定返回值或硬编码输出冒充真实功能完成。
-- 禁止使用宿主机现成功能绕过应由模拟器实现的 CPU、MMU、外设或协议语义。
-- 禁止仅凭编译成功、单元测试或快速冒烟测试宣称系统目标达成。
-- 禁止伪造测试日志、网络结果、Linux 启动状态、覆盖率或任务完成状态。
-- 禁止创建多套相互竞争的译码、内存访问、异常处理或设备逻辑。
-- 禁止为了让实现通过而删除、跳过、弱化或篡改测试，包括降低断言强度、只运行有利子集、吞掉失败和改变正确的预期结果。若测试本身违反正式规范，必须先给出可核对的规范依据，再修正错误测试并补充不弱于原覆盖面的正确断言。
-- 禁止用 `TODO`、`FIXME`、空分支或“以后实现”逃避当前批次必须完成的语义。确因已确认的下游依赖必须保留待办时，必须同时写明对应任务编号、阻塞原因、完成条件和清除节点，并在到达该节点时主动完成和移除标记。
-- 如阶段性测试必须使用测试替身，必须由对应测试规格明确许可、清楚标注范围，并且不得代替最终真实链路验收。
-- 未执行的检查必须明确写为“未执行”，失败的检查必须如实报告。
+- Using mocks, stubs, empty implementations, fixed return values, or hardcoded outputs to fake feature completion is strictly forbidden.
+- Using host system features to bypass CPU, MMU, peripheral, or protocol semantics that should be emulated is strictly forbidden.
+- Declaring system goals met based solely on successful compilation, unit tests, or quick smoke tests is strictly forbidden.
+- Fabricating test logs, network results, Linux boot statuses, coverage metrics, or task completion states is strictly forbidden.
+- Creating multiple competing decoders, memory access paths, exception handling units, or device logic is strictly forbidden.
+- Deleting, skipping, weakening, or tampering with tests—including reducing assertion strength, running only favorable subsets, swallowing failures, or altering valid expected results—to pass implementation is strictly forbidden. If a test violates official specifications, provide verifiable standard references first before correcting the test and supplementing assertions of equal or higher coverage.
+- Using `TODO`, `FIXME`, empty branches, or "future implementations" to evade semantics required in the current batch is strictly forbidden. If downstream dependencies genuinely require temporary TODOs, document the corresponding task ID, blocking reason, completion condition, and cleanup node, and actively implement/remove the tag upon reaching that node.
+- If test doubles must be used during transitional stages, they must be explicitly permitted by test specs, clearly scope-marked, and never replace final real-chain acceptance.
+- Unexecuted checks must be explicitly marked as "unexecuted"; failed checks must be reported truthfully.
 
-## 6. 架构与实现纪律
+## 6. Architecture and Implementation Discipline
 
-- 遵循 SOLID 原则，模块职责单一，依赖方向明确，接口围绕稳定抽象设计。
-- 遵循 DRY 原则。寄存器语义、地址转换、总线访问、陷阱入口和 Virtqueue 解析等核心规则只能有一个权威实现。
-- CPU 只能通过统一内存访问入口进行取指和数据访问；物理访问只能通过统一总线分发。
-- 设备不得绕过总线或受控的 DMA 内存接口直接操作模拟状态。
-- ISA、CSR、异常编码和设备寄存器常量必须集中定义，禁止散落魔法数字。
-- 优先保证语义正确、边界清晰和可维护性，不得以开发速度为理由降低规格覆盖。
+- Adhere to SOLID principles: single responsibility per module, explicit dependency directions, and stable interface abstractions.
+- Adhere to DRY principles: core rules like register semantics, address translation, bus access, trap entry, and Virtqueue parsing must have exactly one authoritative implementation.
+- The CPU must fetch instructions and access data solely through a unified memory access interface; physical accesses must be routed exclusively through a unified bus.
+- Devices must not bypass the bus or controlled DMA memory interfaces to manipulate emulator state directly.
+- ISA, CSR, exception codes, and device register constants must be defined centrally; magic numbers scattered in code are strictly forbidden.
+- Prioritize semantic correctness, clear boundaries, and maintainability; never compromise specification coverage for development speed.
 
-## 7. 文件修改规则
+## 7. File Modification Rules
 
-- 必须使用 `apply_patch` 进行增量修改，不得通过整文件重写规避差异审查。
-- 当单个文件超过 90% 的内容确实需要改变、逐块补丁已失去审阅价值时，可以在说明原因后通过 `apply_patch` 替换该文件内容；仍禁止使用 Shell 重定向、脚本写文件或其他方式绕过 patch 记录。
-- 一个已批准模块可以在同一个 patch 中修改多个相关文件；“使用 patch”不等于必须把同一模块拆成多轮不完整补丁。
-- 在依赖清晰、验收条件可共同验证且失败能够准确归因的前提下，应将多个紧密相关功能合并为一个完整批次，统一实施、构建、回归和提交；不得人为拆碎成频繁确认。不得将跨层且错误难以定位的无关功能混入同一批次。
-- 新增或修改范围应与已批准计划一致。
-- 不得顺手格式化、重命名或调整无关文件。
-- 发现工作区已有改动时必须保留；若与任务冲突，应停止并请用户决定。
-- 仓库内出现的项目文件和目录路径必须使用从仓库根目录开始的相对路径，例如 `specs/tasks.md`；禁止写入任何宿主机用户目录或工作区绝对路径。
-- 文档、配置、脚本、诊断信息和测试证据都不得依赖某台机器的绝对工作区位置。确需引用系统设备节点（例如 `/dev/net/tun`）时，必须明确标注其为宿主系统接口，而不是仓库文件路径。
-- 临时文件和工具输出也必须放在仓库内已批准且被忽略的相对目录；不得借用用户桌面、下载目录或系统临时目录保存项目产物，除非用户针对精确目标另行批准。
+- Must use `apply_patch` for incremental changes; replacing entire files to avoid diff reviews is strictly forbidden.
+- When over 90% of a file content genuinely changes and block-by-block patching loses review value, replace the content via `apply_patch` after explaining the rationale; using shell redirection, scripts, or other means to bypass patch tracking is still forbidden.
+- An approved module can modify multiple related files within a single patch; using patches does not mean breaking a module into multi-round incomplete edits.
+- When dependencies are clear, acceptance conditions can be jointly verified, and failures can be accurately attributed, consolidate closely related features into a single batch for implementation, building, regression testing, and committing; do not artificially fragment into frequent confirmations. Do not mix unrelated cross-layer features with hard-to-locate errors into one batch.
+- Added or modified scopes must align with approved plans.
+- Do not perform formatting, renaming, or adjustment on unrelated files in passing.
+- Retain existing workspace modifications; if conflicts arise, pause and request user guidance.
+- Project files and directory paths referenced in the repository must use relative paths from the repository root, e.g., `specs/tasks.md`; writing host user directories or workspace absolute paths is strictly forbidden.
+- Documentation, configs, scripts, diagnostics, and test evidence must not depend on absolute machine locations. If referencing system device nodes (e.g., `/dev/net/tun`), explicitly mark them as host system interfaces, not repository paths.
+- Temporary files and tool outputs must be placed in approved and ignored relative directories in the repository; borrowing user desktop, download directories, or system temp directories to store project artifacts is forbidden unless explicitly authorized for a specific target.
 
-## 8. 中文注释规范
+## 8. Chinese Annotation Standard
 
-每个代码文件必须包含：
+Every code file must contain:
 
-- 文件开头的中文意图注释：说明职责、边界、主要依赖和明确不负责的内容。
-- 所有对外类型、接口、函数以及包含非平凡语义的私有函数都必须有中文注释：说明设计意图、参数、返回值、状态变化、失败路径、异常及并发约束。紧邻且语义完全一致的简单访问器可以使用一段分组注释，但不得让维护者依赖阅读实现来猜测关键行为。
-- 长函数、复杂条件、位域处理、特权规则、页表漫游、原子操作、描述符链等关键位置的中文注释。
-- 解释“为什么”的注释，而不是逐句复述代码。
+- Chinese intent comments at the top of the file: detailing responsibilities, boundaries, key dependencies, and explicitly excluded scope.
+- Chinese comments for all exported types, interfaces, functions, and non-trivial private functions: detailing design intent, parameters, return values, state changes, failure paths, exceptions, and concurrency constraints. Simple contiguous accessors with identical semantics may use a single grouped block comment, but maintainers must not be forced to guess key behaviors by reading implementation logic.
+- Chinese comments at critical logic positions such as long functions, complex conditions, bitfields, privilege rules, page table walks, atomic operations, and descriptor chains.
+- Explanations focusing on "why", rather than rephrasing code line-by-line.
 
-注释完整性与代码正确性同等属于完成条件。禁止以时间、篇幅或代码“看起来直观”为理由省略文件意图、函数职责、长难逻辑和关键不变量注释。
+Comment completeness and code correctness hold equal weight for completion. Omitting file intent, function duties, complex logic, and key invariant comments due to time, length, or code "seeming self-explanatory" is strictly forbidden.
 
-注释必须与实现同步，禁止保留错误、模糊或过期说明。
+Comments must stay synchronized with code; keeping inaccurate, vague, or obsolete descriptions is forbidden.
 
-## 9. 测试与验收纪律
+## 9. Testing and Acceptance Discipline
 
-- 测试必须覆盖成功路径、边界条件、权限拒绝、非法输入和状态转换。
-- 指令、CSR、Sv39、VirtIO 等行为应对照对应正式规范验证。
-- 单元测试不能替代真实 OpenSBI、Linux、rootfs、VirtIO 和 TAP 的系统集成验证。
-- 最终网络验收必须由来宾 Linux 通过 `eth0` 获取地址，并在真实网络链路上完成域名解析和 ICMP 测试。
-- 环境限制导致无法执行验收时，只能报告受阻，不得降低验收标准或勾选任务。
+- Tests must cover successful paths, boundary conditions, permission rejections, invalid inputs, and state transitions.
+- Behaviors for Instructions, CSRs, Sv39, VirtIO, etc., must be verified against corresponding official specifications.
+- Unit tests cannot substitute for real OpenSBI, Linux, rootfs, VirtIO, and TAP system integration verification.
+- Final network acceptance requires guest Linux to obtain an IP via `eth0`, perform domain name resolution, and execute ICMP ping tests over a real network link.
+- When environment limitations prevent execution of acceptance tests, report the blockage truthfully; lowering acceptance standards or checking off tasks is forbidden.
 
-## 10. 外部产物与 Git
+## 10. External Artifacts and Git
 
-- OpenSBI、Linux 内核、rootfs、磁盘镜像和下载缓存均为外部或构建产物，不得提交到 Git。
-- 下载前必须确认来源、版本、许可证和校验值，并先获得用户许可。
-- `.gitignore` 的实际修改属于独立实施操作，必须另行说明并获得确认。
-- 用户要求 Git 操作时，每一步都要用中文说明。
-- Commit 信息必须使用中文，主题清晰，正文说明原因和关键变更，总计不超过 10 行。
-- 不得主动执行 `add`、`commit`、`push`、`pull`、`merge`、`rebase`、`reset` 或 `checkout`。
+- OpenSBI, Linux kernels, rootfs, disk images, and download caches are external/build artifacts and must never be committed to Git.
+- Before downloading external artifacts, verify source, version, license, and checksum, and obtain user permission first.
+- Modifying `.gitignore` is an independent implementation task and requires prior explanation and confirmation.
+- When requested by the user to perform Git operations, explain every step in Chinese.
+- Commit messages must use Chinese, with a clear subject and a body explaining reasons and key changes, not exceeding 10 lines total.
+- Do not execute `add`, `commit`, `push`, `pull`, `merge`, `rebase`, `reset`, or `checkout` proactively.
 
-## 11. 完成状态
+## 11. Completion Status
 
-只有满足规格、实现完成、真实测试通过、文档同步且不存在已知阻断问题时，任务才可以从 `- [ ]` 更新为 `- [x]`。若仅完成部分工作，应拆分或记录证据，不得提前打勾。
+A task can only be changed from `- [ ]` to `- [x]` when specifications are met, implementation is complete, real tests pass, documentation is synchronized, and no known blocking issues exist. If work is only partially completed, break down tasks or record evidence without checking the box prematurely.

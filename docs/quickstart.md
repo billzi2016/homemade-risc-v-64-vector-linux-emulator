@@ -1,31 +1,31 @@
-# 快速启动指南
+# Quickstart Guide
 
-## 1. 适用范围
+## 1. Scope
 
-本文描述项目达到最终交付状态后的两条真实启动路径：macOS 无网络档位启动到 Linux Shell，Linux TAP 档位继续验证公网连通性。二者使用同一模拟器、固件、内核和 rootfs，不建立替代硬件逻辑。
+This document describes the two real boot execution paths after the project reaches its final delivery state: booting to the Linux Shell under the macOS non-networked profile, and verifying public internet connectivity under the Linux TAP profile. Both profiles utilize identical emulator binaries, firmware, kernel images, and rootfs images without establishing alternative hardware logic.
 
-README 描述最终成品，当前仓库是否已经具备某一步能力，应以 `specs/tasks.md` 的验收状态为准。如果当前提交尚未生成 `riscv_vector_emulator`，先继续完成任务清单，而不是创建同名脚本冒充可执行文件。
+The README describes the final product state; whether the current repository possesses a specific capability should be determined strictly by the acceptance status in `specs/tasks.md`. If the current commit has not yet built `riscv_vector_emulator`, complete the task checklist first rather than creating scripts with matching names to fake an executable.
 
-## 2. 前置条件
+## 2. Prerequisites
 
-- 64 位 Linux 或 Apple Silicon/Intel macOS 宿主机。
-- CMake 3.20+ 和支持 C++17 的编译器。
-- 已安装当前步骤需要的 RISC-V 交叉工具链、DTC 和 e2fsprogs 等工具。
-- 已按本项目机器布局构建 OpenSBI、Linux 和 ext4 rootfs。
-- 只有 Linux 网络档位要求用户有权创建或使用 TAP 接口。
+- 64-bit Linux or Apple Silicon/Intel macOS host.
+- CMake 3.20+ and a C++17-compliant compiler.
+- Installed RISC-V cross-toolchain, DTC, and e2fsprogs required for current steps.
+- Built OpenSBI, Linux kernel, and ext4 rootfs configured for our machine layout.
+- Only the Linux network profile requires administrative permissions to create or use TAP interfaces.
 
-第三方组件的作用、官方来源与安装命令见 `docs/third-party.md`。
+For third-party component roles, official sources, and installation commands, refer to `docs/third-party.md`.
 
-## 3. 获取源码
+## 3. Obtaining Source Code
 
 ```bash
 git clone https://github.com/billzi2016/homemade-risc-v-64-vector-linux-emulator.git
 cd homemade-risc-v-64-vector-linux-emulator
 ```
 
-后续命令都从项目根目录执行。文档不会要求进入或写入项目目录之外的任意用户路径。
+All subsequent commands are executed from the repository root directory. Documentation will never require entering or writing to any user path outside the project directory.
 
-## 4. 构建与测试模拟器
+## 4. Building and Testing the Emulator
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -33,17 +33,17 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-只有配置、编译和全部必需测试均成功后，才进入系统启动步骤。最终可执行文件应为：
+Proceed to system boot steps only after configuration, compilation, and all mandatory tests pass cleanly. The final executable is located at:
 
 ```text
 build/riscv_vector_emulator
 ```
 
-如果没有安装 Ninja，删除 `-G Ninja`，让 CMake 使用宿主机默认生成器即可；这不会改变模拟器功能。
+If Ninja is not installed, remove `-G Ninja` to let CMake use the host default generator; this does not alter emulator functionality.
 
-## 5. 放置启动资源
+## 5. Placing Boot Resources
 
-准备以下目录和文件：
+Prepare the following directory layout and files:
 
 ```text
 artifacts/
@@ -56,13 +56,13 @@ artifacts/
 └── logs/
 ```
 
-三项资源必须与本项目虚拟硬件匹配：
+The three resource files must match our virtual hardware layout:
 
-- `opensbi.bin` 的入口地址和下一阶段跳转协议与 Boot ROM 一致。
-- `vmlinux.bin` 面向 RV64，启用串口、PLIC、CLINT、VirtIO MMIO、块设备、网卡和 ext4。
-- `rootfs.ext4` 包含 `init`、Shell、设备节点管理、DHCP 客户端、DNS 配置和 `ping`。
+- `opensbi.bin`: Entry address and next-stage jump protocol match the Boot ROM.
+- `vmlinux.bin`: Targeted at RV64, enabling serial console, PLIC, CLINT, VirtIO MMIO, block devices, NIC, and ext4.
+- `rootfs.ext4`: Contains `init`, shell, device node management, DHCP client, DNS configuration, and `ping`.
 
-确认文件存在且非空：
+Verify files exist and are non-empty:
 
 ```bash
 test -s artifacts/firmware/opensbi.bin
@@ -70,38 +70,38 @@ test -s artifacts/kernel/vmlinux.bin
 test -s artifacts/disk/rootfs.ext4
 ```
 
-对 ext4 镜像执行只读检查：
+Execute a read-only check on the ext4 image:
 
 ```bash
 e2fsck -fn artifacts/disk/rootfs.ext4
 ```
 
-不要把这些文件执行 `git add -f`；它们属于本地外部产物，并已被 `.gitignore` 排除。
+Do not execute `git add -f` on these files; they are local external artifacts excluded by `.gitignore`.
 
-## 6. 选择宿主档位
+## 6. Selecting Host Profile
 
-macOS 使用无网络档位，不创建 TAP，也不修改系统网络。直接进入下一节并使用 `--net none`。
+macOS uses the non-networked profile, without creating TAP or altering system networking. Skip directly to the next section and use `--net none`.
 
-Linux 网络档位需要一个已存在且处于 UP 状态的 TAP 接口，例如 `tap0`。首先检查 Linux TUN/TAP 能力：
+The Linux network profile requires an existing TAP interface in UP state, such as `tap0`. First check Linux TUN/TAP capabilities:
 
 ```bash
 test -c /dev/net/tun
 ip tuntap help
 ```
 
-创建 TAP、将它加入网桥或配置 NAT 会改变宿主机网络和防火墙。应由管理员依据 `specs/14-host-network-setup.md`、实际上行接口及局域网策略执行，不能盲目复制固定接口名或地址段。
+Creating TAP, adding it to a bridge, or configuring NAT alters host networking and firewalls. Administrators should perform this according to `specs/14-host-network-setup.md`, actual uplink interfaces, and LAN policies, rather than blindly copying fixed interface names or IP subnets.
 
-准备完成后，只读确认接口状态：
+Upon completion, perform a read-only check of the interface status:
 
 ```bash
 ip -details link show tap0
 ```
 
-输出中应包含 TAP 信息且接口状态为 UP。模拟器进程还必须拥有打开 `/dev/net/tun` 和绑定该接口的权限。
+The output must contain TAP information and show an UP state. The emulator process must also possess permissions to open `/dev/net/tun` and bind to the interface.
 
-## 7. 启动完整虚拟机
+## 7. Launching Full Virtual Machine
 
-macOS 无网络档位：
+macOS non-networked profile:
 
 ```bash
 ./build/riscv_vector_emulator \
@@ -111,7 +111,7 @@ macOS 无网络档位：
   --net none
 ```
 
-Linux TAP 网络档位：
+Linux TAP network profile:
 
 ```bash
 ./build/riscv_vector_emulator \
@@ -121,19 +121,19 @@ Linux TAP 网络档位：
   --net tap0
 ```
 
-启动顺序应依次出现：
+The boot sequence should sequentially display:
 
-1. OpenSBI Banner 和平台信息。
-2. Linux 早期启动日志、内存与中断控制器初始化。
-3. UART 和 VirtIO-Blk 驱动探测信息；Linux 网络档位还应出现 VirtIO-Net。
-4. ext4 根文件系统挂载成功。
-5. `init` 启动并显示可输入命令的 Shell。
+1. OpenSBI Banner and platform details.
+2. Early Linux boot logs, memory, and interrupt controller initialization.
+3. UART and VirtIO-Blk driver probe messages; VirtIO-Net should also appear on the Linux network profile.
+4. Successful ext4 root filesystem mount.
+5. `init` startup showing an interactive command shell.
 
-宿主终端会进入 Raw 模式。键盘输入直接送到来宾 UART；`Ctrl+C` 应由来宾处理，而不是粗暴终止模拟器。模拟器正常退出或发生错误时必须恢复宿主终端属性。
+The host terminal enters Raw mode. Keyboard input is sent directly to guest UART; `Ctrl+C` should be handled by the guest rather than forcefully terminating the emulator. The emulator must restore host terminal attributes upon normal exit or error.
 
-## 8. 来宾验收
+## 8. Guest Acceptance
 
-macOS 无网络档位在来宾 Shell 中执行：
+On macOS non-networked profile, execute in guest shell:
 
 ```bash
 ls /
@@ -141,11 +141,9 @@ pwd
 cat /proc/cpuinfo
 ```
 
-三条命令必须由真实来宾执行成功。该结果证明本地完整启动链路，不代表网络已经验收。
+All three commands must execute successfully inside the real guest shell. This result proves the local full boot chain, but does not claim network acceptance.
 
-Linux TAP 网络档位继续执行：
-
-在来宾 Shell 中执行 PRD 要求的 DHCP 和公网测试：
+On Linux TAP network profile, continue with PRD-required DHCP and public network tests in guest shell:
 
 ```bash
 dhclient eth0
@@ -154,18 +152,18 @@ ip route show
 ping -c 4 google.com
 ```
 
-通过条件：
+Passing criteria:
 
-- `eth0` 获得预期网段中的独立 IPv4 地址。
-- 默认路由指向正确网关。
-- `google.com` 能够通过来宾 DNS 配置解析。
-- 收到 4 个 ICMP Echo Reply，统计结果为 0% 丢包。
+- `eth0` acquires an independent IPv4 address in the expected subnet.
+- Default route points to the correct gateway.
+- `google.com` resolves via guest DNS configuration.
+- Receives 4 ICMP Echo Replies with 0% packet loss.
 
-公网可能对 ICMP 限流或阻断，因此出现丢包时还必须分别排查 TAP 收发、ARP、DHCP、DNS、路由、防火墙和上游网络，不能仅凭一次 `ping` 失败认定 VirtIO-Net 实现错误。
+Public networks may rate-limit or block ICMP; if packet loss occurs, troubleshoot TAP RX/TX, ARP, DHCP, DNS, routing, firewalls, and upstream networks separately. Do not declare a VirtIO-Net implementation flaw based solely on a single failed `ping`.
 
-## 9. 保存验收信息
+## 9. Saving Acceptance Information
 
-需要留存证据时，从宿主机重新启动并使用项目内的日志目录：
+When evidence retention is required, restart from host and direct logs to the repository log directory:
 
 ```bash
 ./build/riscv_vector_emulator \
@@ -176,25 +174,25 @@ ping -c 4 google.com
   2>artifacts/logs/emulator-stderr.log
 ```
 
-UART 使用交互终端时，不应简单用普通管道替代 TTY；否则 Raw 模式、控制字符和输入时序的验收条件会改变。日志中不得包含主机密钥、token、密码或其他敏感数据。
+When UART uses an interactive terminal, do not simply replace TTY with a plain pipe, as this alters acceptance conditions for Raw mode, control characters, and input timing. Logs must not contain host keys, tokens, passwords, or sensitive data.
 
-## 10. 常见失败定位
+## 10. Common Failure Troubleshooting
 
-| 现象 | 优先检查 |
+| Symptom | Primary Inspection Points |
 | --- | --- |
-| 找不到可执行文件 | 当前任务状态、CMake 配置与链接目标是否完整 |
-| OpenSBI 无输出 | Boot ROM 跳板、固件装载地址、PC、UART 地址和 FDT 指针 |
-| OpenSBI 后卡住 | CSR、`medeleg`/`mideleg`、`MRET`、定时器和 S-mode 入口 |
-| Linux 页错误循环 | `satp`、Sv39 canonical VA、PTE 权限、超级页、A/D 位与 TLB |
-| 找不到根文件系统 | VirtIO-MMIO 描述、队列布局、磁盘镜像、内核 ext4 配置 |
-| 块设备运行后死锁 | Descriptor Chain、Available/Used Ring 索引回绕和内存发布顺序 |
-| `eth0` 不存在 | FDT VirtIO 节点、VirtIO-Net feature negotiation 和 PLIC 中断 |
-| DHCP 超时 | TAP 状态、网桥/NAT、队列接收缓冲和外部中断 |
-| 能 ping IP 不能解析域名 | rootfs 中的 DNS 配置和 DHCP 下发内容 |
-| 退出后终端异常 | termios 保存/恢复和所有错误退出路径 |
+| Executable not found | Current task status, CMake configuration, and link targets |
+| OpenSBI no output | Boot ROM trampoline, firmware load address, PC, UART address, FDT pointer |
+| Hangs after OpenSBI | CSRs, `medeleg`/`mideleg`, `MRET`, timers, and S-mode entry point |
+| Linux page fault loop | `satp`, Sv39 canonical VA, PTE permissions, superpages, A/D bits, and TLB |
+| Rootfs not found | VirtIO-MMIO descriptions, queue layouts, disk image, kernel ext4 config |
+| Deadlock after block device runs | Descriptor Chain, Available/Used Ring index wrapping, memory publication order |
+| `eth0` does not exist | FDT VirtIO nodes, VirtIO-Net feature negotiation, PLIC interrupts |
+| DHCP timeout | TAP status, bridge/NAT, queue RX buffers, external interrupts |
+| Can ping IP but cannot resolve domain | DNS configuration in rootfs and DHCP lease content |
+| Abnormal terminal state upon exit | Termios save/restore and all error exit paths |
 
-调试时必须修复正式执行链，不得增加只为绕过启动节点的第二套地址翻译、设备实现或伪造返回值。
+During debugging, fix the production execution chain; do not introduce secondary address translation, device logic, or fake returns solely to bypass boot nodes.
 
-## 11. 清理说明
+## 11. Cleanup Notes
 
-删除 `build/` 可以清理本机构建结果；`artifacts/` 保存的是可重新下载或生成的本地产物。清理 TAP、网桥、路由或 nftables 规则会改变宿主网络状态，必须使用创建它们时对应的受控流程，不能用范围不明的批量删除命令。
+Deleting `build/` cleans local build artifacts; `artifacts/` holds re-downloadable or regenerable local files. Cleaning TAP, bridges, routing, or nftables rules alters host network state; use controlled procedures matching their creation rather than broad deletion commands.
