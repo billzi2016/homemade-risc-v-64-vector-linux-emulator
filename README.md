@@ -4,15 +4,14 @@
 
 This project is a homemade, from-scratch 64-bit RISC-V full-system emulator with Vector (V) extension support. It provides an RV64GCV machine capable of booting OpenSBI and Linux, attaching an ext4 root filesystem, and connecting the guest to a host TAP network interface.
 
-## Chinese Disclaimer
-
-本项目是完全从零开始、独立开发的非官方教育项目，仅用于学习和研究。项目与 RISC-V International 不存在隶属、认可、授权或其他关联关系。RISC-V 名称及相关标识的权利归其各自权利人所有。
-
 ## Project Overview
 
-`homemade-risc-v-64-vector-linux-emulator` is a pure command-line, GUI-less 64-bit RISC-V full-system emulator built entirely from scratch in modern C++. It emulates the processor, memory management unit, interrupt controllers, and necessary virtual peripherals in software, forming a minimal RV64GCV computer capable of running OpenSBI and Linux.
+`homemade-risc-v-64-vector-linux-emulator` is a pure CLI, GUI-less, 64-bit RISC-V full-system emulator implemented entirely from scratch. Written in modern C++, it emulates the processor, MMU, interrupt controllers, and essential virtual peripherals to form a minimal RV64GCV computer capable of booting OpenSBI and Linux.
 
-The README describes the final delivery format and usage instructions of the project. The actual development status, acceptance evidence, and pending tasks are independently recorded in `specs/tasks.md`. The README does not replace the task list nor drive task check-offs.
+- **Online Documentation Site (MkDocs)**: [https://billzi2016.github.io/homemade-risc-v-64-vector-linux-emulator/](https://billzi2016.github.io/homemade-risc-v-64-vector-linux-emulator/)
+- **Codebase Metrics**: 130 source files containing **35,167 lines** of code (C++ 18,808 lines, Makefile 6,684 lines, YAML/YML 6,290 lines, HPP 2,944 lines, Shell 281 lines, Python 85 lines, C/H 75 lines).
+
+The README describes the final delivery form and usage of the project. Current development status, acceptance evidence, and pending tasks are tracked independently in `specs/tasks.md`. The README does not substitute for the task list or drive task completion.
 
 ## Target Capabilities
 
@@ -191,7 +190,7 @@ Other key entries:
 - [tasks.md](../specs/tasks.md): Sole progress entry for real task status, acceptance conditions, and verification evidence.
 - [standards-baseline.md](../specs/standards-baseline.md): RISC-V, RVV, and VirtIO standard versions.
 - [project-tree.md](../specs/project-tree.md): Target directory and module responsibilities.
-- [docs-site/specs/](docs-site/specs/): MkDocs and GitHub Pages project PRDs.deployment.
+- `docs-site/specs/mkdocs_prd.md`: MkDocs and GitHub Pages project PRDs.
 
 ## License
 
