@@ -34,7 +34,7 @@ std::string cli_usage(const char* program_name) {
             : std::string{program_name};
     return "用法：\n"
            "  " + name
-           + " --bios artifacts/firmware/opensbi.bin --kernel artifacts/kernel/Image "
+           + " --bios artifacts/firmware/fw_jump.bin --kernel artifacts/kernel/Image "
              "--disk artifacts/disk/rootfs.ext4 [--net none|tap0]\n"
              "可选：--bios-format raw --kernel-format raw\n";
 }

@@ -232,8 +232,8 @@ void test_reset_permissions_and_warl(TestContext& context) {
     context.expect(csrs.peek(rvemu::core::CsrAddress::Mtvec) == 0x1234U,
                    "mtvec 保留 MODE 必须归一为 Direct");
     write_csr(csrs, rvemu::core::CsrAddress::Mepc, 0x1003U);
-    context.expect(csrs.peek(rvemu::core::CsrAddress::Mepc) == 0x1000U,
-                   "未实现 C 时 mepc 必须四字节对齐");
+    context.expect(csrs.peek(rvemu::core::CsrAddress::Mepc) == 0x1002U,
+                   "实现 C 扩展后 mepc 必须保留半字对齐 PC");
 
     constexpr std::uint64_t sv39 = (8ULL << 60U) | 0x12345U;
     write_csr(csrs, rvemu::core::CsrAddress::Satp, sv39);
@@ -423,6 +423,61 @@ void test_counters_and_access_control(TestContext& context) {
     expect_retired(context, result, "显式写 mcycle");
     context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mcycle) == 200U,
                    "显式 mcycle 写必须抑制同指令隐式递增");
+
+    write_csr(state.csrs(), rvemu::core::CsrAddress::Mcountinhibit, bit(0U) | bit(2U));
+    const auto cycle_before = state.csrs().peek(rvemu::core::CsrAddress::Mcycle);
+    const auto instret_before = state.csrs().peek(rvemu::core::CsrAddress::Minstret);
+    result = fixture.execute(encode_addi(3U, 0U, 1U));
+    expect_retired(context, result, "mcountinhibit 屏蔽下的普通指令");
+    context.expect(state.csrs().peek(rvemu::core::CsrAddress::Mcycle) == cycle_before,
+                   "mcountinhibit.CY 必须停止隐式 mcycle 递增");
+    context.expect(state.csrs().peek(rvemu::core::CsrAddress::Minstret) == instret_before,
+                   "mcountinhibit.IR 必须停止隐式 minstret 递增");
+}
+
+// 覆盖 OpenSBI 冷启动探测会访问的机器级 CSR，避免合法探测误入非法指令递归 Trap。
+void test_machine_probe_csrs_for_firmware(TestContext& context) {
+    rvemu::core::CsrFile csrs;
+
+    write_csr(csrs, rvemu::core::CsrAddress::Pmpcfg0, 0x9F00'0000'0000'0000ULL);
+    context.expect(csrs.peek(rvemu::core::CsrAddress::Pmpcfg0) == 0x9F00'0000'0000'0000ULL,
+                   "RV64 pmpcfg0 必须保存 8 个 PMP 配置字节");
+    write_csr(csrs, rvemu::core::CsrAddress::Pmpaddr0, 0x0000'003F'FFFF'FFFFULL);
+    context.expect(csrs.peek(rvemu::core::CsrAddress::Pmpaddr0) == 0x0000'003F'FFFF'FFFFULL,
+                   "pmpaddr0 必须提供 WARL 存储供固件探测");
+
+    write_csr(csrs, rvemu::core::CsrAddress::Mhpmcounter3, 0x55AAU);
+    context.expect(csrs.peek(rvemu::core::CsrAddress::Mhpmcounter3) == 0x55AAU,
+                   "mhpmcounter3 必须可读写，不能被误判为保留 CSR");
+    write_csr(csrs, rvemu::core::CsrAddress::Mhpmevent3, 0x11U);
+    context.expect(csrs.peek(rvemu::core::CsrAddress::Mhpmevent3) == 0x11U,
+                   "mhpmevent3 必须可读写，供 HPM 探测归零");
+    write_csr(csrs, rvemu::core::CsrAddress::Mcounteren, bit(0U) | bit(1U) | bit(2U) | bit(3U));
+    context.expect((csrs.peek(rvemu::core::CsrAddress::Mcounteren)
+                    & (bit(0U) | bit(1U) | bit(2U) | bit(3U)))
+                       == (bit(0U) | bit(1U) | bit(2U) | bit(3U)),
+                   "mcounteren 必须保留 cycle/time/instret 与 HPM 下放位");
+    write_csr(csrs, rvemu::core::CsrAddress::Mcountinhibit, ~0ULL);
+    context.expect((csrs.peek(rvemu::core::CsrAddress::Mcountinhibit) & (bit(0U) | bit(2U)))
+                       == (bit(0U) | bit(2U)),
+                   "mcountinhibit 必须保留 cycle/instret 抑制位");
+    context.expect((csrs.peek(rvemu::core::CsrAddress::Mcountinhibit) & bit(1U)) == 0U,
+                   "mcountinhibit 不得虚构不可抑制的 time 位");
+
+    context.expect(read_csr(csrs, rvemu::core::CsrAddress::Mtinst) == 0U,
+                   "mtinst 未实现转换信息时必须合法读零");
+    context.expect(read_csr(csrs, rvemu::core::CsrAddress::Mtval2) == 0U,
+                   "mtval2 未实现二级地址时必须合法读零");
+
+    const auto odd_pmpcfg = csrs.access(rvemu::core::CsrAccessRequest{
+        static_cast<rvemu::core::CsrAddress>(0x3A1U),
+        rvemu::core::PrivilegeMode::Machine,
+        true,
+        false,
+        rvemu::core::CsrModifyOperation::Replace,
+        0U,
+    });
+    context.expect(!odd_pmpcfg.success, "RV64 奇数 pmpcfg CSR 必须保持非法");
 }
 
 // 从 S-mode 制造未委托 ECALL，核对 M Trap 全状态并通过真实 MRET 往返。
@@ -861,6 +916,7 @@ int main() {
         test_real_csr_instructions(context);
         test_supervisor_aliases(context);
         test_counters_and_access_control(context);
+        test_machine_probe_csrs_for_firmware(context);
         test_machine_trap_and_mret(context);
         test_delegated_trap_and_sret(context);
         test_complete_synchronous_exception_delegation(context);

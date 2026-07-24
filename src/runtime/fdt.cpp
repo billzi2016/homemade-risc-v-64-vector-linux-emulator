@@ -24,8 +24,9 @@ constexpr std::uint32_t kFdtBeginNode = 1U;
 constexpr std::uint32_t kFdtEndNode = 2U;
 constexpr std::uint32_t kFdtProp = 3U;
 constexpr std::uint32_t kFdtEnd = 9U;
-constexpr std::uint32_t kCpuIntcPhandle = 1U;
-constexpr std::uint32_t kPlicPhandle = 2U;
+constexpr std::uint32_t kCpuPhandle = 1U;
+constexpr std::uint32_t kCpuIntcPhandle = 2U;
+constexpr std::uint32_t kPlicPhandle = 3U;
 constexpr std::uint32_t kUartInterrupt = 10U;
 constexpr std::uint32_t kVirtioBlockInterrupt = 1U;
 constexpr std::uint32_t kVirtioNetworkInterrupt = 2U;
@@ -102,6 +103,15 @@ class FdtWriter final {
     void prop_string(const std::string& name, const std::string& value) {
         std::vector<std::uint8_t> bytes{value.begin(), value.end()};
         bytes.push_back(0U);
+        prop_raw(name, bytes);
+    }
+
+    void prop_string_list(const std::string& name, const std::vector<std::string>& values) {
+        std::vector<std::uint8_t> bytes;
+        for (const auto& value : values) {
+            bytes.insert(bytes.end(), value.begin(), value.end());
+            bytes.push_back(0U);
+        }
         prop_raw(name, bytes);
     }
 
@@ -185,6 +195,10 @@ FdtBuildResult build_machine_fdt(const FdtConfig& config) {
     writer.prop_u32("#address-cells", 2U);
     writer.prop_u32("#size-cells", 2U);
 
+    writer.begin_node("aliases");
+    writer.prop_string("serial0", "/soc/serial@10000000");
+    writer.end_node();
+
     writer.begin_node("chosen");
     writer.prop_string("stdout-path", "/soc/serial@10000000:115200n8");
     writer.prop_string("bootargs", config.bootargs);
@@ -202,9 +216,13 @@ FdtBuildResult build_machine_fdt(const FdtConfig& config) {
     writer.begin_node("cpu@0");
     writer.prop_string("device_type", "cpu");
     writer.prop_u32("reg", 0U);
+    writer.prop_u32("phandle", kCpuPhandle);
     writer.prop_string("status", "okay");
     writer.prop_string("compatible", "riscv");
     writer.prop_string("riscv,isa", config.isa);
+    writer.prop_string("riscv,isa-base", "rv64i");
+    writer.prop_string_list("riscv,isa-extensions",
+                            {"i", "m", "a", "f", "d", "c", "v", "zicsr", "zifencei"});
     writer.prop_string("mmu-type", "riscv,sv39");
     writer.begin_node("interrupt-controller");
     writer.prop_empty("interrupt-controller");
@@ -213,6 +231,15 @@ FdtBuildResult build_machine_fdt(const FdtConfig& config) {
     writer.prop_u32("phandle", kCpuIntcPhandle);
     writer.end_node();
     writer.end_node();
+
+    writer.begin_node("cpu-map");
+    writer.begin_node("cluster0");
+    writer.begin_node("core0");
+    writer.prop_u32("cpu", kCpuPhandle);
+    writer.end_node();
+    writer.end_node();
+    writer.end_node();
+
     writer.end_node();
 
     writer.begin_node("soc");
@@ -222,7 +249,7 @@ FdtBuildResult build_machine_fdt(const FdtConfig& config) {
     writer.prop_string("compatible", "simple-bus");
 
     writer.begin_node("clint@2000000");
-    writer.prop_string("compatible", "riscv,clint0");
+    writer.prop_string_list("compatible", {"sifive,clint0", "riscv,clint0"});
     writer.prop_u64_pair("reg",
                          bus::address_map::kClint.base,
                          bus::address_map::kClint.size);
@@ -230,8 +257,9 @@ FdtBuildResult build_machine_fdt(const FdtConfig& config) {
     writer.end_node();
 
     writer.begin_node("interrupt-controller@c000000");
-    writer.prop_string("compatible", "sifive,plic-1.0.0");
+    writer.prop_string_list("compatible", {"sifive,plic-1.0.0", "riscv,plic0"});
     writer.prop_empty("interrupt-controller");
+    writer.prop_u32("#address-cells", 0U);
     writer.prop_u32("#interrupt-cells", 1U);
     writer.prop_u64_pair("reg", bus::address_map::kPlic.base, bus::address_map::kPlic.size);
     writer.prop_u32("riscv,ndev", 31U);

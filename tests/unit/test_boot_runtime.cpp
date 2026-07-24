@@ -55,7 +55,7 @@ void write_file(const std::filesystem::path& path, const std::vector<std::uint8_
 void test_cli(int& failures) {
     const char* ok_args[] = {"rvemu",
                              "--bios",
-                             "artifacts/firmware/opensbi.bin",
+                             "artifacts/firmware/fw_jump.bin",
                              "--kernel",
                              "artifacts/kernel/Image",
                              "--disk",
@@ -92,8 +92,22 @@ void test_fdt(int& failures) {
     expect(blob_text.find("root=/dev/vda") != std::string::npos,
            "FDT chosen bootargs 必须指向 VirtIO-Blk root",
            failures);
+    expect(blob_text.find("rootwait") != std::string::npos,
+           "FDT chosen bootargs 必须等待 VirtIO-Blk root 出现",
+           failures);
     expect(blob_text.find("riscv,sv39") != std::string::npos,
            "FDT CPU 节点必须声明 Sv39",
+           failures);
+    expect(blob_text.find("riscv,isa-base") != std::string::npos
+               && blob_text.find("riscv,isa-extensions") != std::string::npos,
+           "FDT CPU 节点必须提供新版 RISC-V ISA 属性",
+           failures);
+    expect(blob_text.find("cpu-map") != std::string::npos,
+           "FDT 必须声明单 Hart CPU 拓扑",
+           failures);
+    expect(blob_text.find("sifive,clint0") != std::string::npos
+               && blob_text.find("riscv,plic0") != std::string::npos,
+           "FDT 中断控制器 compatible 必须兼容 OpenSBI/Linux virt 约定",
            failures);
     expect(blob_text.find("10002000") == std::string::npos,
            "macOS --net none 默认 FDT 不得暴露 VirtIO-Net 节点",

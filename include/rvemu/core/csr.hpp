@@ -5,6 +5,7 @@
 
 #include "rvemu/core/trap.hpp"
 
+#include <array>
 #include <cstdint>
 #include <optional>
 
@@ -44,13 +45,20 @@ enum class CsrAddress : std::uint16_t {
     Mie = 0x304U,
     Mtvec = 0x305U,
     Mcounteren = 0x306U,
+    Mcountinhibit = 0x320U,
     Mscratch = 0x340U,
     Mepc = 0x341U,
     Mcause = 0x342U,
     Mtval = 0x343U,
     Mip = 0x344U,
+    Mtinst = 0x34AU,
+    Mtval2 = 0x34BU,
+    Pmpcfg0 = 0x3A0U,
+    Pmpaddr0 = 0x3B0U,
     Mcycle = 0xB00U,
     Minstret = 0xB02U,
+    Mhpmcounter3 = 0xB03U,
+    Mhpmevent3 = 0x323U,
 
     Mvendorid = 0xF11U,
     Marchid = 0xF12U,
@@ -139,11 +147,15 @@ class CsrFile final {
     }
     // CPU 每完成一次解释器硬件步进调用一次；64 位无符号溢出按架构位模式自然回绕。
     void increment_cycle() noexcept {
-        ++cycle_;
+        if ((mcountinhibit_ & 0x1U) == 0U) {
+            ++cycle_;
+        }
     }
     // 只对真正退休的指令调用；异常或 WFI 停顿不得增加 instret。
     void increment_instret() noexcept {
-        ++instret_;
+        if ((mcountinhibit_ & 0x4U) == 0U) {
+            ++instret_;
+        }
     }
     // 判断 WFI 是否应被局部 enable+pending 唤醒；此判断刻意不考虑全局 xIE 与委托。
     [[nodiscard]] bool has_locally_enabled_interrupt() const noexcept;
@@ -208,6 +220,11 @@ class CsrFile final {
     std::uint64_t mtval_{0U};
     std::uint64_t mip_{0U};
     std::uint64_t mcounteren_{0U};
+    std::uint64_t mcountinhibit_{0U};
+    std::array<std::uint64_t, 8U> pmpcfg_{};
+    std::array<std::uint64_t, 64U> pmpaddr_{};
+    std::array<std::uint64_t, 29U> mhpmcounter_{};
+    std::array<std::uint64_t, 29U> mhpmevent_{};
 
     std::uint64_t stvec_{0U};
     std::uint64_t sscratch_{0U};

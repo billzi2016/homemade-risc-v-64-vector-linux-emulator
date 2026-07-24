@@ -34,7 +34,11 @@
   - 验证结果：CTest 运行真实 Bus/RAM/Boot ROM 生产组件，1/1 通过、0 失败。
   - 日志或报告：`build/Testing/Temporary/LastTest.log`
   - 已知限制：后续模块需要继续增加 integration、conformance 与 system 测试目标。
-- [ ] **BLD-005** 建立外部产物目录及精确 `.gitignore` 规则。
+- [x] **BLD-005** 建立外部产物目录及精确 `.gitignore` 规则。
+  - 实现文件：`.gitignore`、`run_all_logs.sh`
+  - 验证命令：`BOOT_SECONDS=35 ./run_all_logs.sh`；对 `artifacts/logs/*.log`、运行脚本和文档执行宿主绝对路径关键字扫描。
+  - 验证结果：`artifacts/firmware/fw_jump.bin`、`artifacts/kernel/Image`、`artifacts/disk/rootfs.ext4` 等外部产物仍由 `.gitignore` 排除；`artifacts/logs/*.log` 可作为审查证据保留；固定日志刷新未生成随机文件；绝对路径扫描无命中。
+  - 日志或报告：`artifacts/logs/build.log`、`artifacts/logs/ctest.log`、`artifacts/logs/linux-boot-uart.log`
   - 完成条件：大文件、镜像、日志和缓存不会被 Git 跟踪，源码及校验清单不被误排除。
 
 ## 4. 阶段 2：物理内存与总线
@@ -428,17 +432,32 @@ DHCP、DNS 或 ICMP 网络链路。以下任务保留为规格边界记录，全
     `EventLoop`、服务 VirtIO-Blk 并遵守测试迭代上限。
   - 完成条件：生产 `riscv_vector_emulator` 可用真实产物进入运行循环，且不打印任何伪来宾日志。
 - [ ] **RUN-005** 建立系统运行日志和失败诊断。
-  - [ ] **RUN-005A** 保存 OpenSBI/Linux/UART 原始日志到被忽略的 `artifacts/logs/`。
+  - [x] **RUN-005A** 保存 OpenSBI/Linux/UART 原始日志到可提交审查的 `artifacts/logs/`。
   - [ ] **RUN-005B** 失败诊断包含 PC、特权级、trap cause、设备名和宿主 I/O errno。
-  - [ ] **RUN-005C** 日志不包含宿主绝对工作区路径、隐私信息或伪造状态。
+  - [x] **RUN-005C** 日志不包含宿主绝对工作区路径、隐私信息或伪造状态。
+  - 证据：`run_all_logs.sh` 固定覆盖 `artifacts/logs/build.log`、`artifacts/logs/ctest.log`、
+    `artifacts/logs/linux-boot-uart.log`；`RUN_DEBUG_BOOT=1` 时固定覆盖
+    `artifacts/logs/linux-boot-uart-debug.log`；日志写入后会清理仓库绝对路径。
+  - 验证命令：`BOOT_SECONDS=35 ./run_all_logs.sh`；对 `artifacts/logs/*.log`、运行脚本和文档执行宿主绝对路径关键字扫描。
+  - 验证结果：构建日志生成成功；CTest 日志显示 `26/26` 通过；UART 日志保存真实 OpenSBI 输出；
+    绝对路径扫描无命中。
+  - 已知缺口：`RUN-005B` 仍未完整覆盖设备名和宿主 I/O errno；完整 Linux 到 Shell 成功日志仍待
+    `SYS-002..SYS-004` 完成，因此父项暂不勾选。
   - 完成条件：系统验收失败时有可审查证据，成功时有完整原始日志。
 
 ## 14. 阶段 12：真实系统验收
 
-- [ ] **SYS-001** 使用真实 OpenSBI 观察并保存 Banner 证据。
-  - [ ] **SYS-001A** 运行用户提供或已冻结 SHA-256 的 OpenSBI 二进制，不使用测试字符串或伪固件。
-  - [ ] **SYS-001B** 日志显示 OpenSBI 识别 hart、platform、ISA、timebase 和 next stage。
-  - [ ] **SYS-001C** 记录 OpenSBI 实际设置的委托、中断和计时器相关状态。
+- [x] **SYS-001** 使用真实 OpenSBI 观察并保存 Banner 证据。
+  - [x] **SYS-001A** 运行用户提供或已冻结 SHA-256 的 OpenSBI 二进制，不使用测试字符串或伪固件。
+  - [x] **SYS-001B** 日志显示 OpenSBI 识别 hart、platform、ISA、timebase 和 next stage。
+  - [x] **SYS-001C** 记录 OpenSBI 实际设置的委托、中断和计时器相关状态。
+  - 证据：`artifacts/logs/linux-boot-uart.log` 保存 `OpenSBI v1.6`、platform、hart、
+    `aclint-mtimer @ 10000000Hz`、`Domain0 Next Address=0x80200000`、
+    `Domain0 Next Arg1=0x82200000`、`Domain0 Next Mode=S-mode`、`MIDELEG=0x222` 和
+    `MEDELEG=0xb109`。
+  - 产物校验：`artifacts/firmware/fw_jump.bin` SHA-256 为
+    `09f48fb16f858a16e7cd507fbb3a0fa0c9b430c1d50f8dec2130598a7f42ddea`。
+  - 验证命令：`BOOT_SECONDS=35 ./run_all_logs.sh`。
   - 完成条件：原始 UART 日志中出现真实 OpenSBI 输出，且能追溯到对应二进制校验值。
 - [ ] **SYS-002** 使用真实 Linux 内核完成启动，无 Kernel Panic。
   - [ ] **SYS-002A** Linux 通过 FDT 识别 RAM、CPU ISA、Sv39、CLINT、PLIC 和 UART。

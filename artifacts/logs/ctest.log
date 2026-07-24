@@ -1,0 +1,58 @@
+[run_all_logs] command: ctest --test-dir build --output-on-failure
+Test project build
+      Start  1: rvemu.bus_memory
+ 1/26 Test  #1: rvemu.bus_memory ..................   Passed    0.00 sec
+      Start  2: rvemu.mmu
+ 2/26 Test  #2: rvemu.mmu .........................   Passed    1.11 sec
+      Start  3: rvemu.cpu_rv64i
+ 3/26 Test  #3: rvemu.cpu_rv64i ...................   Passed    0.01 sec
+      Start  4: rvemu.cpu_privilege
+ 4/26 Test  #4: rvemu.cpu_privilege ...............   Passed    0.01 sec
+      Start  5: rvemu.vector_state
+ 5/26 Test  #5: rvemu.vector_state ................   Passed    0.00 sec
+      Start  6: rvemu.cpu_vector_configuration
+ 6/26 Test  #6: rvemu.cpu_vector_configuration ....   Passed    0.00 sec
+      Start  7: rvemu.vector_register_group
+ 7/26 Test  #7: rvemu.vector_register_group .......   Passed    0.00 sec
+      Start  8: rvemu.cpu_vector_memory
+ 8/26 Test  #8: rvemu.cpu_vector_memory ...........   Passed    0.00 sec
+      Start  9: rvemu.cpu_vector_integer
+ 9/26 Test  #9: rvemu.cpu_vector_integer ..........   Passed    0.00 sec
+      Start 10: rvemu.cpu_vector_floating
+10/26 Test #10: rvemu.cpu_vector_floating .........   Passed    0.00 sec
+      Start 11: rvemu.cpu_vector_rvv_boundaries
+11/26 Test #11: rvemu.cpu_vector_rvv_boundaries ...   Passed    0.00 sec
+      Start 12: rvemu.clint
+12/26 Test #12: rvemu.clint .......................   Passed    0.00 sec
+      Start 13: rvemu.plic
+13/26 Test #13: rvemu.plic ........................   Passed    0.00 sec
+      Start 14: rvemu.uart16550
+14/26 Test #14: rvemu.uart16550 ...................   Passed    0.00 sec
+      Start 15: rvemu.virtio_common
+15/26 Test #15: rvemu.virtio_common ...............   Passed    0.01 sec
+      Start 16: rvemu.virtio_block
+16/26 Test #16: rvemu.virtio_block ................   Passed    0.00 sec
+      Start 17: rvemu.terminal
+17/26 Test #17: rvemu.terminal ....................   Passed    0.00 sec
+      Start 18: rvemu.event_loop
+18/26 Test #18: rvemu.event_loop ..................   Passed    0.00 sec
+      Start 19: rvemu.boot_runtime
+19/26 Test #19: rvemu.boot_runtime ................   Passed    0.15 sec
+      Start 20: rvemu.cpu_m
+20/26 Test #20: rvemu.cpu_m .......................   Passed    0.00 sec
+      Start 21: rvemu.cpu_a
+21/26 Test #21: rvemu.cpu_a .......................   Passed    0.00 sec
+      Start 22: rvemu.floating_state
+22/26 Test #22: rvemu.floating_state ..............   Passed    0.00 sec
+      Start 23: rvemu.soft_float
+23/26 Test #23: rvemu.soft_float ..................   Passed    0.00 sec
+      Start 24: rvemu.cpu_floating
+24/26 Test #24: rvemu.cpu_floating ................   Passed    0.00 sec
+      Start 25: rvemu.cpu_compressed
+25/26 Test #25: rvemu.cpu_compressed ..............   Passed    0.00 sec
+      Start 26: rvemu.elf_loader
+26/26 Test #26: rvemu.elf_loader ..................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 26
+
+Total Test time (real) =   1.35 sec

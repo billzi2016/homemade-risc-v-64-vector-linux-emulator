@@ -1,5 +1,10 @@
-# 外部下载、固件、内核、根文件系统、磁盘镜像与运行日志
-/artifacts/
+# 外部下载、固件、内核、根文件系统与磁盘镜像
+/artifacts/*
+!/artifacts/logs/
+/artifacts/logs/*
+!/artifacts/logs/*.log
+!/artifacts/logs/*.dtb
+!/artifacts/logs/*.dts
 
 # CMake 与其他本地构建目录
 /build/
@@ -50,6 +55,9 @@
 *.gcno
 /core
 /core.*
+!/artifacts/logs/*.log
+!/artifacts/logs/*.dtb
+!/artifacts/logs/*.dts
 
 # 编辑器和操作系统临时文件
 .DS_Store

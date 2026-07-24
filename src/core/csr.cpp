@@ -29,6 +29,10 @@ constexpr std::uint64_t kMachineInterruptMask = bit(3U) | bit(7U) | bit(11U);
 constexpr std::uint64_t kImplementedInterruptMask =
     kSupervisorInterruptMask | kMachineInterruptMask;
 constexpr std::uint64_t kSoftwareWritablePendingMask = bit(1U);
+constexpr std::uint64_t kImplementedCounterenMask = bit(0U) | bit(1U) | bit(2U);
+constexpr std::uint64_t kImplementedHpmCounterMask = 0xFFFF'FFF8ULL;
+constexpr std::uint64_t kImplementedMcountinhibitMask =
+    bit(0U) | bit(2U) | kImplementedHpmCounterMask;
 
 constexpr std::uint64_t kDelegatableExceptionMask = bit(0U) | bit(1U) | bit(2U) | bit(3U) | bit(4U)
                                                     | bit(5U) | bit(6U) | bit(7U) | bit(8U)
@@ -42,6 +46,7 @@ constexpr std::uint64_t kMisa =
     | bit(static_cast<std::uint8_t>('U' - 'A'));
 constexpr std::uint64_t kSatpModeMask = 0xFULL << 60U;
 constexpr std::uint64_t kSatpSv39Mode = 8ULL << 60U;
+constexpr std::uint64_t kEpcAlignmentMask = ~0x1ULL;
 constexpr std::uint64_t kVectorVtypeVill = bit(63U);
 constexpr std::uint64_t kVectorRegisterBytes = 32U;
 
@@ -56,6 +61,48 @@ constexpr std::uint64_t kVectorRegisterBytes = 32U;
            || address == CsrAddress::Vxrm || address == CsrAddress::Vcsr
            || address == CsrAddress::Vl || address == CsrAddress::Vtype
            || address == CsrAddress::Vlenb;
+}
+
+[[nodiscard]] constexpr std::uint16_t csr_raw(CsrAddress address) noexcept {
+    return static_cast<std::uint16_t>(address);
+}
+
+// RV64 只暴露偶数 pmpcfg CSR；每个 XLEN 槽保存 8 个 PMP 配置字节。
+[[nodiscard]] constexpr bool is_rv64_pmpcfg(CsrAddress address) noexcept {
+    const auto raw = csr_raw(address);
+    return raw >= csr_raw(CsrAddress::Pmpcfg0) && raw <= 0x3AEU
+           && ((raw - csr_raw(CsrAddress::Pmpcfg0)) % 2U) == 0U;
+}
+
+[[nodiscard]] constexpr std::size_t pmpcfg_index(CsrAddress address) noexcept {
+    return (csr_raw(address) - csr_raw(CsrAddress::Pmpcfg0)) / 2U;
+}
+
+[[nodiscard]] constexpr bool is_pmpaddr(CsrAddress address) noexcept {
+    const auto raw = csr_raw(address);
+    return raw >= csr_raw(CsrAddress::Pmpaddr0) && raw <= 0x3EFU;
+}
+
+[[nodiscard]] constexpr std::size_t pmpaddr_index(CsrAddress address) noexcept {
+    return csr_raw(address) - csr_raw(CsrAddress::Pmpaddr0);
+}
+
+[[nodiscard]] constexpr bool is_mhpmcounter(CsrAddress address) noexcept {
+    const auto raw = csr_raw(address);
+    return raw >= csr_raw(CsrAddress::Mhpmcounter3) && raw <= 0xB1FU;
+}
+
+[[nodiscard]] constexpr std::size_t mhpmcounter_index(CsrAddress address) noexcept {
+    return csr_raw(address) - csr_raw(CsrAddress::Mhpmcounter3);
+}
+
+[[nodiscard]] constexpr bool is_mhpmevent(CsrAddress address) noexcept {
+    const auto raw = csr_raw(address);
+    return raw >= csr_raw(CsrAddress::Mhpmevent3) && raw <= 0x33FU;
+}
+
+[[nodiscard]] constexpr std::size_t mhpmevent_index(CsrAddress address) noexcept {
+    return csr_raw(address) - csr_raw(CsrAddress::Mhpmevent3);
 }
 
 // PrivilegeMode 编码与架构等级一致，但比较集中在此处，避免调用点散落强制转换。
@@ -94,6 +141,11 @@ void CsrFile::reset() noexcept {
     mtval_ = 0U;
     mip_ = 0U;
     mcounteren_ = 0U;
+    mcountinhibit_ = 0U;
+    pmpcfg_.fill(0U);
+    pmpaddr_.fill(0U);
+    mhpmcounter_.fill(0U);
+    mhpmevent_.fill(0U);
     stvec_ = 0U;
     sscratch_ = 0U;
     sepc_ = 0U;
@@ -108,6 +160,11 @@ void CsrFile::reset() noexcept {
 
 // 地址存在性使用穷举列表，而非为 4096 个 CSR 分配通用数组，避免保留地址被误实现。
 bool CsrFile::exists(CsrAddress address) const noexcept {
+    if (is_rv64_pmpcfg(address) || is_pmpaddr(address) || is_mhpmcounter(address)
+        || is_mhpmevent(address)) {
+        return true;
+    }
+
     switch (address) {
         case CsrAddress::Fflags:
         case CsrAddress::Frm:
@@ -139,13 +196,20 @@ bool CsrFile::exists(CsrAddress address) const noexcept {
         case CsrAddress::Mie:
         case CsrAddress::Mtvec:
         case CsrAddress::Mcounteren:
+        case CsrAddress::Mcountinhibit:
         case CsrAddress::Mscratch:
         case CsrAddress::Mepc:
         case CsrAddress::Mcause:
         case CsrAddress::Mtval:
         case CsrAddress::Mip:
+        case CsrAddress::Mtinst:
+        case CsrAddress::Mtval2:
+        case CsrAddress::Pmpcfg0:
+        case CsrAddress::Pmpaddr0:
         case CsrAddress::Mcycle:
         case CsrAddress::Minstret:
+        case CsrAddress::Mhpmcounter3:
+        case CsrAddress::Mhpmevent3:
         case CsrAddress::Mvendorid:
         case CsrAddress::Marchid:
         case CsrAddress::Mimpid:
@@ -311,6 +375,19 @@ void CsrFile::commit_vector_configuration(std::uint64_t vtype, std::uint64_t vl)
 
 // Supervisor CSR 在此处直接从 Machine 底层字段投影，保证别名永远不可能分叉。
 std::uint64_t CsrFile::read_value(CsrAddress address) const noexcept {
+    if (is_rv64_pmpcfg(address)) {
+        return pmpcfg_[pmpcfg_index(address)];
+    }
+    if (is_pmpaddr(address)) {
+        return pmpaddr_[pmpaddr_index(address)];
+    }
+    if (is_mhpmcounter(address)) {
+        return mhpmcounter_[mhpmcounter_index(address)];
+    }
+    if (is_mhpmevent(address)) {
+        return mhpmevent_[mhpmevent_index(address)];
+    }
+
     switch (address) {
         case CsrAddress::Fflags:
             return floating_exception_flags();
@@ -381,6 +458,8 @@ std::uint64_t CsrFile::read_value(CsrAddress address) const noexcept {
             return mtvec_;
         case CsrAddress::Mcounteren:
             return mcounteren_;
+        case CsrAddress::Mcountinhibit:
+            return mcountinhibit_;
         case CsrAddress::Mscratch:
             return mscratch_;
         case CsrAddress::Mepc:
@@ -391,6 +470,13 @@ std::uint64_t CsrFile::read_value(CsrAddress address) const noexcept {
             return mtval_;
         case CsrAddress::Mip:
             return mip_;
+        case CsrAddress::Mtinst:
+        case CsrAddress::Mtval2:
+        case CsrAddress::Pmpcfg0:
+        case CsrAddress::Pmpaddr0:
+        case CsrAddress::Mhpmcounter3:
+        case CsrAddress::Mhpmevent3:
+            return 0U;
         case CsrAddress::Mvendorid:
         case CsrAddress::Marchid:
         case CsrAddress::Mimpid:
@@ -402,6 +488,23 @@ std::uint64_t CsrFile::read_value(CsrAddress address) const noexcept {
 
 // 每个 case 只更新自身可写域；只读、WPRI 和未委托位在进入这里前后都不会形成隐藏状态。
 void CsrFile::write_value(CsrAddress address, std::uint64_t value) noexcept {
+    if (is_rv64_pmpcfg(address)) {
+        pmpcfg_[pmpcfg_index(address)] = value;
+        return;
+    }
+    if (is_pmpaddr(address)) {
+        pmpaddr_[pmpaddr_index(address)] = value;
+        return;
+    }
+    if (is_mhpmcounter(address)) {
+        mhpmcounter_[mhpmcounter_index(address)] = value;
+        return;
+    }
+    if (is_mhpmevent(address)) {
+        mhpmevent_[mhpmevent_index(address)] = value;
+        return;
+    }
+
     switch (address) {
         case CsrAddress::Fflags:
             fcsr_ = static_cast<std::uint8_t>((fcsr_ & 0xE0U) | (value & kFloatingExceptionMask));
@@ -453,7 +556,7 @@ void CsrFile::write_value(CsrAddress address, std::uint64_t value) noexcept {
             sscratch_ = value;
             break;
         case CsrAddress::Sepc:
-            sepc_ = value & ~0x3ULL;
+            sepc_ = value & kEpcAlignmentMask;
             break;
         case CsrAddress::Scause:
             scause_ = value;
@@ -503,13 +606,16 @@ void CsrFile::write_value(CsrAddress address, std::uint64_t value) noexcept {
             break;
         }
         case CsrAddress::Mcounteren:
-            mcounteren_ = value & 0x7U;
+            mcounteren_ = value & (kImplementedCounterenMask | kImplementedHpmCounterMask);
+            break;
+        case CsrAddress::Mcountinhibit:
+            mcountinhibit_ = value & kImplementedMcountinhibitMask;
             break;
         case CsrAddress::Mscratch:
             mscratch_ = value;
             break;
         case CsrAddress::Mepc:
-            mepc_ = value & ~0x3ULL;
+            mepc_ = value & kEpcAlignmentMask;
             break;
         case CsrAddress::Mcause:
             mcause_ = value;
@@ -530,6 +636,12 @@ void CsrFile::write_value(CsrAddress address, std::uint64_t value) noexcept {
         case CsrAddress::Time:
         case CsrAddress::Instret:
         case CsrAddress::Misa:
+        case CsrAddress::Mtinst:
+        case CsrAddress::Mtval2:
+        case CsrAddress::Pmpcfg0:
+        case CsrAddress::Pmpaddr0:
+        case CsrAddress::Mhpmcounter3:
+        case CsrAddress::Mhpmevent3:
         case CsrAddress::Mvendorid:
         case CsrAddress::Marchid:
         case CsrAddress::Mimpid:
@@ -605,7 +717,7 @@ void CsrFile::enter_machine_trap(PrivilegeMode previous_privilege,
     mstatus_ &= ~bit(3U);
     mstatus_ =
         (mstatus_ & ~(0x3ULL << 11U)) | (static_cast<std::uint64_t>(previous_privilege) << 11U);
-    mepc_ = program_counter & ~0x3ULL;
+    mepc_ = program_counter & kEpcAlignmentMask;
     mcause_ = cause;
     mtval_ = trap_value;
 }
@@ -623,7 +735,7 @@ void CsrFile::enter_supervisor_trap(PrivilegeMode previous_privilege,
     } else {
         mstatus_ |= bit(8U);
     }
-    sepc_ = program_counter & ~0x3ULL;
+    sepc_ = program_counter & kEpcAlignmentMask;
     scause_ = cause;
     stval_ = trap_value;
 }
