@@ -128,6 +128,7 @@ plugins:
                 - specs/13-cli-runtime.md
                 - specs/14-host-network-setup.md
                 - docs/linux-runbook.md
+                - docs/linux-boot-flow-analysis.md
             - Quality and Testing:
                 - specs/16-testing-verification.md
                 - specs/17-coding-standards.md
