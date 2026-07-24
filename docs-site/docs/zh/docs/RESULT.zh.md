@@ -1,0 +1,1 @@
+../../../../docs/RESULT.zh.md

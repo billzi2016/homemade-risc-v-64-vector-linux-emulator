@@ -1,0 +1,77 @@
+name: Docs Pages
+
+on:
+  pull_request:
+    paths:
+      - README.md
+      - AGENTS.md
+      - LINUX_BOOT_FLOW.md
+      - docs/**
+      - specs/**
+      - docs-site/**
+      - .github/workflows/docs-pages.yml
+  push:
+    branches:
+      - main
+    paths:
+      - README.md
+      - AGENTS.md
+      - LINUX_BOOT_FLOW.md
+      - docs/**
+      - specs/**
+      - docs-site/**
+      - .github/workflows/docs-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: docs-site/requirements.lock
+
+      - name: Install dependencies
+        run: python -m pip install -r docs-site/requirements.lock
+
+      - name: Check docs links and language entries
+        run: python docs-site/scripts/check_docs.py
+
+      - name: Build MkDocs site
+        run: mkdocs build --strict --config-file docs-site/mkdocs.yml
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-site/site
+
+  deploy:
+    name: Deploy docs
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

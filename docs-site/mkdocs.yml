@@ -1,0 +1,103 @@
+site_name: RISC-V 64 Vector Linux Emulator
+site_description: RV64GCV full-system emulator specifications and run evidence.
+site_url: https://billzi2016.github.io/homemade-risc-v-64-vector-linux-emulator/
+repo_url: https://github.com/billzi2016/homemade-risc-v-64-vector-linux-emulator
+repo_name: billzi2016/homemade-risc-v-64-vector-linux-emulator
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+    - search.share
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: folder
+      languages:
+        - locale: zh
+          name: 简体中文
+          default: true
+          build: true
+          site_name: RISC-V 64 Vector Linux Emulator
+          nav_translations:
+            Home: 首页
+            Governance: 项目治理
+            Architecture: 总体架构
+            CPU and ISA: CPU 与 ISA
+            Vector Engine: 向量引擎
+            Memory System: 内存系统
+            Devices: 外设
+            System Integration: 系统集成
+            Quality: 质量保证
+            Docs Site: 文档站
+        - locale: en
+          name: English
+          build: true
+          site_name: RISC-V 64 Vector Linux Emulator
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home:
+      - project/README.md
+      - project/LINUX_BOOT_FLOW.md
+      - docs/RESULT.md
+      - docs/quickstart.md
+  - Governance:
+      - project/AGENTS.md
+      - specs/constitution.md
+      - specs/standards-baseline.md
+      - specs/project-tree.md
+      - specs/tasks.md
+  - Architecture:
+      - specs/00-product-overview.md
+      - specs/01-architecture.md
+      - specs/19-implementation-roadmap.md
+  - CPU and ISA:
+      - specs/02-cpu-privilege-csr.md
+      - specs/03-instruction-set.md
+      - specs/15-error-trap-handling.md
+  - Vector Engine:
+      - specs/04-vector-extension-rvv.md
+  - Memory System:
+      - specs/05-memory-mmu-sv39.md
+      - specs/06-bus-mmio.md
+  - Devices:
+      - specs/07-interrupt-clint-plic.md
+      - specs/08-uart-console.md
+      - specs/09-virtio-common.md
+      - specs/10-virtio-block.md
+      - specs/11-virtio-network.md
+  - System Integration:
+      - specs/12-boot-firmware-linux.md
+      - specs/13-cli-runtime.md
+      - specs/14-host-network-setup.md
+      - docs/linux-runbook.md
+  - Quality:
+      - specs/16-testing-verification.md
+      - specs/17-coding-standards.md
+      - specs/18-dependency-artifact-policy.md
+      - docs/third-party.md
+  - Docs Site:
+      - docs-site/mkdocs_prd.md
+      - docs-site/github_action_prd.md

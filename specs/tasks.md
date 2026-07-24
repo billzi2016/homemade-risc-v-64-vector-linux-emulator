@@ -490,15 +490,37 @@ DHCP、DNS 或 ICMP 网络链路。以下任务保留为规格边界记录，全
 
 ## 15. 文档站与 GitHub Pages
 
-- [ ] **DOCS-001** 审阅并确认项目化 MkDocs 与 GitHub Actions PRD。
+- [x] **DOCS-001** 审阅并确认项目化 MkDocs 与 GitHub Actions PRD。
   - 规格文件：`docs-site/specs/mkdocs_prd.zh.md`、`docs-site/specs/github_action_prd.zh.md`
-- [ ] **DOCS-002** 锁定 MkDocs、Material、i18n 插件和 Python 依赖版本。
-- [ ] **DOCS-003** 建立 `docs-site/docs/zh/` 中文 `.zh.md` 相对 symlink 文档树。
-- [ ] **DOCS-004** 建立 `docs-site/docs/en/` 真实英文 `.en.md` 文档树，不使用空翻译或中文替代。
-- [ ] **DOCS-005** 实现与模拟器规格对应的左侧分层导航。
+- [x] **DOCS-002** 锁定 MkDocs、Material、i18n 插件和 Python 依赖版本。
+  - 证据：`docs-site/requirements.lock`
+- [x] **DOCS-003** 建立 `docs-site/docs/zh/` 与 `docs-site/docs/en/` 双语入口树。
+  - [x] **DOCS-003A** 枚举需要进入文档站的根目录、`docs/` 和 `specs/` Markdown 清单，形成稳定 symlink 映射表。
+  - [x] **DOCS-003B** `zh/` 使用 `.zh.md`，`en/` 使用无语言后缀的普通 `.md`，且不移动、重命名或改写现有权威 Markdown。
+  - [x] **DOCS-003C** 双语入口均使用相对 symlink 指向仓库内最终语言源路径；目标可由后续 Gemini 原地翻译补齐，当前不要求全部存在。
+  - 证据：`docs-site/docs/zh/`、`docs-site/docs/en/`
+- [ ] **DOCS-004** 由 Gemini 对 `docs-site/docs/en/` 的无语言后缀 `.md` 入口目标完成真实英文原地翻译。
+  - [ ] **DOCS-004A** 为每个中文 `.zh.md` 入口保留对应英文 `.md` 翻译入口。
+  - [ ] **DOCS-004B** 英文入口当前只作为 Gemini 翻译目标映射，不得把未审查英文内容当作英文完成证据。
+  - [ ] **DOCS-004C** Gemini 完成后逐文件审查：标题、术语、命令、路径、规格编号、任务状态和警告语必须与中文权威文档语义一致。
+  - [ ] **DOCS-004D** 英文文档通过人工或自动检查前，`DOCS-004`、`DOCS-006`、`DOCS-009` 和 `DOCS-010` 均不得打勾。
+  - 完成条件：所有英文 `.md` 均为真实英文翻译，不能是空文件、中文复制、机器占位或未审查草稿。
+- [x] **DOCS-005** 实现与模拟器规格对应的左侧分层导航。
+  - [x] **DOCS-005A** 导航覆盖首页、治理、架构、CPU/ISA/RVV/MMU/总线/设备/VirtIO/引导/测试/任务。
+  - [x] **DOCS-005B** `zh/` 与 `en/` 入口保持同构路径，后续 Gemini 原地翻译不需要重做导航结构。
+  - 证据：`docs-site/mkdocs.yml`
 - [ ] **DOCS-006** 实现顶部简体中文/English 切换并验证对应页面映射。
-- [ ] **DOCS-007** 实现失效、绝对、循环和仓库越界 symlink 严格检查。
-- [ ] **DOCS-008** 实现 `.github/workflows/docs-pages.yml` 的 PR 验证与 `main` Pages 部署。
+  - [ ] **DOCS-006A** 语言切换必须在对应主题之间跳转，不得跳到错误页面或空白占位。
+  - [ ] **DOCS-006B** 缺失英文翻译时必须保持任务未完成，并在构建检查中暴露缺口。
+- [x] **DOCS-007** 实现失效、绝对、循环和仓库越界 symlink 严格检查。
+  - [x] **DOCS-007A** 检查所有文档站入口只使用相对路径，不允许链接到仓库外或宿主绝对路径。
+  - [x] **DOCS-007B** 检查 `zh/*.zh.md`、`en/*.md` 命名、语言目录和中英文成对入口。
+  - 证据：`docs-site/scripts/check_docs.py`
+- [x] **DOCS-008** 实现 `.github/workflows/docs-pages.yml` 的 PR 验证与 `main` Pages 部署。
+  - [x] **DOCS-008A** Workflow 只构建文档站，不运行模拟器、不下载 OpenSBI/Linux/rootfs、不修改网络。
+  - [x] **DOCS-008B** PR 阶段执行依赖安装、symlink 检查、命名检查、MkDocs strict build。
+  - [x] **DOCS-008C** `main` 分支部署 GitHub Pages，权限最小化为 `contents: read`、`pages: write`、`id-token: write`。
+  - 证据：`.github/workflows/docs-pages.yml`
 - [ ] **DOCS-009** 使用锁定依赖执行本地严格构建并验证桌面/移动导航与链接。
 - [ ] **DOCS-010** 在 GitHub Actions 中真实部署 Pages，并核对公开 URL、语言切换和全部导航。
 

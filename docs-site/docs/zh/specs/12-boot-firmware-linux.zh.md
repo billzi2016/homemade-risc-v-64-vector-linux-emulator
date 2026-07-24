@@ -1,0 +1,1 @@
+../../../../specs/12-boot-firmware-linux.zh.md

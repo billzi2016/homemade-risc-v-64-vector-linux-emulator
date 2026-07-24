@@ -10,6 +10,8 @@
 /build/
 /out/
 /cmake-build-*/
+/docs-site/site/
+/docs-site/.venv/
 /CMakeFiles/
 /CMakeCache.txt
 /cmake_install.cmake

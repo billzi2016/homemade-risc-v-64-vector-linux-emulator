@@ -226,7 +226,7 @@
 - 支持手动触发
 - 优先兼容 GitHub Pages
 - 使用 `docs-site/` 的锁定依赖和严格构建入口
-- 验证 `.zh.md/.en.md` 与相对 symlink
+- 验证 `zh/`、`en/` 目录下的 `.zh.md/.en.md` 与相对 symlink
 - 使用最小 Pages 权限，PR 不部署
 - 使用清晰、稳定、可维护的工作流结构
 - 尽量减少项目特化逻辑
