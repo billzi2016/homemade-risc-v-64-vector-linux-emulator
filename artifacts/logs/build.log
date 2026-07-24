@@ -1,35 +1,35 @@
 [run_all_logs] command: cmake --build build -j8
 [  3%] Built target rvemu_platform
 [  8%] Built target rvemu_bus_memory
-[ 10%] Built target rvemu_terminal_tests
-[ 12%] Built target rvemu_conformance
+[ 14%] Built target rvemu_terminal_tests
 [ 14%] Built target rvemu_bus_memory_tests
+[ 14%] Built target rvemu_conformance
 [ 33%] Built target rvemu_core
 [ 35%] Built target rvemu_elf_loader_tests
-[ 37%] Built target rvemu_conformance_runner
-[ 42%] Built target rvemu_cpu_rv64i_tests
-[ 45%] Built target rvemu_cpu_vector_configuration_tests
-[ 49%] Built target rvemu_mmu_tests
-[ 49%] Built target rvemu_vector_state_tests
-[ 49%] Built target rvemu_cpu_privilege_tests
-[ 49%] Built target rvemu_vector_register_group_tests
+[ 37%] Built target rvemu_cpu_privilege_tests
+[ 41%] Built target rvemu_vector_state_tests
+[ 44%] Built target rvemu_cpu_rv64i_tests
+[ 44%] Built target rvemu_cpu_vector_configuration_tests
+[ 46%] Built target rvemu_mmu_tests
+[ 47%] Built target rvemu_conformance_runner
+[ 54%] Built target rvemu_vector_register_group_tests
 [ 56%] Built target rvemu_devices
 [ 58%] Built target rvemu_cpu_vector_memory_tests
 [ 60%] Built target rvemu_cpu_vector_floating_tests
 [ 62%] Built target rvemu_cpu_vector_integer_tests
-[ 64%] Built target rvemu_cpu_vector_rvv_boundaries_tests
+[ 66%] Built target rvemu_cpu_vector_rvv_boundaries_tests
+[ 66%] Built target rvemu_cpu_a_tests
+[ 68%] Built target rvemu_cpu_m_tests
 [ 72%] Built target rvemu_floating_state_tests
 [ 72%] Built target rvemu_soft_float_tests
-[ 72%] Built target rvemu_cpu_a_tests
-[ 72%] Built target rvemu_cpu_m_tests
-[ 76%] Built target rvemu_cpu_compressed_tests
 [ 76%] Built target rvemu_cpu_floating_tests
-[ 78%] Built target rvemu_plic_tests
-[ 82%] Built target rvemu_virtio_block_tests
-[ 83%] Built target rvemu_uart16550_tests
-[ 86%] Built target rvemu_virtio_common_tests
-[ 86%] Built target rvemu_clint_tests
+[ 76%] Built target rvemu_cpu_compressed_tests
+[ 78%] Built target rvemu_clint_tests
+[ 81%] Built target rvemu_uart16550_tests
+[ 82%] Built target rvemu_plic_tests
+[ 85%] Built target rvemu_virtio_common_tests
+[ 86%] Built target rvemu_virtio_block_tests
 [ 94%] Built target rvemu_runtime
-[ 98%] Built target riscv_vector_emulator
-[100%] Built target rvemu_boot_runtime_tests
-[100%] Built target rvemu_event_loop_tests
+[ 96%] Built target rvemu_event_loop_tests
+[ 99%] Built target rvemu_boot_runtime_tests
+[100%] Built target riscv_vector_emulator

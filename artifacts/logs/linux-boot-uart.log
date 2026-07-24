@@ -61,6 +61,25 @@ Boot HART MHPM Info         : 29 (0xfffffff8)
 Boot HART Debug Triggers    : 0 triggers
 Boot HART MIDELEG           : 0x0000000000000222
 Boot HART MEDELEG           : 0x000000000000b109
-
-[run_all_logs] BOOT_SECONDS=35
-[run_all_logs] exit_status=130
+[    0.000000] Booting Linux on hartid 0
+[    0.000000] Linux version 6.18.7 (root@7f5452be63ab) (riscv64-buildroot-linux-gnu-gcc.br_real (Buildroot 2026.05.1) 14.4.0, GNU ld (GNU Binutils) 2.45.1) #1 SMP Thu Jul 23 05:30:55 UTC 2026
+[    0.000000] Machine model: rvemu,riscv64-gcv-single-hart
+[    0.000000] SBI specification v2.0 detected
+[    0.000000] SBI implementation ID=0x1 Version=0x10006
+[    0.000000] SBI TIME extension detected
+[    0.000000] SBI IPI extension detected
+[    0.000000] SBI RFENCE extension detected
+[    0.000000] SBI DBCN extension detected
+[    0.000000] efi: UEFI not found.
+[    0.000000] earlycon: ns16550a0 at MMIO 0x0000000010000000 (options '115200n8')
+[    0.000000] printk: legacy bootconsole [ns16550a0] enabled
+[    0.000000] OF: reserved mem: 0x0000000080000000..0x000000008003ffff (256 KiB) nomap non-reusable mmode_resv1@80000000
+[    0.000000] OF: reserved mem: 0x0000000080040000..0x000000008005ffff (128 KiB) nomap non-reusable mmode_resv0@80040000
+[    0.000000] Zone ranges:
+[    0.000000]   DMA32    [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000080000000-0x000000008005ffff]
+[    0.000000]   node   0: [mem 0x0000000080060000-0x00000000bfffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000080000000-0x00000000bfffffff]
