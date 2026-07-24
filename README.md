@@ -53,6 +53,23 @@ flowchart TB
 
 CPU instruction fetches, normal data accesses, page table walks, and DMA all pass through the unified physical bus. RAM and MMIO devices share the same address routing and error model to avoid creating secondary access paths that bypass permissions, boundary checks, or device semantics.
 
+### System Architecture & Emulator C++ Source Code Mapping
+
+| Booting Phase & Mechanism | MMIO / CSR Address | Emulator C++ Source File | Key Logic & Class Responsibility |
+| --- | --- | --- | --- |
+| **Boot ROM Reset** | `0x00001000` | `src/memory/boot_rom.cpp` | `BootRom`: Read-only init code loading, write-protection & sealing |
+| **OpenSBI Firmware Loading** | `0x80000000` (RAM) | `src/runtime/boot.cpp` | `load_boot_images()`: Safe binary loading, initializes `PC=0x80000000` |
+| **FDT Placement** | `0x82200000` (RAM) | `src/runtime/fdt.cpp` | `FdtBuilder`: Generates DTB nodes, passes DTB base address in `a1` |
+| **Sv39 MMU Page Walk** | `satp` CSR | `src/memory/mmu.cpp` | `Mmu`: 3-level page table walk, TLB flushing, atomic A/D bit updates |
+| **RVV 1.0 Vector Engine** | `vtype`, `vl` CSRs | `src/vector/vector_state.cpp` | `VectorState`: 32x256-bit vector register state & `mstatus.VS` maintenance |
+| **CLINT Timer Interrupt** | `0x02000000` | `src/devices/clint.cpp` | `Clint`: `mtime` vs `mtimecmp` comparison, drives MTIP timer interrupts |
+| **PLIC Interrupt Controller** | `0x0C000000` | `src/devices/plic.cpp` | `Plic`: 31 external interrupt priority arbitration & Claim/Complete |
+| **UART 16550A Serial** | `0x10000000` | `src/devices/uart16550.cpp` | `Uart16550`: 8-bit MMIO registers, RBR/THR FIFOs & terminal bridge |
+| **VirtIO-Blk Device** | `0x10001000` | `src/devices/virtio_block.cpp` | `VirtioBlock`: 512-byte sector DMA I/O & Virtqueue descriptor chain parsing |
+| **VirtIO-Net NIC** | `0x10002000` | `src/devices/virtio_mmio.cpp` | `VirtioMmio`: VirtIO 1.0 state machine, RX/TX queues & TAP forwarding |
+| **Host Terminal Raw Mode** | Host PTY | `src/platform/terminal.cpp` | `TerminalBackend`: Host `termios` raw mode toggling & `O_NONBLOCK` I/O |
+| **Single-Hart Event Loop** | Cpu & Devices | `src/runtime/event_loop.cpp` | `EventLoop`: Instruction step, interrupt checks, & device ticks |
+
 ## Emulated Hardware
 
 | Component | Physical Address Range | Primary Responsibility |
@@ -182,7 +199,8 @@ Specification entry point is at `specs/README.md`, agent rules at `AGENTS.md`, a
 
 Other key entries:
 
-- [LINUX_BOOT_FLOW.md](LINUX_BOOT_FLOW.md): OpenSBI, Linux, VirtIO-Blk, ext4 rootfs, and Shell boot flow evidence.
+- [LINUX_BOOT_FLOW.md](LINUX_BOOT_FLOW.md): Verified boot flow evidence for OpenSBI, Linux, VirtIO-Blk, ext4 rootfs, and interactive shell.
+- [linux-boot-flow-analysis.md](../docs/linux-boot-flow-analysis.md): Line-by-line technical analysis of Linux boot flow and console logs.
 - [RESULT.md](../docs/RESULT.md): Build artifacts, SHA-256 hashes, file types, regression tests, and un-accepted status.
 - [linux-runbook.md](../docs/linux-runbook.md): Buildroot builds, artifact copies, regression verification, and macOS `--net none` runbook.
 - [third-party.md](../docs/third-party.md): Third-party tools, firmware, kernel, and rootfs purposes, official sources, and installation instructions.
