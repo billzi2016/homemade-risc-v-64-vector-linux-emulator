@@ -66,6 +66,9 @@ class VirtioMmioTransport final : public bus::AddressRegion {
     /** 为共享描述符解析器导出指定队列的不可变布局快照。 */
     [[nodiscard]] VirtqueueLayout queue_layout(std::uint16_t queue_index) const noexcept;
 
+    /** 返回 transport 配置代际；设备层用它隔离复位前后的队列运行态。 */
+    [[nodiscard]] std::uint64_t generation() const noexcept;
+
     [[nodiscard]] bus::AccessResult read(std::uint64_t offset,
                                          bus::AccessWidth width,
                                          bus::AccessType type) override;

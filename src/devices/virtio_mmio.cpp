@@ -52,8 +52,7 @@ constexpr std::uint64_t kFeatureIndirectDesc = 1ULL << 28U;
 constexpr std::uint64_t kFeatureEventIdx = 1ULL << 29U;
 
 [[nodiscard]] bus::AddressRange require_range(const VirtioMmioConfig& config) {
-    const auto range =
-        bus::AddressRange::create(bus::PhysicalAddress{config.base}, config.size);
+    const auto range = bus::AddressRange::create(bus::PhysicalAddress{config.base}, config.size);
     if (!range.has_value()) {
         throw std::logic_error("VirtIO MMIO 固定物理地址范围无效");
     }
@@ -64,12 +63,11 @@ constexpr std::uint64_t kFeatureEventIdx = 1ULL << 29U;
                                                std::uint64_t offset,
                                                bus::AccessWidth width,
                                                const char* detail) {
-    return bus::AccessResult::failure(
-        bus::BusError{bus::BusErrorCode::InvalidWidth,
-                      bus::PhysicalAddress{config.base + offset},
-                      bus::width_in_bytes(width),
-                      config.name,
-                      detail});
+    return bus::AccessResult::failure(bus::BusError{bus::BusErrorCode::InvalidWidth,
+                                                    bus::PhysicalAddress{config.base + offset},
+                                                    bus::width_in_bytes(width),
+                                                    config.name,
+                                                    detail});
 }
 
 [[nodiscard]] bool power_of_two(std::uint16_t value) noexcept {
@@ -145,6 +143,11 @@ VirtqueueLayout VirtioMmioTransport::queue_layout(std::uint16_t queue_index) con
                            queue.ready,
                            (accepted_features & kFeatureIndirectDesc) != 0U,
                            (accepted_features & kFeatureEventIdx) != 0U};
+}
+
+std::uint64_t VirtioMmioTransport::generation() const noexcept {
+    std::lock_guard<std::mutex> lock{mutex_};
+    return generation_;
 }
 
 bus::AccessResult VirtioMmioTransport::validate_register_access(std::uint64_t offset,

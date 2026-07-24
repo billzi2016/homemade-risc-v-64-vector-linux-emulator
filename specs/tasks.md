@@ -306,15 +306,18 @@
   - [x] **VIO-004A** 实现 16 位模 2^16 索引差值和 `0xFFFF -> 0x0000` 回绕。
   - [x] **VIO-004B** 区分单调回绕索引与通过 queue size 计算的 ring 槽位。
   - [x] **VIO-004C** 检测驱动一次公布的未处理条目数超过队列容量。
-  - [ ] **VIO-004D** 按规范顺序读取 descriptor 内容并观察 available idx。
+  - [x] **VIO-004D** 按规范顺序读取 descriptor 内容并观察 available idx。
   - [x] **VIO-004E** 先写 used element，再以正确可见性发布 used idx。
   - [x] **VIO-004F** 实现通知抑制，并仅在协商后实现 `EVENT_IDX` 回绕判断。
-  - [ ] **VIO-004G** 在设备复位时隔离队列代际，禁止旧请求提交到新队列。
+  - [x] **VIO-004G** 在设备复位时隔离队列代际，禁止旧请求提交到新队列。
   - [ ] **VIO-004H** 让真实块和网络请求持续跨越至少一次完整 16 位索引回绕。
   - 已验证结果：公共 `VirtqueueRuntimeState` 覆盖 idx 差值、槽位计算、pending 超容量拒绝、
     available head 消费、used element 与 used idx 发布顺序、avail flags 通知抑制、
-    协商后 `EVENT_IDX` 回绕公式，以及 runtime reset 代际递增；descriptor-before-idx
-    的完整设备处理顺序和 transport 复位代际接线仍待真实请求处理层验证。
+    协商后 `EVENT_IDX` 回绕公式，以及 runtime reset 代际递增；VirtIO-Blk 专项测试验证
+    available head 选择描述符链，并验证 transport 复位后新队列不会被旧 `last_available_idx`
+    卡住。
+  - 验证命令：`cmake --build build --target rvemu_virtio_common_tests rvemu_virtio_block_tests --parallel`；
+    `./build/tests/rvemu_virtio_common_tests`；`./build/tests/rvemu_virtio_block_tests`。
   - 完成条件：以上子任务全部完成，长期压力测试无丢项、重复完成、越界或死锁。
 - [x] **BLK-001** 实现 VirtIO-Blk 请求头、IN/OUT、状态字节和只读策略。
   - 证据：`include/rvemu/devices/virtio_block.hpp`、`src/devices/virtio_block.cpp` 与

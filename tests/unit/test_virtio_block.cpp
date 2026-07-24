@@ -48,8 +48,8 @@ constexpr std::uint64_t kQueueDeviceHigh = 0x0A4U;
 class TempDisk final {
    public:
     TempDisk() {
-        std::array<char, 32> pattern{'r', 'v', 'e', 'm', 'u', '-', 'b', 'l', 'k', '-', 'X', 'X',
-                                     'X', 'X', 'X', 'X', '\0'};
+        std::array<char, 32> pattern{
+            'r', 'v', 'e', 'm', 'u', '-', 'b', 'l', 'k', '-', 'X', 'X', 'X', 'X', 'X', 'X', '\0'};
         fd_ = ::mkstemp(pattern.data());
         if (fd_ < 0) {
             throw std::runtime_error("创建小型临时磁盘失败");
@@ -142,14 +142,18 @@ class Fixture final {
     }
 
     void write_mem(std::uint64_t address, rvemu::bus::AccessWidth width, std::uint64_t value) {
-        if (!bus.write(rvemu::bus::PhysicalAddress{address}, width, value, rvemu::bus::AccessType::DmaWrite)
+        if (!bus.write(rvemu::bus::PhysicalAddress{address},
+                       width,
+                       value,
+                       rvemu::bus::AccessType::DmaWrite)
                  .ok()) {
             throw std::runtime_error("写 VirtIO-Blk 测试内存失败");
         }
     }
 
     [[nodiscard]] std::uint64_t read_mem(std::uint64_t address, rvemu::bus::AccessWidth width) {
-        return bus.read(rvemu::bus::PhysicalAddress{address}, width, rvemu::bus::AccessType::DmaRead)
+        return bus
+            .read(rvemu::bus::PhysicalAddress{address}, width, rvemu::bus::AccessType::DmaRead)
             .value;
     }
 
@@ -165,15 +169,23 @@ class Fixture final {
         write_mem(base + 14U, rvemu::bus::AccessWidth::HalfWord, next);
     }
 
-    void request(std::uint32_t type, std::uint64_t sector, bool data_write) {
+    void request_at(std::uint16_t head, std::uint32_t type, std::uint64_t sector, bool data_write) {
         write_mem(kHeader, rvemu::bus::AccessWidth::Word, type);
         write_mem(kHeader + 8U, rvemu::bus::AccessWidth::DoubleWord, sector);
-        descriptor(0U, kHeader, 16U, kDescNext, 1U);
-        descriptor(1U, kData, 512U, static_cast<std::uint16_t>(kDescNext | (data_write ? kDescWrite : 0U)), 2U);
+        descriptor(head, kHeader, 16U, kDescNext, 1U);
+        descriptor(1U,
+                   kData,
+                   512U,
+                   static_cast<std::uint16_t>(kDescNext | (data_write ? kDescWrite : 0U)),
+                   2U);
         descriptor(2U, kStatus, 1U, kDescWrite, 0U);
-        write_mem(kAvail + 4U, rvemu::bus::AccessWidth::HalfWord, 0U);
+        write_mem(kAvail + 4U, rvemu::bus::AccessWidth::HalfWord, head);
         write_mem(kAvail + 2U, rvemu::bus::AccessWidth::HalfWord, 1U);
         write_reg(kQueueNotify, 0U);
+    }
+
+    void request(std::uint32_t type, std::uint64_t sector, bool data_write) {
+        request_at(0U, type, sector, data_write);
     }
 
     TempDisk temp;
@@ -187,7 +199,8 @@ class Fixture final {
 void test_read_request(int& failures) {
     Fixture fixture;
     fixture.request(rvemu::devices::VirtioBlockDevice::kRequestIn, 0U, true);
-    expect(fixture.block.process_one(fixture.bus) == rvemu::devices::VirtioBlockProcessStatus::Completed,
+    expect(fixture.block.process_one(fixture.bus)
+               == rvemu::devices::VirtioBlockProcessStatus::Completed,
            "IN 请求必须完成",
            failures);
     expect(fixture.read_mem(kData, rvemu::bus::AccessWidth::Byte) == 0U
@@ -211,7 +224,8 @@ void test_write_request(int& failures) {
         fixture.write_mem(kData + offset, rvemu::bus::AccessWidth::Byte, 0xA5U);
     }
     fixture.request(rvemu::devices::VirtioBlockDevice::kRequestOut, 1U, false);
-    expect(fixture.block.process_one(fixture.bus) == rvemu::devices::VirtioBlockProcessStatus::Completed,
+    expect(fixture.block.process_one(fixture.bus)
+               == rvemu::devices::VirtioBlockProcessStatus::Completed,
            "OUT 请求必须完成",
            failures);
     std::vector<std::uint8_t> sector(512U);
@@ -227,12 +241,47 @@ void test_write_request(int& failures) {
 void test_out_of_range_reports_ioerr(int& failures) {
     Fixture fixture;
     fixture.request(rvemu::devices::VirtioBlockDevice::kRequestIn, 2U, true);
-    expect(fixture.block.process_one(fixture.bus) == rvemu::devices::VirtioBlockProcessStatus::Completed,
+    expect(fixture.block.process_one(fixture.bus)
+               == rvemu::devices::VirtioBlockProcessStatus::Completed,
            "越界 IN 请求也必须以错误 status 完成",
            failures);
     expect(fixture.read_mem(kStatus, rvemu::bus::AccessWidth::Byte)
                == rvemu::devices::VirtioBlockDevice::kStatusIoError,
            "越界请求 status 必须为 IOERR",
+           failures);
+}
+
+void test_available_head_selects_descriptor_chain(int& failures) {
+    Fixture fixture;
+    fixture.descriptor(0U, kHeader, 16U, 0U, 0U);
+    fixture.request_at(3U, rvemu::devices::VirtioBlockDevice::kRequestIn, 0U, true);
+    expect(fixture.block.process_one(fixture.bus)
+               == rvemu::devices::VirtioBlockProcessStatus::Completed,
+           "设备必须按 available ring head 选择描述符链",
+           failures);
+    expect(fixture.read_mem(kStatus, rvemu::bus::AccessWidth::Byte)
+               == rvemu::devices::VirtioBlockDevice::kStatusOk,
+           "available head 指向的请求必须完成为 OK",
+           failures);
+    expect(fixture.read_mem(kUsed + 4U, rvemu::bus::AccessWidth::Word) == 3U,
+           "used element id 必须回写 available head，而不是 descriptor0",
+           failures);
+}
+
+void test_transport_reset_isolates_old_queue_runtime(int& failures) {
+    Fixture fixture;
+    fixture.request(rvemu::devices::VirtioBlockDevice::kRequestIn, 0U, true);
+    expect(fixture.block.process_one(fixture.bus)
+               == rvemu::devices::VirtioBlockProcessStatus::Completed,
+           "复位前请求必须先完成",
+           failures);
+
+    fixture.write_reg(kStatusReg, 0U);
+    fixture.configure_transport();
+    fixture.request(rvemu::devices::VirtioBlockDevice::kRequestIn, 0U, true);
+    expect(fixture.block.process_one(fixture.bus)
+               == rvemu::devices::VirtioBlockProcessStatus::Completed,
+           "transport 复位后的新队列请求不得被旧 last_available_idx 卡住",
            failures);
 }
 
@@ -244,6 +293,8 @@ int main() {
         test_read_request(failures);
         test_write_request(failures);
         test_out_of_range_reports_ioerr(failures);
+        test_available_head_selects_descriptor_chain(failures);
+        test_transport_reset_isolates_old_queue_runtime(failures);
     } catch (const std::exception& exception) {
         std::cerr << "VirtIO-Blk 测试基础设施失败：" << exception.what() << '\n';
         return 1;

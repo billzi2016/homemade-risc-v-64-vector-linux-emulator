@@ -18,8 +18,8 @@ namespace {
 [[nodiscard]] bool sector_range_valid(std::uint64_t sector,
                                       std::uint64_t byte_count,
                                       std::uint64_t capacity_sectors) noexcept {
-    const auto sector_count = (byte_count + platform::DiskBackend::kSectorSize - 1U)
-                              / platform::DiskBackend::kSectorSize;
+    const auto sector_count =
+        (byte_count + platform::DiskBackend::kSectorSize - 1U) / platform::DiskBackend::kSectorSize;
     return !add_overflows(sector, sector_count) && sector + sector_count <= capacity_sectors;
 }
 
@@ -27,7 +27,7 @@ namespace {
 
 VirtioBlockDevice::VirtioBlockDevice(VirtioMmioTransport& transport,
                                      platform::DiskBackend& disk) noexcept
-    : transport_(transport), disk_(disk) {
+    : transport_(transport), disk_(disk), observed_transport_generation_(transport.generation()) {
 }
 
 bool VirtioBlockDevice::read_header(bus::Bus& bus,
@@ -91,7 +91,17 @@ bool VirtioBlockDevice::write_status(bus::Bus& bus,
     if (!segment.device_writes || segment.length < 1U) {
         return false;
     }
-    return bus.write(segment.address, bus::AccessWidth::Byte, status, bus::AccessType::DmaWrite).ok();
+    return bus.write(segment.address, bus::AccessWidth::Byte, status, bus::AccessType::DmaWrite)
+        .ok();
+}
+
+void VirtioBlockDevice::synchronize_queue_generation() {
+    const auto current_generation = transport_.generation();
+    if (current_generation == observed_transport_generation_) {
+        return;
+    }
+    observed_transport_generation_ = current_generation;
+    queue_runtime_.reset();
 }
 
 VirtioBlockProcessStatus VirtioBlockDevice::process_one(bus::Bus& bus) {
@@ -100,6 +110,7 @@ VirtioBlockProcessStatus VirtioBlockDevice::process_one(bus::Bus& bus) {
         return VirtioBlockProcessStatus::NoNotification;
     }
     const auto layout = transport_.queue_layout(queue_index);
+    synchronize_queue_generation();
     const auto available = queue_runtime_.consume_available(bus, layout);
     if (!available.ok() || available.pending_count == 0U) {
         return VirtioBlockProcessStatus::QueueError;
@@ -147,12 +158,13 @@ VirtioBlockProcessStatus VirtioBlockDevice::process_one(bus::Bus& bus) {
             } else {
                 status = disk_.read(header.sector, data).ok() ? kStatusOk : kStatusIoError;
                 std::size_t offset = 0U;
-                for (std::size_t index = 1U; status == kStatusOk && index + 1U < parsed.segments.size();
+                for (std::size_t index = 1U;
+                     status == kStatusOk && index + 1U < parsed.segments.size();
                      ++index) {
                     const auto length = parsed.segments[index].length;
-                    const std::vector<std::uint8_t> part(data.begin() + static_cast<std::ptrdiff_t>(offset),
-                                                         data.begin()
-                                                             + static_cast<std::ptrdiff_t>(offset + length));
+                    const std::vector<std::uint8_t> part(
+                        data.begin() + static_cast<std::ptrdiff_t>(offset),
+                        data.begin() + static_cast<std::ptrdiff_t>(offset + length));
                     if (!copy_to_guest(bus, parsed.segments[index], part)) {
                         status = kStatusIoError;
                     }
